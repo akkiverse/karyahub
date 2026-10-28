@@ -1,10 +1,10 @@
 # CR-0001: First version (MVP demo prototype)
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (board notes)
 - **Date:** 2026-10-28
-- **Release:** not yet released
-- **Pull request:** to be opened from `cr/0001-mvp`
+- **Release:** v0.1.0 (2026-10-28)
+- **Pull request:** [#1](https://github.com/akkiverse/karyahub/pull/1)
 
 ## Why
 The founder approved the build of KaryaHub's demo prototype on the Idea Studio board. The founder's notes ask for "a basic prototype to display to the client or vendor with dummy data and processing" that "can explain what problem it will be resolving", and say the real product depends on the WhatsApp Business Cloud API, a speech-to-text service and an LLM, which need accounts and keys the team cannot create. So the MVP is a web demo that simulates the WhatsApp conversation, with every outside service behind an adapter that returns mock responses.

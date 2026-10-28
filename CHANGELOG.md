@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-28
+
 ### Added
 - First version (MVP), a key-free demo prototype built from the approved spec. See [CR-0001](docs/changes/CR-0001-mvp.md).
   - Home explains the problem and shows the money at stake in the next 90 days.

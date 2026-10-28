@@ -55,4 +55,4 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
-Not yet released.
+- v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.

@@ -137,7 +137,7 @@ export function mountApp(root, options = {}) {
     const nearBottom = thread ? thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120 : true;
     const oldTop = thread ? thread.scrollTop : 0;
     if (!me) {
-      root.innerHTML = `<main id="main" class="auth-main">${signIn({ state, ui })}<footer class="site-foot auth-site-foot"><a href="${HUB_URL}">Part of Idea Studio by AkkiVerse</a><span>Sample data only.</span></footer></main>`;
+      root.innerHTML = `<main id="main" class="auth-main">${signIn({ state, ui, hubUrl: HUB_URL })}</main>`;
     } else {
       const allow = (perm) => can(me.role, perm);
       const props = { state, ui, params: route.params || {}, busy: actions.isBusy(), me, allow };

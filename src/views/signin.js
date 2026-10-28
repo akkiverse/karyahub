@@ -8,7 +8,7 @@ const POINTS = [
   ['renewals', 'Every AMC renewal followed up', 'See the money at stake and remind customers before contracts lapse.'],
 ];
 
-export function signIn({ state, ui }) {
+export function signIn({ state, ui, hubUrl = '' }) {
   const f = ui.signin || {};
   const demo = (state.staff || []).filter((s) => DEMO_PINS[s.id] && s.active);
   return `
@@ -45,6 +45,7 @@ export function signIn({ state, ui }) {
           <span class="demo-account-main"><strong>${escapeHtml(s.name)}</strong><span class="muted small">${escapeHtml(roleName(s.role))} · ${escapeHtml(prettyPhone(s.phone))} · PIN ${DEMO_PINS[s.id]}</span></span>
           ${icon('arrowRight', { size: 18 })}</button></li>`).join('')}</ul>
       </div>` : ''}
+      <footer class="site-foot auth-site-foot"><a href="${hubUrl}">Part of Idea Studio by AkkiVerse</a><span>Sample data only.</span></footer>
     </section>
   </div>`;
 }

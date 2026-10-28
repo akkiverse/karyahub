@@ -1,12 +1,12 @@
 # KaryaHub: Test report
 
-**Run:** 2026-10-28 · **Branch:** `cr/0002-advance-tech` (CR-0002 and CR-0003) · **Result:** 75 of 75 acceptance tests passing, covering all 65 acceptance criteria · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 23 kB JS and 7 kB CSS gzipped)
+**Run:** 2026-10-28 · **Branch:** `cr/0004-studio-ai` (CR-0004) · **Result:** 87 of 87 acceptance tests passing, covering all 77 acceptance criteria · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 31 kB JS and 10 kB CSS gzipped)
 
-Since CR-0003 every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in or another role.
+Since CR-0003 every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in or another role. Since CR-0004 no test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport` (an autouse fixture clears every `AI_*` setting first), and Vitest uses the fake API and a stubbed `fetch`.
 
 Two suites:
-- **Web app:** 55 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js` standing in for the server (it records calls and can act unreachable). AC-2.2 runs with the real step timing under fake timers.
-- **Server:** 20 tests with pytest and FastAPI's test client against `backend/karyahub` in mock mode (live-mode tests set `KARYAHUB_MODE=live` with no keys).
+- **Web app:** 61 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js` standing in for the server (it records calls and can act unreachable). AC-2.2 runs with the real step timing under fake timers.
+- **Server:** 26 tests with pytest and FastAPI's test client against `backend/karyahub` in mock mode (live-mode tests set `KARYAHUB_MODE=live` with no keys; Studio AI tests set `AI_ENDPOINTS` to a mocked server).
 
 Some criteria have a test on each side (for example AC-7.2: the web app calls the API, and the server returns the AC-3.2 fields).
 
@@ -90,6 +90,18 @@ Some criteria have a test on each side (for example AC-7.2: the web app calls th
 | AC-16.1 | `tests/us16-look.test.js` › AC-16.1: Home shows a "Today at" row with jobs, waiting checks, renewals in 30 days with money, and paperwork, from the data | Pass |
 | AC-16.2 | `tests/us16-look.test.js` › AC-16.2: every signed-in screen shows the business and who is signed in, with Sign out | Pass |
 
+| AC-17.1 | `tests/api/test_us17_studio_ai.py` › test_ac_17_1_without_ai_settings_the_demo_reader_is_used | Pass |
+| AC-17.2 | `tests/api/test_us17_studio_ai.py` › test_ac_17_2_ai_reads_the_job_with_a_json_schema | Pass |
+| AC-17.3 | `tests/api/test_us17_studio_ai.py` › test_ac_17_3_no_customer_name_keeps_the_ask_for_a_name_behaviour | Pass |
+| AC-17.4 | `tests/api/test_us17_studio_ai.py` › test_ac_17_4_ai_answers_are_validated_and_bad_ones_fall_back | Pass |
+| AC-17.5 | `tests/api/test_us17_studio_ai.py` › test_ac_17_5_ai_reads_the_job_sheet_photo | Pass |
+| AC-17.6 | `tests/api/test_us17_studio_ai.py` › test_ac_17_6_ai_offline_falls_back_and_everything_else_works | Pass |
+| AC-17.7 | `tests/us17-studio-ai.test.js` › AC-17.7: a message read by Studio AI says so on the processing steps and the job card | Pass |
+| AC-17.8 | `tests/us17-studio-ai.test.js` › AC-17.8: when AI is offline the message is read without AI, clearly labelled, and still becomes a draft | Pass |
+| AC-17.9 | `tests/us17-studio-ai.test.js` › AC-17.9: the job sheet photo is sent to the server as an image for Studio AI to read | Pass |
+| AC-17.10 | `tests/us17-studio-ai.test.js` › AC-17.10: if the AI server is offline and a photo can't be read, the message stays with Try again, and the offline banner shows | Pass |
+| AC-17.11 | `tests/us17-studio-ai.test.js` › AC-17.11: the offline banner follows /api/ai/status and stays quiet when AI isn't set up | Pass |
+| AC-17.12 | `tests/us17-studio-ai.test.js` › AC-17.12: chat saved by v0.2.0 (cards without a reader) still shows and approves as before | Pass |
 
 ## Design checklist
 | Check | Result |
@@ -106,6 +118,8 @@ Some criteria have a test on each side (for example AC-7.2: the web app calls th
 | Motion: one entrance moment plus action feedback | Yes: processing steps ticking to green; sheet rises; voice-note waveform while playing |
 
 ## Visual check
+**CR-0004:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`) and `AI_ENDPOINTS` pointing at a local stand-in for the Ollama server, driven by Playwright in Chromium. Flow: sign in as the owner, Chat, send the job-sheet photo. With AI online, the photo reached the AI as an 80 kB JPEG drawn from the sheet, both steps said "Read by Studio AI (KaryaHub server)" and the card showed "Read by AI" with Sunil Patil's job. With the AI server off (a second server whose `AI_ENDPOINTS` answers nothing), both steps said "Read without AI (KaryaHub server)", the processing note and the banner showed, and the card showed "Read without AI" with the draft ready to approve. Checked at 375px and 1280px in light and dark: no console errors, page width equals the viewport. No fixes were needed.
+
 **CR-0003:** the production build served by `vite preview`, driven by Playwright in Chromium at 375px and 1280px in light and dark: Sign in (desktop split screen and phone), sign in as the owner, Home with the "Today at" row, Jobs, Admin (full page), then a technician's Chat and the no-access page for Renewals. Page width equals the viewport on every screen. Fixes made after looking: the footer overlapped the last demo account on the desktop sign-in page (moved into the form column); the no-access heading was grey and oversized (now ink colour, 1.4rem); avatar initials were low-contrast on the lighter dark-theme colours (dark text in dark theme). Also removed the focus box drawn around page headings when focus moves to them by script (keyboard focus still shows).
 
 **CR-0002:** the production build served by `vite preview` with `/api` proxied to `uv run uvicorn api.index:app` (the real server, mock mode), driven by Playwright in Chromium at 375px and 1280px wide in light and dark: Chat (voice note, steps say "KaryaHub server"), Approve, job screen with Proof of work and AMC service visits, Send code, enter the code, Verify, Close, and Settings (connected to API v0.2.0). No console errors; page width equals the viewport on every screen. Fix made after looking: the third mode radio button shrank when its label wrapped on phones; radios no longer shrink.
@@ -120,3 +134,4 @@ Fixes made after looking at the screenshots:
 ## Releases
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.
+- CR-0004 in review: 87 of 87 acceptance tests passing.

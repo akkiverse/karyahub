@@ -85,11 +85,13 @@ Server (stateless): Tenant configuration (`tenancy.py`); everything else is comp
 | WhatsApp Cloud API: incoming | `POST /api/v1/whatsapp/webhook` | Works with demo secrets in mock mode | Meta business verification, a number, `KARYAHUB_WHATSAPP_APP_SECRET`, `KARYAHUB_WHATSAPP_VERIFY_TOKEN`; register the webhook URL |
 | WhatsApp Cloud API: outgoing | `adapters/whatsapp.py` (`send`) | Mock: records a simulated send | `KARYAHUB_WHATSAPP_ACCESS_TOKEN`, approved utility templates, build the live adapter |
 | Speech-to-text | `adapters/speech.py` (`transcribe`) | Mock: sample transcript | `KARYAHUB_SPEECH_API_KEY`, build the live adapter (media download from Meta, then the speech API) |
-| LLM | `adapters/llm.py` (`extract_job`, `read_image`) | Mock: sample answers, heuristic parser | `KARYAHUB_LLM_API_KEY`, a vision-capable model, build the live adapter |
+| LLM | `adapters/llm.py` (`extract_job`, `read_image`): `StudioAiLlm` (CR-0004), `MockLlm`, `LiveLlm` | Studio AI (`qwen3.5:9b` on the founder's Ollama server, through `studio_ai.py`) when `AI_ENDPOINTS` is set; otherwise mock. Offline or unusable answers fall back to the quick reader, labelled "Read without AI" | Link the shared `AI_ENDPOINTS` and `AI_GATEWAY_KEY` variables to the karyahub Vercel project |
 | Customer codes | `domain/otp.py` | Demo secret, code shown on screen | `KARYAHUB_OTP_SECRET`, live WhatsApp sending |
 
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.
+
+**Reading with Studio AI (CR-0004):** Chat → API `read-image` (photo as JPEG) and/or `extract` → `StudioAiLlm` → `studio_ai.chat` (first AI server that answers; 40 seconds) → Pydantic-checked job → draft card tagged "Read by AI". If no AI server answers: quick reader → draft tagged "Read without AI" with a note, and the banner (polling `/api/ai/status` every minute) says AI is offline.
 
 **Proof of work:** Job → Send code → API `request_otp` (code bound to job and tenant, 10 minutes) → enter code → API `verify_otp` → Verified → Close → Closed; each step appended to the job's history with an idempotent operation id.
 
@@ -115,3 +117,4 @@ See [../adr/](../adr/):
 - [ADR-0008](../adr/0008-customer-otp-proof.md) customer codes (CR-0002)
 - [ADR-0009](../adr/0009-multi-tenant-ready.md) tenancy (CR-0002)
 - [ADR-0010](../adr/0010-demo-sign-in-and-roles.md) demo sign-in and one shared role table (CR-0003)
+- [ADR-0011](../adr/0011-studio-ai-for-the-llm.md) Studio AI for the LLM, with the quick reader as the offline fallback (CR-0004)

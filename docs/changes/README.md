@@ -4,4 +4,4 @@ Every change to KaryaHub is recorded here: what changed, why, and how it affecte
 
 | CR | Change | Why (short) | Status | Release |
 |---|---|---|---|---|
-| [CR-0001](CR-0001-mvp.md) | First version (MVP) | Approved idea, built from the spec | In progress | Not yet released |
+| [CR-0001](CR-0001-mvp.md) | First version (MVP) | Approved idea, built from the spec | Released | v0.1.0 |

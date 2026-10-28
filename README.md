@@ -13,9 +13,9 @@ KaryaHub is a demo prototype for AMC (annual maintenance contract) service firms
 
 | | |
 |---|---|
-| Stage | Building the MVP (CR-0001) |
-| Acceptance tests | 0 of 0 passing ([report](docs/quality/TEST-REPORT.md)) |
-| Latest change | [CR-0001](docs/changes/CR-0001-mvp.md): first version (MVP) |
+| Stage | MVP in review (CR-0001), not yet released |
+| Acceptance tests | 23 of 23 passing ([report](docs/quality/TEST-REPORT.md)) |
+| Latest change | [CR-0001](docs/changes/CR-0001-mvp.md): first version (MVP), in review |
 
 ## Run it locally
 

@@ -1,6 +1,6 @@
 # CR-0001: First version (MVP demo prototype)
 
-- **Status:** In progress
+- **Status:** In review
 - **Requested by:** Founder (board notes)
 - **Date:** 2026-10-28
 - **Release:** not yet released
@@ -28,10 +28,12 @@ A new mobile-first web app with five screens (Home, Chat, Jobs, Renewals, Settin
 | AC-6.1 to AC-6.4 | Added |
 
 ## Architecture impact
-New codebase. Decisions: ADR-0001 (spec-driven development), plus the ADRs written during the build for the stack, storage and adapters.
+New codebase, described in [ARCHITECTURE.md](../architecture/ARCHITECTURE.md). Decisions: [ADR-0001](../adr/0001-spec-driven-development.md) (spec-driven development), [ADR-0002](../adr/0002-vanilla-js-and-vite.md) (plain JavaScript, Vite and Vitest), [ADR-0003](../adr/0003-browser-storage-demo-data.md) (browser storage and a fixed demo date), [ADR-0004](../adr/0004-service-adapters-with-mocks.md) (service adapters with mock and live implementations).
 
 ## Verification
-To be filled when the build is tested.
+23 acceptance tests, one per criterion (AC-1.1 to AC-6.4), all passing on commit 774b7d7; production build passes. Visual check at 375px and 1280px in light and dark themes with headless Chromium. See [TEST-REPORT.md](../quality/TEST-REPORT.md).
 
 ## Notes
 Open questions from the spec were answered with the analyst's recommended defaults: AC service as the demo vertical, a dummy firm called "CoolCare AC Services", and English reminder text. The founder can change any of these with a change request.
+
+The demo runs on a fixed date (1 Jan 2027) so the renewals story is the same in every pitch. Approving a job also creates or updates the customer, so its AMC appears in Renewals and in the Home total. Free text typed in Chat is read by a simple pattern-matching mock, so it understands messages that name a customer (for example "Gas refill for Mr Anil Kumar, 9900000150, charge 2500"); the real LLM will be far more flexible.

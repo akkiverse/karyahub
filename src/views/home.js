@@ -5,7 +5,7 @@ import { today } from '../clock.js';
 
 export const HEADLINE = 'Never miss an AMC renewal again';
 
-export function home({ state }) {
+export function home({ state, me }) {
   const t = today();
   const due90 = dueWithin(state.customers, t, 90);
   const total = moneyAtStake(due90);
@@ -38,6 +38,16 @@ export function home({ state }) {
         .join('')}</ul>` : ''}
       <a class="link-arrow" href="#/renewals">See all renewals ${icon('arrowRight', { size: 16 })}</a>
     </article>
+
+    <section class="today" aria-labelledby="today-title" data-testid="today-kpis">
+      <div class="panel-head"><h2 class="section-title" id="today-title">${me ? `Good to see you, ${escapeHtml(me.name.split(' ')[0])}. ` : ''}Today at ${escapeHtml(state.settings.business_name)}</h2><span class="muted small">Sample data</span></div>
+      <ul class="kpis">
+        <li class="kpi"><span class="kpi-label">${icon('jobs', { size: 16 })} Jobs recorded</span><span class="kpi-value" data-kpi="jobs">${state.jobs.length}</span><a class="kpi-sub" href="#/jobs">Open jobs</a></li>
+        <li class="kpi"><span class="kpi-label">${icon('shield', { size: 16 })} Waiting for customer check</span><span class="kpi-value" data-kpi="waiting">${state.jobs.filter((j) => (j.state || 'WORK_DONE') === 'WORK_DONE').length}</span><span class="kpi-sub muted">Proof of work pending</span></li>
+        <li class="kpi"><span class="kpi-label">${icon('renewals', { size: 16 })} Renewals in 30 days</span><span class="kpi-value" data-kpi="due30">${dueWithin(state.customers, t, 30).length}</span><span class="kpi-sub money">${rupees(buckets[0].value)} at stake</span></li>
+        <li class="kpi"><span class="kpi-label">${icon('file', { size: 16 })} Quotes and invoices</span><span class="kpi-value" data-kpi="docs">${state.documents.length}</span><span class="kpi-sub muted">Sent on WhatsApp (simulated)</span></li>
+      </ul>
+    </section>
 
     <h2 class="section-title">What goes wrong today</h2>
     <ul class="problems" data-testid="problem-cards">

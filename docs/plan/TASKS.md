@@ -1,22 +1,17 @@
 # KaryaHub: Tasks
 
-For CR-0001. Each task names the stories and criteria it serves.
+For CR-0003 (business look, Admin panel and staff logins), built on the CR-0002 branch. Each task names the stories and criteria it serves. (Earlier tasks are in the git history of this file.)
 
 | # | Task | Serves | Done |
 |---|---|---|---|
-| 1 | Bootstrap repo from the Idea Studio template; fill README, BRIEF, SPEC, ADR-0001, CR-0001, CHANGELOG, studio.json | All | Yes |
-| 2 | Create the Vercel project `karyahub` (no deploy), framework Vite, protection for previews, domain `karyahub-akkiverse.vercel.app` | All | Yes |
-| 3 | Vite + Vitest set-up, CI workflow, PR template | All | Yes |
-| 4 | Demo data: business, 12 customers, 3 samples, drawn job sheet | US-1, US-2, US-5 | Yes |
-| 5 | Adapters with mock and live implementations and one mode switch | US-6 (AC-6.1, AC-6.2) | Yes |
-| 6 | Store with localStorage and Reset demo | US-6 (AC-6.4) | Yes |
-| 7 | Home: headline, problem cards, money at stake meter | US-1 (AC-1.1 to AC-1.3) | Yes |
-| 8 | Chat: phone frame, samples, composer, voice and image bubbles | US-2 (AC-2.1 to AC-2.4) | Yes |
-| 9 | Processing pipeline and summary card with Edit and Approve; failure path | US-3 (AC-3.1 to AC-3.4) | Yes |
-| 10 | Jobs list and job detail | US-3 (AC-3.3), US-4 | Yes |
-| 11 | Documents: GST totals, watermark, print styles, simulated send | US-4 (AC-4.1 to AC-4.4) | Yes |
-| 12 | Renewals: filters, totals, lapsed label, reminder sheet | US-5 (AC-5.1 to AC-5.4) | Yes |
-| 13 | Settings: mode banner, services, Simulate failure, theme, Reset demo | US-6 (AC-6.2 to AC-6.4) | Yes |
-| 14 | Acceptance tests, one per criterion | All | Yes |
-| 15 | Visual check at 375px and 1280px, light and dark; fixes | Design | Yes |
-| 16 | Records: architecture, design, test report, CR, changelog | All | Yes |
+| 1 | Role table, permissions, route and action rules, guards, PIN hashing (`src/domain/access.js`) | US-13, US-14, US-15 | Yes |
+| 2 | Session on the device; sign-in, sign-out and Admin actions with the access log (`src/session.js`, `src/domain/team.js`) | US-13 (AC-13.2 to AC-13.6), US-15 | Yes |
+| 3 | Data version 3 with the demo team; migrations from v1 and v2; Reset demo keeps the team | AC-6.4, AC-11.1, AC-11.3 | Yes |
+| 4 | Sign-in screen with demo accounts | AC-13.1, AC-13.4 | Yes |
+| 5 | Shell: role-filtered sidebar and tabs, account menu, no-access page; hide paperwork and closing for technicians; name and role on job actions | US-14 (AC-14.1 to AC-14.4), AC-16.2 | Yes |
+| 6 | Admin panel: counts, team, role change, access on or off, Reset PIN, Add staff, roles table, access log | US-15 (AC-15.1 to AC-15.7) | Yes |
+| 7 | Business look: sidebar, top bar, KPI tiles, "Today at" row on Home, sign-in design, dark theme | US-16 (AC-16.1) | Yes |
+| 8 | Server: `access.py`, `GET /api/v1/access/roles`, role check on job actions | AC-14.5 | Yes |
+| 9 | Tests: Vitest for US-13 to US-16, AC-6.4 and AC-11.3; pytest for AC-14.5; test helper signs in as the owner | All | Yes |
+| 10 | Visual check at 375px and 1280px, light and dark; fixes | Design | Yes |
+| 11 | CR-0003, ADR-0010, SPEC, DESIGN, ARCHITECTURE, RISKS, PLAN, TEST-REPORT, CHANGELOG, README, studio.json | Records | Yes |

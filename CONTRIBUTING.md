@@ -5,10 +5,10 @@ Changes can be made two ways. Both follow the same spec-driven rules, so the doc
 ## The rules
 
 1. **Spec first.** If a change alters what the product does, update [docs/spec/SPEC.md](docs/spec/SPEC.md) before (or in the same pull request as) the code. Add new acceptance criteria with the next free ID; never reuse an ID. Mark removed criteria as `Retired in CR-xxxx` rather than deleting them.
-2. **One test per acceptance criterion.** Name it with the ID, for example `it("AC-2.1: rejects an invalid GSTIN", ...)`.
+2. **One test per acceptance criterion.** Name it with the ID: in the web app `it("AC-2.1: rejects an invalid GSTIN", ...)`; on the server `def test_ac_2_1_rejects_invalid_gstin():` with `"""AC-2.1: ..."""` as the docstring.
 3. **Record why.** Every change gets a change request in [docs/changes/](docs/changes/) using the template. Significant technical choices also get an ADR in [docs/adr/](docs/adr/).
 4. **Keep the trail.** Add an entry to [CHANGELOG.md](CHANGELOG.md) under `Unreleased`, and update [docs/quality/TEST-REPORT.md](docs/quality/TEST-REPORT.md).
-5. **Green before merge.** CI runs `npm test` and `npm run build` on every push and pull request.
+5. **Green before merge.** CI runs Ruff and `pytest` for the server, and `npm test` and `npm run build` for the web app, on every push and pull request.
 
 ## Making a change by hand
 

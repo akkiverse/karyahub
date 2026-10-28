@@ -11,7 +11,7 @@ let t;
 afterEach(() => t?.app.unmount());
 
 describe('US-6 Adapters and demo mode', () => {
-  it('AC-6.1: src/adapters has whatsapp, speech and llm modules with mock and live implementations of one interface, chosen by one config value defaulting to "mock"', () => {
+  it('AC-6.1: src/adapters has whatsapp, speech and llm modules with mock, live and server implementations of one interface, chosen by one config value defaulting to "server"', () => {
     for (const f of ['whatsapp', 'speech', 'llm']) expect(existsSync(`src/adapters/${f}.js`)).toBe(true);
     expect(typeof whatsapp.mockWhatsApp.sendMessage).toBe('function');
     expect(typeof whatsapp.liveWhatsApp.sendMessage).toBe('function');
@@ -19,10 +19,13 @@ describe('US-6 Adapters and demo mode', () => {
     expect(typeof speech.liveSpeech.transcribe).toBe('function');
     expect(typeof llm.mockLlm.extractJob).toBe('function');
     expect(typeof llm.liveLlm.extractJob).toBe('function');
-    expect(DEFAULT_MODE).toBe('mock');
+    expect(existsSync('src/adapters/server.js')).toBe(true);
+    expect(DEFAULT_MODE).toBe('server');
     const d = getAdapters();
-    expect(d.mode).toBe('mock');
-    expect([d.whatsapp, d.speech, d.llm]).toEqual([whatsapp.mockWhatsApp, speech.mockSpeech, llm.mockLlm]);
+    expect(d.mode).toBe('server');
+    expect([typeof d.speech.transcribe, typeof d.llm.extractJob, typeof d.llm.readImage, typeof d.whatsapp.sendMessage]).toEqual(['function', 'function', 'function', 'function']);
+    const m = getAdapters('mock');
+    expect([m.whatsapp, m.speech, m.llm]).toEqual([whatsapp.mockWhatsApp, speech.mockSpeech, llm.mockLlm]);
     const l = getAdapters('live');
     expect([l.whatsapp, l.speech, l.llm]).toEqual([whatsapp.liveWhatsApp, speech.liveSpeech, llm.liveLlm]);
   });
@@ -45,8 +48,11 @@ describe('US-6 Adapters and demo mode', () => {
     expect(t.$('[data-testid="reminder-sheet"]').textContent).toContain('Not configured: add WhatsApp key');
   });
 
-  it('AC-6.3: Settings shows "Demo mode: mock responses" and three services with status Mock and the key each needs', () => {
+  it('AC-6.3: in the in-browser mode, Settings shows "Demo mode: mock responses" and three services with status Mock and the key each needs', () => {
     t = setup({ hash: '#/settings' });
+    const mock = t.$('input[data-action="set-mode"][value="mock"]');
+    mock.checked = true;
+    mock.dispatchEvent(new Event('change', { bubbles: true }));
     expect(t.$('[data-testid="mode-banner"]').textContent).toContain('Demo mode: mock responses');
     const rows = t.$$('[data-testid="services"] .service');
     expect(rows).toHaveLength(3);
@@ -75,4 +81,15 @@ describe('US-6 Adapters and demo mode', () => {
     t.go('#/jobs');
     expect(t.$('[data-testid="jobs-empty"]').textContent).toContain('No jobs yet, send a sample in Chat');
   });
+
+  it('AC-6.4 (changed CR-0003): Reset demo keeps the team, their PINs and the access log, and keeps you signed in', () => {
+    t = setup({ hash: '#/settings' });
+    t.app.store.update((s) => { s.staff[1].role = 'technician'; s.access_log.unshift({ id: 'log-x', at: '2027-01-01T09:00:00', who: 'Akash Mehta', text: 'Changed something' }); });
+    t.click('[data-action="reset"]');
+    const s = t.app.store.get();
+    expect(s.staff[1].role).toBe('technician');
+    expect(s.access_log[0].id).toBe('log-x');
+    expect(t.$('[data-testid="account-menu"]')).toBeTruthy();
+  });
 });
+

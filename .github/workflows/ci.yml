@@ -1,17 +1,43 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
+
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      # Python back end (every tier except "no back end")
+      - name: Set up uv
+        if: hashFiles('pyproject.toml') != ''
+        uses: astral-sh/setup-uv@v6
+      - name: Install Python dependencies
+        if: hashFiles('pyproject.toml') != ''
+        run: uv sync --all-extras --dev
+      - name: Lint (Ruff)
+        if: hashFiles('pyproject.toml') != ''
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Python acceptance tests
+        if: hashFiles('pyproject.toml') != ''
+        run: uv run pytest -q
+
+      # JavaScript user interface (tier R, or no back end)
       - uses: actions/setup-node@v4
+        if: hashFiles('package.json') != ''
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Install UI dependencies
+        if: hashFiles('package.json') != ''
+        run: npm ci
+      - name: UI tests
+        if: hashFiles('package.json') != ''
+        run: npm test --if-present
+      - name: UI production build
+        if: hashFiles('package.json') != ''
+        run: npm run build

@@ -1,4 +1,5 @@
 import { demoState } from './data/demo.js';
+import { migrate } from './migrations.js';
 
 const KEY = 'karyahub.demo.v1';
 
@@ -6,8 +7,7 @@ function safeRead() {
   try {
     const raw = globalThis.localStorage?.getItem(KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && parsed.version === 1 ? parsed : null;
+    return migrate(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -33,9 +33,14 @@ export function createStore() {
       listeners.forEach((l) => l(state));
     },
     reset() {
-      const keep = state.settings.theme;
+      // The team and its access log are the business's set-up, not demo activity: keep them (CR-0003).
+      const keep = { theme: state.settings.theme, staff: state.staff, access_log: state.access_log, staffSeq: state.seq.staff, logSeq: state.seq.log };
       state = demoState();
-      state.settings.theme = keep;
+      state.settings.theme = keep.theme;
+      if (keep.staff) state.staff = keep.staff;
+      if (keep.access_log) state.access_log = keep.access_log;
+      state.seq.staff = keep.staffSeq || 0;
+      state.seq.log = keep.logSeq || 0;
       safeWrite(state);
       listeners.forEach((l) => l(state));
     },

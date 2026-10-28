@@ -5,3 +5,10 @@ coverage/
 .DS_Store
 *.log
 screenshots/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

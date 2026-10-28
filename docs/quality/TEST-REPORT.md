@@ -1,8 +1,14 @@
 # KaryaHub: Test report
 
-**Run:** 2026-10-28 · **Commit:** 774b7d7 (branch `cr/0001-mvp`) · **Result:** 23 of 23 acceptance tests passing · **Build:** `npm run build` passed (Vite 8; about 18 kB JS and 7 kB CSS gzipped)
+**Run:** 2026-10-28 · **Branch:** `cr/0002-advance-tech` (CR-0002 and CR-0003) · **Result:** 75 of 75 acceptance tests passing, covering all 65 acceptance criteria · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 23 kB JS and 7 kB CSS gzipped)
 
-Tests run with Vitest 5 in jsdom, in mock mode, on the fixed demo date 2027-01-01, against the real app (`mountApp`). AC-2.2 runs with the real step timing under fake timers to prove the reply lands within 3 seconds.
+Since CR-0003 every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in or another role.
+
+Two suites:
+- **Web app:** 55 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js` standing in for the server (it records calls and can act unreachable). AC-2.2 runs with the real step timing under fake timers.
+- **Server:** 20 tests with pytest and FastAPI's test client against `backend/karyahub` in mock mode (live-mode tests set `KARYAHUB_MODE=live` with no keys).
+
+Some criteria have a test on each side (for example AC-7.2: the web app calls the API, and the server returns the AC-3.2 fields).
 
 ## Traceability: acceptance criteria to tests
 
@@ -27,10 +33,63 @@ Tests run with Vitest 5 in jsdom, in mock mode, on the fixed demo date 2027-01-0
 | AC-5.2 | `tests/us5-renewals.test.js` › AC-5.2: with the 90-day filter, Money at stake equals the sum of listed AMC values | Pass |
 | AC-5.3 | `tests/us5-renewals.test.js` › AC-5.3: a customer whose AMC expired before today appears under Lapsed with a red label | Pass |
 | AC-5.4 | `tests/us5-renewals.test.js` › AC-5.4: Send reminder previews the customer-side WhatsApp text and marks the customer "Reminded (demo)" | Pass |
-| AC-6.1 | `tests/us6-adapters.test.js` › AC-6.1: src/adapters has whatsapp, speech and llm modules with mock and live implementations of one interface, chosen by one config value defaulting to "mock" | Pass |
+| AC-6.1 | `tests/us6-adapters.test.js` › AC-6.1: src/adapters has whatsapp, speech and llm modules with mock, live and server implementations of one interface, chosen by one config value defaulting to "server" | Pass |
 | AC-6.2 | `tests/us6-adapters.test.js` › AC-6.2: in live mode with no key, a live adapter returns "Not configured: add <SERVICE> key" and the UI shows it without crashing | Pass |
-| AC-6.3 | `tests/us6-adapters.test.js` › AC-6.3: Settings shows "Demo mode: mock responses" and three services with status Mock and the key each needs | Pass |
+| AC-6.3 | `tests/us6-adapters.test.js` › AC-6.3: in the in-browser mode, Settings shows "Demo mode: mock responses" and three services with status Mock and the key each needs | Pass |
 | AC-6.4 | `tests/us6-adapters.test.js` › AC-6.4: Reset demo returns jobs, documents and reminder marks to the bundled demo data | Pass |
+| AC-6.4 | `tests/us6-adapters.test.js` › AC-6.4 (changed CR-0003): Reset demo keeps the team, their PINs and the access log, and keeps you signed in | Pass |
+| AC-7.1 | `tests/api/test_us7_server.py::test_ac_7_1_health_and_meta` (/api/health answers ok and /api/v1/meta lists the tenant, mode and three services.) | Pass |
+| AC-7.2 | `tests/us7-server.test.js` › AC-7.2: in server mode the Transcribe and Extract steps are answered by the KaryaHub API and say so | Pass |
+| AC-7.2 | `tests/api/test_us7_server.py::test_ac_7_2_pipeline_matches_the_demo_extraction` (transcribe and extract on the server give the AC-3.2 fields for the Ramesh sample.) | Pass |
+| AC-7.3 | `tests/us7-server.test.js` › AC-7.3: when the server cannot be reached, chat falls back to the in-browser demo and says so | Pass |
+| AC-7.4 | `tests/us7-server.test.js` › AC-7.4: the web app turns API errors into plain messages and unreachable servers into a clear error type | Pass |
+| AC-7.4 | `tests/api/test_us7_server.py::test_ac_7_4_errors_have_one_plain_shape` (errors are {"error": {"code", "message"}} with plain-English messages.) | Pass |
+| AC-7.5 | `tests/api/test_us7_server.py::test_ac_7_5_live_mode_without_keys_fails_closed` (in live mode with no keys, services answer 503 "Not configured: add <SERVICE> key".) | Pass |
+| AC-7.6 | `tests/us7-server.test.js` › AC-7.6: Settings in server mode shows the API version, business and each service status from the server with the server key it needs | Pass |
+| AC-8.1 | `tests/api/test_us8_webhook.py::test_ac_8_1_handshake_needs_the_verify_token` (GET echoes hub.challenge only for mode=subscribe with the right verify token; else 403.) | Pass |
+| AC-8.2 | `tests/api/test_us8_webhook.py::test_ac_8_2_signature_is_checked_before_anything_runs` (a missing or wrong X-Hub-Signature-256 gets 401 and nothing is processed.) | Pass |
+| AC-8.2 | `tests/api/test_us8_webhook.py::test_ac_8_2_live_mode_without_app_secret_refuses` (in live mode with no app secret configured, the webhook refuses with 503 (fails closed).) | Pass |
+| AC-8.3 | `tests/api/test_us8_webhook.py::test_ac_8_3_text_voice_and_photo_become_jobs_once` (text, voice and photo messages are processed; a repeated id is processed once; no phone echoed.) | Pass |
+| AC-9.1 | `tests/us9-proof-of-work.test.js` › AC-9.1: an approved job starts as "Work done, waiting for customer check" with who reported it, and the Jobs list shows its status | Pass |
+| AC-9.2 | `tests/us9-proof-of-work.test.js` › AC-9.2: Send code, enter the customer's code, then Close moves the job to Verified and Closed through the server | Pass |
+| AC-9.2 | `tests/api/test_us9_workflow.py::test_ac_9_2_code_then_verify_then_close` (a 6-digit code tied to the job verifies the work, then the job closes.) | Pass |
+| AC-9.3 | `tests/us9-proof-of-work.test.js` › AC-9.3: a wrong code shows "That code doesn't match or has expired. Send a new code." and the job stays unverified | Pass |
+| AC-9.3 | `tests/api/test_us9_workflow.py::test_ac_9_3_wrong_expired_or_other_job_codes_fail` (a wrong code, an expired code or another job's code is refused and the state stays.) | Pass |
+| AC-9.4 | `tests/api/test_us9_workflow.py::test_ac_9_4_actions_not_allowed_in_this_state_are_refused` (closing an unverified job (or any action not allowed in the state) gets 409.) | Pass |
+| AC-9.5 | `tests/api/test_us9_workflow.py::test_ac_9_5_the_same_operation_never_counts_twice` (a repeated client_op_id returns duplicate with no new event; event ids are deterministic.) | Pass |
+| AC-9.6 | `tests/us9-proof-of-work.test.js` › AC-9.6: if the server cannot be reached, proof-of-work steps explain it and nothing changes | Pass |
+| AC-10.1 | `tests/api/test_us10_amc.py::test_ac_10_1_visits_every_90_days_with_overdue_escalation` (a contract ending 2027-03-15 owes 4 visits; on 2027-01-01 the 2026-12-10 visit is overdue.) | Pass |
+| AC-10.2 | `tests/api/test_us10_amc.py::test_ac_10_2_jobs_are_created_lead_days_ahead_and_never_twice` (inside the lead time a visit says create the job now; a visit with a job is never listed again.) | Pass |
+| AC-10.3 | `tests/us10-visits.test.js` › AC-10.3: the job screen shows the AMC service visits from the server, with the next visit and its status | Pass |
+| AC-11.1 | `tests/us11-compat.test.js` › AC-11.1: data saved by v0.1.0 loads with jobs, documents, customers and settings kept, and jobs gain a workflow state | Pass |
+| AC-11.2 | `tests/api/test_us11_documents.py::test_ac_11_2_gst_totals_match_the_web_app` (server GST totals equal v0.1.0's (CGST 9% + SGST 9%, rupee rounding); inter-state uses IGST 18%.) | Pass |
+| AC-12.1 | `tests/api/test_us12_docs.py::test_ac_12_1_architecture_design_and_risks_are_written_down` (HLD, LLD, RISKS and REFERENCE-REVIEW exist with their key sections.) | Pass |
+| AC-11.3 | `tests/us11-compat.test.js` › AC-11.3: data saved by the 0.2.0 preview (version 2) loads with jobs and proof of work kept, and gains the demo team | Pass |
+| AC-13.1 | `tests/us13-signin.test.js` › AC-13.1: with nobody signed in, any address shows only the Sign-in screen with the demo accounts and their PINs | Pass |
+| AC-13.2 | `tests/us13-signin.test.js` › AC-13.2: the owner's number and PIN open Home with their name and role, and the sign-in is logged | Pass |
+| AC-13.3 | `tests/us13-signin.test.js` › AC-13.3: a wrong PIN or unknown number shows a plain error, stays on Sign in, and a wrong PIN for a known person is logged | Pass |
+| AC-13.4 | `tests/us13-signin.test.js` › AC-13.4: tapping a demo account fills in its number and PIN | Pass |
+| AC-13.5 | `tests/us13-signin.test.js` › AC-13.5: Sign out returns to Sign in with a message; the session survives a reload while signed in and not after signing out | Pass |
+| AC-13.6 | `tests/us13-signin.test.js` › AC-13.6: staff records keep only a salted SHA-256 hash of each PIN, never the PIN | Pass |
+| AC-14.1 | `tests/us14-roles.test.js` › AC-14.1: a technician lands on Chat, sees only Chat and Jobs, and job screens hide paperwork and closing | Pass |
+| AC-14.2 | `tests/us14-roles.test.js` › AC-14.2: a technician opening Home, Renewals, Settings, Admin or a document gets a plain no-access page and none of that screen's content | Pass |
+| AC-14.3 | `tests/us14-roles.test.js` › AC-14.3: an office coordinator works with Home, Chat, Jobs and Renewals, can make quotes and close jobs, but not Admin or Settings | Pass |
+| AC-14.4 | `tests/us14-roles.test.js` › AC-14.4: a technician's proof-of-work step tells the server who they are and their role, and the history names them | Pass |
+| AC-14.5 | `tests/us14-roles.test.js` › AC-14.5 (web side): the role table matches the server rules for every job action | Pass |
+| AC-14.5 | `tests/api/test_us14_access.py::test_ac_14_5_roles_endpoint_matches_web_app` (GET /api/v1/access/roles returns the same roles and permissions as the web app.) | Pass |
+| AC-14.5 | `tests/api/test_us14_access.py::test_ac_14_5_technician_cannot_close_a_job` (a technician closing a job gets 403 with a plain message, and nothing changes.) | Pass |
+| AC-14.5 | `tests/api/test_us14_access.py::test_ac_14_5_allowed_roles_and_system_calls_pass` (coordinators may close, technicians may send the customer code, and calls without a role still work.) | Pass |
+| AC-14.5 | `tests/api/test_us14_access.py::test_ac_14_5_unknown_role_is_refused` (a role the server does not know is refused rather than trusted.) | Pass |
+| AC-15.1 | `tests/us15-admin.test.js` › AC-15.1: Admin shows staff counts by role, the team, Add staff, the roles table and the access log | Pass |
+| AC-15.2 | `tests/us15-admin.test.js` › AC-15.2: a new technician is added, logged, and can sign in with technician access | Pass |
+| AC-15.3 | `tests/us15-admin.test.js` › AC-15.3: bad name, number or PIN each show their own message and nobody is added | Pass |
+| AC-15.4 | `tests/us15-admin.test.js` › AC-15.4: changing Priya's role to Technician changes what she can open and is logged | Pass |
+| AC-15.5 | `tests/us15-admin.test.js` › AC-15.5: turning off access blocks sign-in and ends that person's open session; turning it on restores it | Pass |
+| AC-15.6 | `tests/us15-admin.test.js` › AC-15.6: Reset PIN shows a new 4-digit PIN once; the old PIN stops working and the new one works | Pass |
+| AC-15.7 | `tests/us15-admin.test.js` › AC-15.7: owners cannot change their own role, turn off their own access, or remove the last active owner | Pass |
+| AC-16.1 | `tests/us16-look.test.js` › AC-16.1: Home shows a "Today at" row with jobs, waiting checks, renewals in 30 days with money, and paperwork, from the data | Pass |
+| AC-16.2 | `tests/us16-look.test.js` › AC-16.2: every signed-in screen shows the business and who is signed in, with Sign out | Pass |
+
 
 ## Design checklist
 | Check | Result |
@@ -40,14 +99,18 @@ Tests run with Vitest 5 in jsdom, in mock mode, on the fixed demo date 2027-01-0
 | Tap targets at least 44px | Yes: buttons, chips, tabs, radios and links have a 44px minimum height |
 | Semantic HTML, labelled fields, visible focus, contrast, reduced motion | Yes: landmarks (header, nav, main, footer), labelled inputs, `:focus-visible` outline, AA colour pairs, `prefers-reduced-motion` turns off animation |
 | Plain-English copy; sample data marked | Yes: "Demo" pill, "(demo)" and "(dummy)" labels, "Simulated: nothing was sent" |
-| Designed empty, loading and error states | Yes: see DESIGN.md > States |
+| Designed empty, loading and error states | Yes: see DESIGN.md > States and > Additions in CR-0002 (visit plan loading, server unreachable, wrong code) |
 | Favicon, title, meta description, Open Graph title and description, theme-color | Yes (`index.html`, `public/favicon.svg`) |
 | Inline SVG icons, no emoji | Yes (`src/ui/icons.js`) |
 | Footer link "Part of Idea Studio by AkkiVerse" to the hub | Yes |
 | Motion: one entrance moment plus action feedback | Yes: processing steps ticking to green; sheet rises; voice-note waveform while playing |
 
 ## Visual check
-Headless Chromium (Playwright) against `vite preview` of the production build. Screens: Home, Chat (after a voice note, a photo, edit mode and a simulated failure), Document (invoice), Renewals (with the reminder preview) and Settings, each at 375px and 1280px wide in light and dark. No console errors and no horizontal overflow.
+**CR-0003:** the production build served by `vite preview`, driven by Playwright in Chromium at 375px and 1280px in light and dark: Sign in (desktop split screen and phone), sign in as the owner, Home with the "Today at" row, Jobs, Admin (full page), then a technician's Chat and the no-access page for Renewals. Page width equals the viewport on every screen. Fixes made after looking: the footer overlapped the last demo account on the desktop sign-in page (moved into the form column); the no-access heading was grey and oversized (now ink colour, 1.4rem); avatar initials were low-contrast on the lighter dark-theme colours (dark text in dark theme). Also removed the focus box drawn around page headings when focus moves to them by script (keyboard focus still shows).
+
+**CR-0002:** the production build served by `vite preview` with `/api` proxied to `uv run uvicorn api.index:app` (the real server, mock mode), driven by Playwright in Chromium at 375px and 1280px wide in light and dark: Chat (voice note, steps say "KaryaHub server"), Approve, job screen with Proof of work and AMC service visits, Send code, enter the code, Verify, Close, and Settings (connected to API v0.2.0). No console errors; page width equals the viewport on every screen. Fix made after looking: the third mode radio button shrank when its label wrapped on phones; radios no longer shrink.
+
+**CR-0001:** Headless Chromium (Playwright) against `vite preview` of the production build. Screens: Home, Chat (after a voice note, a photo, edit mode and a simulated failure), Document (invoice), Renewals (with the reminder preview) and Settings, each at 375px and 1280px wide in light and dark. No console errors and no horizontal overflow.
 
 Fixes made after looking at the screenshots:
 - The chat thread did not stay scrolled to the newest message while steps updated; it now keeps the bottom in view unless the viewer has scrolled up.
@@ -56,3 +119,4 @@ Fixes made after looking at the screenshots:
 
 ## Releases
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
+- v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.

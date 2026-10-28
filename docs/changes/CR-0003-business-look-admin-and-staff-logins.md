@@ -1,9 +1,9 @@
 # CR-0003: Business look, Admin panel and staff logins
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (board note on the CR-0002 release: "Ask for changes")
 - **Date:** 2026-10-28
-- **Release:** (set on release; planned together with CR-0002 as v0.2.0, a feature release)
+- **Release:** v0.2.0 (2026-10-28)
 - **Pull request:** the CR-0002 pull request ([#2](https://github.com/akkiverse/karyahub/pull/2)), on branch `cr/0002-advance-tech`
 
 ## Why

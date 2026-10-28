@@ -119,4 +119,4 @@ Fixes made after looking at the screenshots:
 
 ## Releases
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
-- (pending) CR-0002 and CR-0003 in review: 75 of 75 acceptance tests passing.
+- v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.

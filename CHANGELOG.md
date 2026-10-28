@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-28
+
 ### Added
 - Staff sign-in with mobile number and PIN, and three roles with limited access: owner (admin), office coordinator and technician. See [CR-0003](docs/changes/CR-0003-business-look-admin-and-staff-logins.md).
 - Admin panel for owners: team, roles, access on or off, PIN resets, add staff, a roles table and an access log. See [CR-0003](docs/changes/CR-0003-business-look-admin-and-staff-logins.md).
@@ -29,3 +31,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Quotations and GST-format invoices (CGST 9% + SGST 9%) with a DEMO watermark and print-to-PDF.
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
+
+[0.2.0]: https://github.com/akkiverse/karyahub/pull/2
+[0.1.0]: https://github.com/akkiverse/karyahub/pull/1

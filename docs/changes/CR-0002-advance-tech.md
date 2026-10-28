@@ -1,10 +1,10 @@
 # CR-0002: Advance Tech: KaryaHub server, secure WhatsApp webhook, proof of work and AMC visit plans
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (board notes, "New feature: Advance Tech")
 - **Date:** 2026-10-28
-- **Release:** (set on release; planned v0.2.0, a feature release)
-- **Pull request:** see the pull request for branch `cr/0002-advance-tech`
+- **Release:** v0.2.0 (2026-10-28)
+- **Pull request:** [#2](https://github.com/akkiverse/karyahub/pull/2)
 
 ## Why
 The founder asked to "advance up the application" using another application he built "with the same kind of implementation": the engineers should go through its documentation, understand its architecture, HLD and LLD, proceed with development, and analyse the risks and challenges with how to resolve them.

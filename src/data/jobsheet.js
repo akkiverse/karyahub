@@ -20,3 +20,27 @@ export const JOBSHEET_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
 <path d="M140 262 c10 -14 22 6 32 -6 s14 4 24 -2" fill="none" stroke="#1d3a8a" stroke-width="1.4"/>
 <text x="32" y="266" font-family="Georgia,serif" font-size="9" fill="#777">Sign</text>
 </g></svg>`;
+
+/**
+ * The demo job sheet as a JPEG (base64 data URL), so Studio AI can read it like a real photo (CR-0004).
+ * Drawn at 3x on a canvas. Returns null where the browser can't draw it (for example in tests);
+ * the server then uses the sample's stored text and says so.
+ */
+export async function jobsheetImage(sample, { doc = globalThis.document, scale = 3 } = {}) {
+  if (!sample || sample.kind !== 'photo' || !doc || typeof globalThis.Image !== 'function' || typeof URL.createObjectURL !== 'function') return null;
+  if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '')) return null;
+  const canvas = doc.createElement('canvas');
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx) return null;
+  const url = URL.createObjectURL(new Blob([JOBSHEET_SVG], { type: 'image/svg+xml' }));
+  try {
+    const img = new Image();
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+    canvas.width = 240 * scale;
+    canvas.height = 300 * scale;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}

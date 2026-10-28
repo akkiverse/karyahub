@@ -527,3 +527,10 @@ a.kpi-sub { font-weight: 700; text-decoration: none; }
 .page > * + .panel, .page > .panel + * { margin-top: 16px; }
 .page > .kpis { margin-top: 16px; }
 @media print { .bottom-tabs, .account { display: none !important; } }
+
+/* CR-0004: Studio AI notes. The kit's offline banner is themed to match KaryaHub. */
+.process-note { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; line-height: 1.45; background: color-mix(in srgb, var(--c-soon) 12%, var(--c-surface)); color: var(--c-ink); }
+.process-note svg { flex: none; margin-top: 2px; color: var(--c-soon); }
+.badge-warn { background: color-mix(in srgb, var(--c-soon) 18%, transparent); color: var(--c-soon); }
+.studio-ai-offline { background: color-mix(in srgb, var(--c-soon) 14%, var(--c-surface)) !important; color: var(--c-ink) !important; border-bottom: 1px solid var(--c-line) !important; font-family: var(--font); justify-content: center; }
+.studio-ai-offline svg { color: var(--c-soon); }

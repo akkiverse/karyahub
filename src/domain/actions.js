@@ -25,10 +25,14 @@ function pushMessage(state, msg) {
 
 const SERVER_NEEDED = "Couldn't reach the KaryaHub server. Proof-of-work steps and visit plans need it; check your connection and try again.";
 const via = (r, a) => (r && r._via === 'fallback' ? `${a.mode}: ${FALLBACK_NOTE}` : a.mode === 'server' ? 'KaryaHub server' : a.mode);
+// Who read the message on the server (CR-0004): Studio AI, or the quick reader when AI is offline.
+export const READ_WITHOUT_AI = 'Read without AI';
+const readerLabel = (r) => (r && r.reader === 'ai' ? 'Read by Studio AI' : r && r.reader === 'quick' ? READ_WITHOUT_AI : '');
+const stepDetail = (base, r, a) => (readerLabel(r) ? `${readerLabel(r)} (${via(r, a)})` : `${base} (${via(r, a)})`);
 let opCounter = 0;
 const newOpId = (jobId) => `op-${jobId}-${Date.now().toString(36)}-${(opCounter += 1)}-${Math.random().toString(36).slice(2, 6)}`;
 
-export function createActions({ store, getAdapters, stepDelay, api, currentUser = () => null }) {
+export function createActions({ store, getAdapters, stepDelay, api, currentUser = () => null, photoImage = async () => null }) {
   const adapters = () => getAdapters(store.get().settings.mode, api);
   const updateMsg = (id, fn) => store.update((s) => { const m = s.messages.find((x) => x.id === id); if (m) fn(m, s); });
   const setStep = (id, stepId, patch) => updateMsg(id, (m) => Object.assign(m.steps.find((st) => st.id === stepId), patch));
@@ -45,13 +49,17 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
     try {
       let r = null;
       if (source.type === 'voice') r = await a.speech.transcribe(sample, { fail });
-      else if (source.type === 'photo') r = await a.llm.readImage(sample, { fail });
+      else if (source.type === 'photo') {
+        let image = null;
+        if (a.mode === 'server') { try { image = await photoImage(sample); } catch { image = null; } }
+        r = await a.llm.readImage(sample, { fail, image });
+      }
       text = r ? r.text : source.text;
       setStep(processId, 'transcribe', {
         status: 'done',
-        detail: source.type === 'voice' ? `Speech adapter (${via(r, a)})` : source.type === 'photo' ? `Photo read by LLM adapter (${via(r, a)})` : 'Text message, nothing to transcribe',
+        detail: source.type === 'voice' ? `Speech adapter (${via(r, a)})` : source.type === 'photo' ? (readerLabel(r) ? stepDetail('', r, a) : `Photo read by LLM adapter (${via(r, a)})`) : 'Text message, nothing to transcribe',
       });
-      updateMsg(processId, (m) => { m.transcript = text; });
+      updateMsg(processId, (m) => { m.transcript = text; if (r && r.notice) m.notice = r.notice; });
     } catch (e) {
       setStep(processId, 'transcribe', { status: 'failed', detail: e.message });
       updateMsg(processId, (m) => { m.error = e.message; });
@@ -63,7 +71,8 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
     let result;
     try {
       result = await a.llm.extractJob(text, { fail: false });
-      setStep(processId, 'extract', { status: 'done', detail: `LLM adapter (${via(result, a)})` });
+      setStep(processId, 'extract', { status: 'done', detail: stepDetail('LLM adapter', result, a) });
+      if (result && result.notice) updateMsg(processId, (m) => { m.notice = result.notice; });
     } catch (e) {
       setStep(processId, 'extract', { status: 'failed', detail: e.message });
       updateMsg(processId, (m) => { m.error = e.message; });
@@ -86,7 +95,7 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
       Object.assign(m.steps.find((st) => st.id === 'save'), { status: 'done', detail: 'Saved as a draft for your approval' });
       pushMessage(s, { from: 'bot', kind: 'text', body: UNDERSTOOD_REPLY });
       const author = source.sample_id ? (SAMPLES.find((x) => x.id === source.sample_id) || {}).technician : 'the technician';
-      pushMessage(s, { from: 'bot', kind: 'card', status: 'draft', job: result.job, source_sample_id: source.sample_id || null, reported_by: author || 'the technician' });
+      pushMessage(s, { from: 'bot', kind: 'card', status: 'draft', job: result.job, source_sample_id: source.sample_id || null, reported_by: author || 'the technician', reader: result.reader || '' });
     });
   }
 
@@ -118,7 +127,7 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
     if (!msg) return;
     busy = true;
     try {
-      updateMsg(processId, (m) => { m.error = ''; m.transcript = ''; m.steps.forEach((st) => { st.status = 'pending'; st.detail = ''; }); });
+      updateMsg(processId, (m) => { m.error = ''; m.transcript = ''; m.notice = ''; m.steps.forEach((st) => { st.status = 'pending'; st.detail = ''; }); });
       await process(msg.source, processId);
     } finally {
       busy = false;

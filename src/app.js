@@ -12,6 +12,7 @@ import { settings } from './views/settings.js';
 import { prettyDate } from './format.js';
 import { today } from './clock.js';
 import { SAMPLES } from './data/demo.js';
+import { api as defaultApi } from './api/client.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
 const NAV = [
@@ -40,8 +41,30 @@ export function mountApp(root, options = {}) {
   const win = root.ownerDocument.defaultView;
   const store = options.store || createStore();
   const stepDelay = () => (options.stepDelay ?? STEP_DELAY_MS);
-  const actions = createActions({ store, getAdapters, stepDelay });
-  const ui = { renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '' };
+  const api = options.api || defaultApi;
+  const actions = createActions({ store, getAdapters, stepDelay, api });
+  const ui = { renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null };
+  let alive = true;
+
+  // Data the server works out for a screen, fetched when the screen opens (CR-0002).
+  async function loadForRoute() {
+    if (route.name === 'settings' && store.get().settings.mode === 'server' && !(ui.meta && ui.meta.data)) {
+      ui.meta = null;
+      try { ui.meta = { data: await api.meta() }; } catch (e) { ui.meta = { error: e.message }; }
+      if (alive && route.name === 'settings') render();
+    }
+    if (route.name === 'job') loadPlan(route.params.id);
+  }
+  async function loadPlan(jobId, force = false) {
+    const j = store.get().jobs.find((x) => x.id === jobId);
+    if (!j || !j.amc_expiry) return;
+    const cached = ui.plans[jobId];
+    if (cached && !force && (cached.loading || cached.expiry === j.amc_expiry)) return;
+    ui.plans[jobId] = { loading: true, expiry: j.amc_expiry };
+    const res = await actions.amcPlan(jobId);
+    ui.plans[jobId] = { ...res, expiry: j.amc_expiry };
+    if (alive && route.name === 'job') render();
+  }
   let route = parseRoute(win.location.hash);
   let lastRouteName = null;
 
@@ -86,11 +109,13 @@ export function mountApp(root, options = {}) {
     route = parseRoute(hash);
     ui.toast = null;
     ui.sheet = null;
+    ui.wfNote = null;
     render();
+    loadForRoute();
   }
 
   const routeKey = (r) => `${r.name}:${(r.params && r.params.id) || ''}`;
-  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.toast = null; ui.sheet = null; render(); };
+  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.toast = null; ui.sheet = null; ui.wfNote = null; render(); loadForRoute(); };
   win.addEventListener('hashchange', onHash);
   const unsub = store.subscribe(() => { applyTheme(); render(); });
 
@@ -123,7 +148,24 @@ export function mountApp(root, options = {}) {
       render();
       root.querySelector('.sheet .icon-btn')?.focus();
     } else if (a === 'close-sheet') { ui.sheet = null; render(); }
+    else if (a === 'wf') await runTransition(el.dataset.job, el.dataset.wf, {});
+    else if (a === 'reload-plan') loadPlan(el.dataset.job, true);
     else if (a === 'reset') { actions.reset(); ui.editingCard = null; ui.cardErrors = {}; ui.toast = { where: 'settings', text: 'Demo reset. Jobs, documents, chat and reminders are back to the bundled demo data.' }; render(); }
+  }
+
+  async function runTransition(jobId, action, payload) {
+    if (ui.wfBusy) return;
+    ui.wfBusy = jobId; ui.openTimeline = null; render();
+    const res = await actions.transition(jobId, action, payload);
+    ui.wfBusy = null;
+    if (res.error) ui.wfNote = { job: jobId, error: true, text: res.error };
+    else if (action === 'request_otp') ui.wfNote = { job: jobId, text: 'Code sent to the customer (simulated). Ask them for it when the work is done.' };
+    else if (action === 'verify_otp') ui.wfNote = { job: jobId, text: 'Verified. The customer confirmed the work with their code.' };
+    else if (action === 'close') ui.wfNote = { job: jobId, text: 'Job closed with proof of work.' };
+    else ui.wfNote = null;
+    render();
+    if (res.error) root.querySelector('[data-form="verify-otp"] input')?.focus();
+    else root.querySelector('[data-form="verify-otp"] input, .pow-controls .btn')?.focus();
   }
 
   function approve(id, edits) {
@@ -141,6 +183,11 @@ export function mountApp(root, options = {}) {
       if (!text) return;
       ui.draft = '';
       actions.send({ type: 'text', text });
+    } else if (form.dataset.form === 'verify-otp') {
+      const code = form.elements.code.value.replace(/\D/g, '');
+      if (code.length !== 6) { ui.wfNote = { job: form.dataset.job, error: true, text: 'Enter the 6-digit code the customer received.' }; render(); root.querySelector('[data-form="verify-otp"] input')?.focus(); return; }
+      const j = store.get().jobs.find((x) => x.id === form.dataset.job);
+      runTransition(form.dataset.job, 'verify_otp', { code, challenge: (j && j.otp && j.otp.challenge) || '' });
     } else if (form.dataset.form === 'approve') {
       const edits = {};
       form.querySelectorAll('input[data-field]').forEach((i) => { edits[i.dataset.field] = i.dataset.field === 'amc_value' ? (i.value === '' ? '' : Number(i.value)) : i.value.trim(); });
@@ -152,7 +199,7 @@ export function mountApp(root, options = {}) {
     const el = e.target;
     const a = el.dataset.action;
     if (a === 'edit-line') actions.updateDocumentLine(el.dataset.doc, Number(el.dataset.index), { [el.dataset.key]: el.value === '' ? NaN : Number(el.value) });
-    else if (a === 'set-mode') actions.setSetting('mode', el.value);
+    else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
     else if (a === 'set-theme') actions.setSetting('theme', el.value);
     else if (a === 'toggle-failure') actions.setSetting('simulate_failure', el.checked);
   }
@@ -166,9 +213,10 @@ export function mountApp(root, options = {}) {
   root.ownerDocument.addEventListener('keydown', onKey);
   applyTheme();
   render();
+  loadForRoute();
 
   return {
     store, actions, ui, navigate, render,
-    unmount() { win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
+    unmount() { alive = false; win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
   };
 }

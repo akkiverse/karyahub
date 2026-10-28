@@ -1,7 +1,8 @@
-// One config value chooses the adapter implementation (AC-6.1).
-// "mock" (default) answers every outside service with bundled demo responses.
-// "live" calls the real services and needs keys (see Settings and ARCHITECTURE.md).
-export const DEFAULT_MODE = 'mock';
+// One config value chooses the adapter implementation (AC-6.1, changed CR-0002).
+// "server" (default) asks the KaryaHub API (Python), which holds the services and their keys.
+// "mock" answers every outside service in the browser with bundled demo responses.
+// "live" is the old browser stub: it shows the error you get without keys.
+export const DEFAULT_MODE = 'server';
 
 // Milliseconds each processing step takes in the demo. Three steps finish well inside 3 seconds (AC-2.2).
 export const STEP_DELAY_MS = 650;
@@ -15,3 +16,6 @@ export const SERVICES = [
 ];
 
 export const configuredKeys = {}; // empty on purpose: the demo has no keys
+
+// Keys the KaryaHub server reads from its environment variables (CR-0002). Shown in Settings.
+export const SERVER_KEYS = { whatsapp: 'KARYAHUB_WHATSAPP_ACCESS_TOKEN', speech: 'KARYAHUB_SPEECH_API_KEY', llm: 'KARYAHUB_LLM_API_KEY' };

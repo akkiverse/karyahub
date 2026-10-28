@@ -5,6 +5,8 @@ import { today, nowStamp } from '../clock.js';
 import { computeTotals, docNumber, docTitle } from './documents.js';
 import { reminderText } from './renewals.js';
 import { isValidISO } from '../format.js';
+import { ApiUnreachable } from '../api/client.js';
+import { FALLBACK_NOTE } from '../adapters/server.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const NO_NAME_REPLY = "I couldn't find a customer name, can you add it?";
@@ -20,8 +22,13 @@ function pushMessage(state, msg) {
   return id;
 }
 
-export function createActions({ store, getAdapters, stepDelay }) {
-  const adapters = () => getAdapters(store.get().settings.mode);
+const SERVER_NEEDED = "Couldn't reach the KaryaHub server. Proof-of-work steps and visit plans need it; check your connection and try again.";
+const via = (r, a) => (r && r._via === 'fallback' ? `${a.mode}: ${FALLBACK_NOTE}` : a.mode === 'server' ? 'KaryaHub server' : a.mode);
+let opCounter = 0;
+const newOpId = (jobId) => `op-${jobId}-${Date.now().toString(36)}-${(opCounter += 1)}-${Math.random().toString(36).slice(2, 6)}`;
+
+export function createActions({ store, getAdapters, stepDelay, api }) {
+  const adapters = () => getAdapters(store.get().settings.mode, api);
   const updateMsg = (id, fn) => store.update((s) => { const m = s.messages.find((x) => x.id === id); if (m) fn(m, s); });
   const setStep = (id, stepId, patch) => updateMsg(id, (m) => Object.assign(m.steps.find((st) => st.id === stepId), patch));
   let busy = false;
@@ -35,12 +42,13 @@ export function createActions({ store, getAdapters, stepDelay }) {
     await sleep(stepDelay());
     let text;
     try {
-      if (source.type === 'voice') text = (await a.speech.transcribe(sample, { fail })).text;
-      else if (source.type === 'photo') text = (await a.llm.readImage(sample, { fail })).text;
-      else text = source.text;
+      let r = null;
+      if (source.type === 'voice') r = await a.speech.transcribe(sample, { fail });
+      else if (source.type === 'photo') r = await a.llm.readImage(sample, { fail });
+      text = r ? r.text : source.text;
       setStep(processId, 'transcribe', {
         status: 'done',
-        detail: source.type === 'voice' ? `Speech adapter (${a.mode})` : source.type === 'photo' ? `Photo read by LLM adapter (${a.mode})` : 'Text message, nothing to transcribe',
+        detail: source.type === 'voice' ? `Speech adapter (${via(r, a)})` : source.type === 'photo' ? `Photo read by LLM adapter (${via(r, a)})` : 'Text message, nothing to transcribe',
       });
       updateMsg(processId, (m) => { m.transcript = text; });
     } catch (e) {
@@ -54,7 +62,7 @@ export function createActions({ store, getAdapters, stepDelay }) {
     let result;
     try {
       result = await a.llm.extractJob(text, { fail: false });
-      setStep(processId, 'extract', { status: 'done', detail: `LLM adapter (${a.mode})` });
+      setStep(processId, 'extract', { status: 'done', detail: `LLM adapter (${via(result, a)})` });
     } catch (e) {
       setStep(processId, 'extract', { status: 'failed', detail: e.message });
       updateMsg(processId, (m) => { m.error = e.message; });
@@ -76,7 +84,8 @@ export function createActions({ store, getAdapters, stepDelay }) {
       const m = s.messages.find((x) => x.id === processId);
       Object.assign(m.steps.find((st) => st.id === 'save'), { status: 'done', detail: 'Saved as a draft for your approval' });
       pushMessage(s, { from: 'bot', kind: 'text', body: UNDERSTOOD_REPLY });
-      pushMessage(s, { from: 'bot', kind: 'card', status: 'draft', job: result.job, source_sample_id: source.sample_id || null });
+      const author = source.sample_id ? (SAMPLES.find((x) => x.id === source.sample_id) || {}).technician : 'the technician';
+      pushMessage(s, { from: 'bot', kind: 'card', status: 'draft', job: result.job, source_sample_id: source.sample_id || null, reported_by: author || 'the technician' });
     });
   }
 
@@ -163,6 +172,14 @@ export function createActions({ store, getAdapters, stepDelay }) {
         lines: (job.lines || []).map((l) => ({ ...l })),
         source_sample_id: card.source_sample_id,
         approved_at: nowStamp(),
+        // Proof of work (CR-0002): the technician reported the work done, so the job starts there.
+        state: 'WORK_DONE',
+        events: [{
+          id: `ev-${jobId}-reported`, action: 'report_done', from_state: 'NEW', to_state: 'WORK_DONE',
+          client_op_id: `reported-${jobId}`, actor: (card.reported_by || 'the technician').replace(/ \(technician\)$/, ''), channel: 'whatsapp',
+          detail: `Reported done by ${(card.reported_by || 'the technician').replace(/ \(technician\)$/, '')} on WhatsApp`, received_at: nowStamp(),
+        }],
+        otp: null,
       });
       const m = s.messages.find((x) => x.id === cardId);
       m.status = 'approved';
@@ -220,7 +237,51 @@ export function createActions({ store, getAdapters, stepDelay }) {
     }
   }
 
+  /** Move a job through its workflow. The KaryaHub server checks every rule (CR-0002, US-8). */
+  async function transition(jobId, action, payload = {}) {
+    const job = store.get().jobs.find((j) => j.id === jobId);
+    if (!job) return { error: 'That job no longer exists. Reset the demo or pick another job.' };
+    const body = {
+      state: job.state || 'WORK_DONE',
+      action,
+      client_op_id: newOpId(jobId),
+      applied_op_ids: (job.events || []).map((e) => e.client_op_id),
+      payload: action === 'request_otp' ? { ...payload, phone: job.phone } : payload,
+      actor: 'Owner',
+      channel: 'web',
+      captured_at: nowStamp(),
+      work_done: job.work_done,
+    };
+    let r;
+    try {
+      r = await api.transition(jobId, body);
+    } catch (e) {
+      return { error: e instanceof ApiUnreachable ? SERVER_NEEDED : e.message };
+    }
+    store.update((s) => {
+      const j = s.jobs.find((x) => x.id === jobId);
+      if (!j) return;
+      j.state = r.state;
+      j.events = j.events || [];
+      if (r.event && !j.events.some((e) => e.id === r.event.id)) j.events.push(r.event);
+      if (r.otp) j.otp = { challenge: r.otp.challenge, expires_at: r.otp.expires_at, demo_code: r.otp.demo_code || '' };
+      if (r.state !== 'WORK_DONE') j.otp = null;
+    });
+    return { state: r.state, event: r.event, otp: r.otp || null };
+  }
+
+  /** AMC visit plan for a job's customer, worked out by the server (US-9). */
+  async function amcPlan(jobId) {
+    const job = store.get().jobs.find((j) => j.id === jobId);
+    if (!job || !job.amc_expiry) return { error: 'This job has no AMC end date, so there are no visits to plan.' };
+    try {
+      return { plan: await api.amcPlan({ customer_id: job.customer_id, ends_on: job.amc_expiry, every_days: 90, lead_days: 7 }, today()) };
+    } catch (e) {
+      return { error: e instanceof ApiUnreachable ? SERVER_NEEDED : e.message };
+    }
+  }
+
   const setSetting = (key, value) => store.update((s) => { s.settings[key] = value; });
 
-  return { send, retry, approve, createDocument, updateDocumentLine, sendReminder, setSetting, reset: () => store.reset(), isBusy: () => busy };
+  return { send, retry, approve, createDocument, updateDocumentLine, sendReminder, transition, amcPlan, setSetting, reset: () => store.reset(), isBusy: () => busy };
 }

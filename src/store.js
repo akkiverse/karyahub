@@ -1,4 +1,5 @@
 import { demoState } from './data/demo.js';
+import { migrate } from './migrations.js';
 
 const KEY = 'karyahub.demo.v1';
 
@@ -6,8 +7,7 @@ function safeRead() {
   try {
     const raw = globalThis.localStorage?.getItem(KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && parsed.version === 1 ? parsed : null;
+    return migrate(JSON.parse(raw));
   } catch {
     return null;
   }

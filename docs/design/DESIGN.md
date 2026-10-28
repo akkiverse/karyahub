@@ -32,3 +32,11 @@ The rupee meter: a huge green "₹99,100" with a three-part bar splitting it int
 - **Loading:** each processing step shows a small spinner and "working"; sample chips and the composer are disabled while a message is processed.
 - **Error:** a failed step turns red with "Couldn't read this message. Try again." and a Try again button; live mode without keys shows "Not configured: add <SERVICE> key"; a bad document line shows "Check quantity and rate"; approving with a bad field shows the field's own message (for example "Use a 10-digit mobile number.").
 - **Demo honesty:** every send says it is simulated; documents carry a "DEMO, not a valid tax invoice" watermark; the GSTIN is marked dummy.
+
+## Additions in CR-0002
+- **Proof of work card** on the job screen: a status chip (amber "Work done, waiting for customer check", green "Verified by customer" and "Closed"), three step tiles that tick green as the job moves, one primary action at a time (Send code, then the code field with Verify, then Close job), and a collapsible history. The code field uses large tabular digits with letter spacing so the customer's code is easy to read back.
+- **Demo honesty:** the customer's code is shown in a dashed "Demo:" box that says the real code arrives on WhatsApp.
+- **AMC service visits card:** the next visit in one sentence, then a quiet list of visits with small status tags (grey "Before tracking", red "Overdue", amber "Create job now", teal "Upcoming", green "Job created").
+- **Settings:** a server icon banner for "Server mode: KaryaHub API" and one line under it with the connection status.
+- **States:** loading ("Working out the visit plan…" with a spinner; "Checking the KaryaHub server…"), errors as red notes with what to do ("Couldn't reach the KaryaHub server…", the wrong-code message), and the Chat fallback named in the step detail.
+- No new colours or fonts: existing tokens (`--c-soon`, `--c-money`, `--c-lapsed`, `--c-brand`) carry the new statuses in light and dark.

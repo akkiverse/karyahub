@@ -1,3 +1,5 @@
+import { DEFAULT_MODE } from '../config.js';
+
 // Bundled demo data. Every name, phone number, address and GSTIN here is invented and labelled as demo.
 export const BUSINESS = {
   business_name: 'CoolCare AC Services',
@@ -102,10 +104,12 @@ export const WELCOME_MESSAGE = {
   at: '2027-01-01T09:00:00',
 };
 
+export const DATA_VERSION = 2;
+
 export function demoState() {
   return {
-    version: 1,
-    settings: { ...BUSINESS, mode: 'mock', simulate_failure: false, theme: 'system' },
+    version: DATA_VERSION,
+    settings: { ...BUSINESS, mode: DEFAULT_MODE, simulate_failure: false, theme: 'system' },
     customers: DEMO_CUSTOMERS.map((c) => ({ ...c })),
     jobs: [],
     documents: [],

@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- KaryaHub server (Python, FastAPI) under `/api`: processing pipeline, secure WhatsApp Cloud API webhook, job workflow with customer one-time codes, AMC visit planner, GST totals and reminder text. See [CR-0002](docs/changes/CR-0002-advance-tech.md).
+- Proof of work on every job: send the customer a code, verify, close, with a history of each step. See [CR-0002](docs/changes/CR-0002-advance-tech.md).
+- AMC service visits on the job screen: next visit, overdue escalation, job creation 7 days ahead. See [CR-0002](docs/changes/CR-0002-advance-tech.md).
+- Architecture documents: HLD, LLD, risks and challenges, and a review of the reference platform. See [CR-0002](docs/changes/CR-0002-advance-tech.md).
+
+### Changed
+- Chat is processed by the KaryaHub server by default, falling back to the in-browser demo if the server can't be reached; Settings shows where messages are processed and the server's status. See [CR-0002](docs/changes/CR-0002-advance-tech.md).
+- Saved demo data is upgraded automatically (data version 2); nothing is lost. See [CR-0002](docs/changes/CR-0002-advance-tech.md).
+
 ## [0.1.0] - 2026-10-28
 
 ### Added

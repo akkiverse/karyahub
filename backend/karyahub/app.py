@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from karyahub import __version__, access
+from karyahub import __version__, access, studio_ai
 from karyahub.adapters import Adapters, get_adapters
 from karyahub.domain import amc, otp, renewals, workflow
 from karyahub.domain.documents import DocLine, Totals, compute_totals
@@ -44,12 +44,18 @@ SERVICES = [
     {"id": "speech", "name": "Speech-to-text", "key": "KARYAHUB_SPEECH_API_KEY", "setting": "speech_api_key"},
     {"id": "llm", "name": "LLM", "key": "KARYAHUB_LLM_API_KEY", "setting": "llm_api_key"},
 ]
+STUDIO_AI_KEY = "AI_ENDPOINTS"
 
 
 # ---------- request and response models ----------
 class MediaRequest(BaseModel):
     media_id: str = Field(min_length=1, max_length=200)
     simulate_failure: bool = False
+
+
+class ImageRequest(MediaRequest):
+    # The photo itself (CR-0004), base64 or a data: URL; read by Studio AI when it's set up.
+    image_base64: str | None = Field(None, max_length=4_200_000)
 
 
 class TextRequest(BaseModel):
@@ -61,6 +67,8 @@ class TextResult(BaseModel):
     text: str
     language: str = ""
     adapter: str
+    reader: str = ""
+    notice: str = ""
 
 
 class ExtractResult(Extraction):
@@ -105,6 +113,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
     install_error_handlers(app)
+    studio_ai.install(app)  # /api/ai/status and friendly "AI is offline" errors (CR-0004)
     api = APIRouter(prefix="/api")
     v1 = APIRouter(prefix="/api/v1")
 
@@ -118,11 +127,16 @@ def create_app() -> FastAPI:
         for s in SERVICES:
             configured = bool(getattr(settings, s["setting"]))
             status = "Mock" if settings.mode == "mock" else ("Live" if configured else "Missing key")
+            key = s["key"]
+            if s["id"] == "llm":
+                key = STUDIO_AI_KEY
+                configured = studio_ai.configured()
+                status = "Studio AI" if configured else ("Mock" if settings.mode == "mock" else "Missing key")
             services.append(
                 {
                     "id": s["id"],
                     "name": s["name"],
-                    "key": s["key"],
+                    "key": key,
                     "configured": configured,
                     "status": status,
                 }
@@ -148,9 +162,11 @@ def create_app() -> FastAPI:
         return TextResult(text=r["text"], language=r.get("language", ""), adapter=a.mode)
 
     @v1.post("/pipeline/read-image")
-    async def read_image(req: MediaRequest, a: AdaptersDep) -> TextResult:
-        r = await a.llm.read_image(req.media_id, fail=req.simulate_failure)
-        return TextResult(text=r["text"], adapter=a.mode)
+    async def read_image(req: ImageRequest, a: AdaptersDep) -> TextResult:
+        r = await a.llm.read_image(req.media_id, image_b64=req.image_base64, fail=req.simulate_failure)
+        return TextResult(
+            text=r["text"], adapter=a.mode, reader=r.get("reader", ""), notice=r.get("notice", "")
+        )
 
     @v1.post("/pipeline/extract")
     async def extract(req: TextRequest, a: AdaptersDep) -> ExtractResult:

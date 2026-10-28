@@ -6,13 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
+    "httpx>=0.27",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.27",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "ruff>=0.8",
@@ -32,7 +32,8 @@ filterwarnings = ["ignore::DeprecationWarning:fastapi.testclient", "ignore:Using
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-extend-exclude = ["node_modules", "dist"]
+# studio_ai.py is the hub's Studio AI kit, copied unchanged (CR-0004).
+extend-exclude = ["node_modules", "dist", "backend/karyahub/studio_ai.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]

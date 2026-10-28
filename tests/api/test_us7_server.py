@@ -44,7 +44,14 @@ def test_ac_7_2_pipeline_matches_the_demo_extraction(client):
     assert free["job"]["customer_name"] == "Anil Kumar"
     assert free["job"]["phone"] == "9812345678"
     none = client.post("/api/v1/pipeline/extract", json={"text": "gas refill done, all ok"}).json()
-    assert none == {"found": False, "job": None, "missing": ["customer_name"], "adapter": "mock"}
+    # CR-0004 added "reader" and "notice"; the earlier fields are unchanged.
+    assert {k: none[k] for k in ("found", "job", "missing", "adapter")} == {
+        "found": False,
+        "job": None,
+        "missing": ["customer_name"],
+        "adapter": "mock",
+    }
+    assert none["reader"] == "demo"
 
 
 def test_ac_7_4_errors_have_one_plain_shape(client):

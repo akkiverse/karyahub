@@ -63,6 +63,7 @@ class TransitionRequest(BaseModel):
     applied_op_ids: list[str] = []
     payload: dict[str, Any] = {}
     actor: str = "Owner"
+    actor_role: str | None = None  # staff role from the web app (CR-0003); None for system calls
     channel: Channel = "web"
     captured_at: str | None = None
     work_done: str = ""

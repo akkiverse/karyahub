@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from karyahub import __version__
+from karyahub import __version__, access
 from karyahub.adapters import Adapters, get_adapters
 from karyahub.domain import amc, otp, renewals, workflow
 from karyahub.domain.documents import DocLine, Totals, compute_totals
@@ -184,6 +184,7 @@ def create_app() -> FastAPI:
     async def transition(
         job_id: str, req: workflow.TransitionRequest, settings: SettingsDep, tenant: TenantDep, a: AdaptersDep
     ) -> workflow.TransitionResult:
+        access.check_action(req.actor_role, req.action)
         secret = settings.secret("otp_secret")
         ctx: dict[str, Any] = {}
         if req.action == "verify_otp":
@@ -207,6 +208,15 @@ def create_app() -> FastAPI:
             if settings.mode == "mock":
                 result.otp["demo_code"] = code  # mock mode only: nothing is really sent
         return result
+
+    # ---------- staff roles (CR-0003) ----------
+    @v1.get("/access/roles")
+    async def roles() -> dict[str, Any]:
+        return {
+            "roles": [r.model_dump() for r in access.ROLES],
+            "permissions": [p.model_dump() for p in access.PERMISSIONS],
+            "action_permissions": access.ACTION_PERMISSION,
+        }
 
     # ---------- AMC visit planning ----------
     @v1.post("/amc/plan")

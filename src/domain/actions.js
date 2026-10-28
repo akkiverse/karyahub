@@ -7,6 +7,7 @@ import { reminderText } from './renewals.js';
 import { isValidISO } from '../format.js';
 import { ApiUnreachable } from '../api/client.js';
 import { FALLBACK_NOTE } from '../adapters/server.js';
+import { can, ACTION_PERMISSION, roleName, roleShort } from './access.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const NO_NAME_REPLY = "I couldn't find a customer name, can you add it?";
@@ -27,7 +28,7 @@ const via = (r, a) => (r && r._via === 'fallback' ? `${a.mode}: ${FALLBACK_NOTE}
 let opCounter = 0;
 const newOpId = (jobId) => `op-${jobId}-${Date.now().toString(36)}-${(opCounter += 1)}-${Math.random().toString(36).slice(2, 6)}`;
 
-export function createActions({ store, getAdapters, stepDelay, api }) {
+export function createActions({ store, getAdapters, stepDelay, api, currentUser = () => null }) {
   const adapters = () => getAdapters(store.get().settings.mode, api);
   const updateMsg = (id, fn) => store.update((s) => { const m = s.messages.find((x) => x.id === id); if (m) fn(m, s); });
   const setStep = (id, stepId, patch) => updateMsg(id, (m) => Object.assign(m.steps.find((st) => st.id === stepId), patch));
@@ -241,13 +242,18 @@ export function createActions({ store, getAdapters, stepDelay, api }) {
   async function transition(jobId, action, payload = {}) {
     const job = store.get().jobs.find((j) => j.id === jobId);
     if (!job) return { error: 'That job no longer exists. Reset the demo or pick another job.' };
+    const user = currentUser();
+    if (user && !can(user.role, ACTION_PERMISSION[action])) {
+      return { error: `Your role (${roleName(user.role)}) can't do this. Ask the owner or the office coordinator.` };
+    }
     const body = {
       state: job.state || 'WORK_DONE',
       action,
       client_op_id: newOpId(jobId),
       applied_op_ids: (job.events || []).map((e) => e.client_op_id),
       payload: action === 'request_otp' ? { ...payload, phone: job.phone } : payload,
-      actor: 'Owner',
+      actor: user ? `${user.name} (${roleShort(user.role)})` : 'Owner',
+      actor_role: user ? user.role : null,
       channel: 'web',
       captured_at: nowStamp(),
       work_done: job.work_done,

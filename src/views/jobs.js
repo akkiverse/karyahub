@@ -23,7 +23,7 @@ export const STATE_LABELS = {
 const STEPS = [['WORK_DONE', 'Work reported'], ['VERIFIED', 'Customer verified'], ['CLOSED', 'Closed']];
 const VISIT_LABELS = { past: 'Before tracking', upcoming: 'Upcoming', create_job_now: 'Create job now', overdue: 'Overdue', job_created: 'Job created' };
 
-function proofOfWork(j, ui) {
+function proofOfWork(j, ui, allow = () => true) {
   const st = j.state || 'WORK_DONE';
   const reached = (s) => STEPS.findIndex(([k]) => k === s) <= STEPS.findIndex(([k]) => k === st);
   const busy = ui.wfBusy === j.id;
@@ -39,6 +39,8 @@ function proofOfWork(j, ui) {
       </form>
       ${j.otp.demo_code ? `<p class="demo-code" data-testid="demo-code">Demo: the customer's code is <strong>${escapeHtml(j.otp.demo_code)}</strong>. In the real version it arrives on their WhatsApp, not here.</p>` : '<p class="muted small">The code was sent to the customer\'s WhatsApp.</p>'}
       <button type="button" class="btn btn-ghost btn-small" data-action="wf" data-wf="request_otp" data-job="${j.id}" ${busy ? 'disabled' : ''}>${icon('rotate', { size: 16 })} Send a new code</button>`;
+  } else if (st === 'VERIFIED' && !allow('close_jobs')) {
+    controls = '<p class="muted small" data-testid="close-hidden">Verified. The office closes the job.</p>';
   } else if (st === 'VERIFIED') {
     controls = `<button type="button" class="btn btn-primary" data-action="wf" data-wf="close" data-job="${j.id}" ${busy ? 'disabled' : ''}>${icon('checks', { size: 18 })} Close job</button>`;
   }
@@ -69,7 +71,7 @@ function visitPlan(j, ui) {
   return `<section class="plan" aria-labelledby="plan-title"><h2 class="section-title" id="plan-title">${icon('renewals', { size: 18 })} AMC service visits</h2><p class="muted small">A visit every 90 days until the contract ends on ${prettyDate(j.amc_expiry)}.</p>${body}</section>`;
 }
 
-export function job({ state, params, ui }) {
+export function job({ state, params, ui, allow = () => true }) {
   const j = state.jobs.find((x) => x.id === params.id);
   if (!j) return `<section class="page"><h1 id="page-title" tabindex="-1">Job not found</h1><p>This job isn't in the demo data any more. It may have been cleared by Reset demo.</p><a class="btn btn-ghost" href="#/jobs">Back to Jobs</a></section>`;
   const docs = state.documents.filter((d) => d.job_id === j.id);
@@ -88,12 +90,12 @@ export function job({ state, params, ui }) {
     <h2 class="section-title">Charges</h2>
     <ul class="lines">${j.lines.map((l) => `<li><span>${escapeHtml(l.description)}${l.qty > 1 ? ` x ${l.qty}` : ''}</span><span>${rupees(l.qty * l.rate)}</span></li>`).join('')}<li class="lines-total"><span>Before GST</span><span>${rupees(sub)}</span></li></ul>
     ${ui.toast && ui.toast.where === 'job' ? `<p class="notice ${ui.toast.error ? 'notice-error' : ''}" role="status">${escapeHtml(ui.toast.text)}</p>` : ''}
-    <div class="actions">
+    ${allow('create_documents') ? `<div class="actions">
       <button type="button" class="btn btn-primary" data-action="create-doc" data-type="quote" data-job="${j.id}">${icon('file', { size: 18 })} Create quote</button>
       <button type="button" class="btn btn-secondary" data-action="create-doc" data-type="invoice" data-job="${j.id}">${icon('file', { size: 18 })} Create invoice</button>
-    </div>
-    ${proofOfWork(j, ui)}
+    </div>` : '<p class="muted small" data-testid="docs-hidden">Quotes and invoices are made by the office.</p>'}
+    ${proofOfWork(j, ui, allow)}
     ${visitPlan(j, ui)}
-    ${docs.length ? `<h2 class="section-title">Documents</h2><ul class="list">${docs.map((d) => `<li class="row-card"><a class="row-link" href="#/doc/${d.id}"><span class="row-main"><strong>${docTitle(d.type)} ${d.id}</strong><span class="muted">${prettyDate(d.date)}</span></span><span class="row-side"><strong>${rupees(d.total)}</strong>${icon('arrowRight', { size: 18 })}</span></a></li>`).join('')}</ul>` : ''}
+    ${docs.length && allow('create_documents') ? `<h2 class="section-title">Documents</h2><ul class="list">${docs.map((d) => `<li class="row-card"><a class="row-link" href="#/doc/${d.id}"><span class="row-main"><strong>${docTitle(d.type)} ${d.id}</strong><span class="muted">${prettyDate(d.date)}</span></span><span class="row-side"><strong>${rupees(d.total)}</strong>${icon('arrowRight', { size: 18 })}</span></a></li>`).join('')}</ul>` : ''}
   </section>`;
 }

@@ -1,4 +1,5 @@
 import { DEFAULT_MODE } from '../config.js';
+import { demoStaff } from '../domain/access.js';
 
 // Bundled demo data. Every name, phone number, address and GSTIN here is invented and labelled as demo.
 export const BUSINESS = {
@@ -104,7 +105,7 @@ export const WELCOME_MESSAGE = {
   at: '2027-01-01T09:00:00',
 };
 
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3; // 3: staff accounts and access log (CR-0003)
 
 export function demoState() {
   return {
@@ -114,6 +115,8 @@ export function demoState() {
     jobs: [],
     documents: [],
     messages: [{ ...WELCOME_MESSAGE }],
-    seq: { job: 0, quote: 0, invoice: 0, msg: 0, customer: 0 },
+    seq: { job: 0, quote: 0, invoice: 0, msg: 0, customer: 0, staff: 0, log: 0 },
+    staff: demoStaff(),
+    access_log: [],
   };
 }

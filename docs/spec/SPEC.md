@@ -1,6 +1,6 @@
 # KaryaHub: Specification
 
-**Status:** Approved 2026-10-28, changed by CR-0002 (2026-10-28) · **Source:** https://claude.ai/artifact/AtyPCQQWYaVSmg1K8gPxgC
+**Status:** Approved 2026-10-28, changed by CR-0002 and CR-0003 (2026-10-28) · **Source:** https://claude.ai/artifact/AtyPCQQWYaVSmg1K8gPxgC
 This file is the source of truth for what the product does. Every change to it is made through a change request (see [../changes/](../changes/)).
 
 ## Overview
@@ -10,12 +10,15 @@ KaryaHub Demo is a mobile-first web prototype the founder shows to AMC service f
 
 **Since CR-0002 ("Advance Tech"):** a Python KaryaHub server (FastAPI) does the processing, receives WhatsApp webhooks securely, runs a job workflow with customer-confirmed proof of work, and plans AMC service visits. It still answers every outside service with mock data, so the demo needs no keys; real services are switched on with server keys. The design follows the founder's reference platform (see `docs/architecture/REFERENCE-REVIEW.md`), with the risks in `docs/architecture/RISKS.md`.
 
+**Since CR-0003 (business look, Admin and staff logins):** people sign in with a mobile number and PIN, and each role (owner, office coordinator, technician) sees only what its job needs. Owners manage the team in an Admin panel. The look is more businesslike: a dark sidebar with the firm and the signed-in person, and a "Today at" row of figures on Home. Sign-in is a demo kept on the device (ADR-0010); real accounts come with the database.
+
 Founder notes applied: build "a basic prototype to display to the client or vendor with dummy data and processing" that "can explain what problem it will be resolving"; keep the idea open for review.
 
 ## Users
 - **Founder as presenter:** shows the demo on a phone or laptop in an owner's shop or on a video call.
 - **Owner (viewer):** Suresh, 45, runs an AC service firm with 8 technicians in Pune; lives on WhatsApp, avoids dashboards.
 - **Vendor or partner (viewer):** a parts distributor who might refer firms.
+- **Staff inside a firm (added CR-0003):** the owner (Akash Mehta in the demo, admin), an office coordinator (Priya Nair) and technicians (Santosh Pawar, Imran Khan). Each signs in and sees only what their role allows.
 
 ## User stories and acceptance criteria
 
@@ -68,7 +71,7 @@ As the founder I want every outside service behind a swappable adapter so that r
 - **AC-6.1** Given the codebase, then `src/adapters` has whatsapp, speech and llm modules, each exporting a mock and a live implementation of the same interface (sendMessage; transcribe; extractJob), plus `server.js` with server implementations of the same interface, chosen by one config value that defaults to "server". *(added CR-0001, changed CR-0002: default was "mock")*
 - **AC-6.2** Given mode "live" with no key configured, then calling a live adapter returns the error "Not configured: add <SERVICE> key" and the UI shows it, without crashing. *(added CR-0001)*
 - **AC-6.3** Given Settings in the in-browser mode, then it shows "Demo mode: mock responses" and lists the three services with status "Mock" and the key each would need. *(added CR-0001, changed CR-0002: now applies to the in-browser mode; server mode is AC-7.6)*
-- **AC-6.4** Given Settings, when I press "Reset demo", then all jobs, documents and reminder marks return to the bundled demo data. *(added CR-0001)*
+- **AC-6.4** Given Settings, when I press "Reset demo", then all jobs, documents and reminder marks return to the bundled demo data, while the team, their PINs and the access log are kept and I stay signed in. *(added CR-0001, changed CR-0003: the team and log are kept)*
 
 ### US-7: KaryaHub server
 As the founder I want the processing to run on a Python server so that real services and their keys can be added safely later without changing screens.
@@ -102,15 +105,49 @@ As an owner I want to see which service visits each AMC owes and when to schedul
 
 ### US-11: Existing data keeps working
 As a returning viewer I want my saved demo to keep working after the update so that nothing is lost.
-- **AC-11.1** Given demo data saved by v0.1.0, when the app opens, then jobs, documents, customers, reminder marks and settings are kept, and each job gains the status "Work done, waiting for customer check". *(added CR-0002)*
+- **AC-11.1** Given demo data saved by v0.1.0, when the app opens, then jobs, documents, customers, reminder marks and settings are kept, each job gains the status "Work done, waiting for customer check", and the data is upgraded to the current version with the demo team added. *(added CR-0002, changed CR-0003: upgrades to data version 3)*
 - **AC-11.2** Given the same document lines, then the server's GST totals equal v0.1.0's (CGST 9% + SGST 9%, total rounded to the rupee), inter-state supply uses IGST 18%, and the server's reminder text matches the web app's. *(added CR-0002)*
+
+- **AC-11.3** Given demo data saved by the 0.2.0 preview (data version 2), when the app opens, then jobs and their proof-of-work state and history are kept, and the demo team and an empty access log are added. *(added CR-0003)*
 
 ### US-12: Engineering documentation
 As the founder I want the architecture, design and risks written down so that any engineer can understand and continue the work.
 - **AC-12.1** Given the repository, then `docs/architecture/` has HLD.md (context, building blocks, flows, deployment), LLD.md (API, errors, workflow, code, visit planner, webhook), RISKS.md (each risk with likelihood, impact, resolution and status) and REFERENCE-REVIEW.md (what was learned from the reference repositories and what KaryaHub adopts, adapts or defers). *(added CR-0002)*
 
+### US-13: Staff sign-in
+As a member of a firm's team I want to sign in with my mobile number and a PIN so that KaryaHub knows who I am and what I may do.
+- **AC-13.1** Given nobody is signed in, when the app opens at any address, then only the Sign-in screen shows: mobile number and PIN fields (the PIN hidden) and the demo accounts (Akash Mehta, Priya Nair, Santosh Pawar, Imran Khan) with their roles and demo PINs. *(added CR-0003)*
+- **AC-13.2** Given the owner's number 9900000201 and PIN 2468, when I sign in, then Home opens, the account menu shows "Akash Mehta" and "Owner (admin)", and the access log records "Signed in as Owner (admin)". *(added CR-0003)*
+- **AC-13.3** Given a wrong PIN or a number not on the team, when I sign in, then I see "That mobile number and PIN don't match an active staff account. Check them, or ask the owner to reset your PIN." and stay on Sign in; a wrong PIN for someone on the team is logged as a failed sign-in. *(added CR-0003)*
+- **AC-13.4** Given the demo accounts, when I tap one, then its number and PIN are filled in. *(added CR-0003)*
+- **AC-13.5** Given I'm signed in, then reloading keeps me signed in; when I press Sign out, the Sign-in screen says "You have signed out.", the session is removed and the log records it. *(added CR-0003)*
+- **AC-13.6** Given any staff record, then it holds a salted SHA-256 hash of the PIN, never the PIN itself. *(added CR-0003)*
+
+### US-14: Roles and limited access
+As an owner I want each person to see only what their job needs so that money, paperwork and settings stay with the office.
+- **AC-14.1** Given a technician signs in, then Chat opens and the navigation offers only Chat and Jobs; a job screen hides Create quote, Create invoice and Documents ("Quotes and invoices are made by the office."), and a verified job shows "Verified. The office closes the job." instead of Close job. *(added CR-0003)*
+- **AC-14.2** Given a technician opens Home, Renewals, Settings, Admin or a document by its address, then they see "You don't have access to <screen>" with their name and role and "Ask the owner to change your role in Admin", and none of that screen's content. *(added CR-0003)*
+- **AC-14.3** Given an office coordinator signs in, then the navigation offers Home, Chat, Jobs and Renewals; they can create quotes and invoices and close verified jobs; Admin and Settings aren't offered and are refused if opened. *(added CR-0003)*
+- **AC-14.4** Given a signed-in person moves a job through proof of work, then the server request carries their name and role (for example "Santosh Pawar (Technician)", `technician`); an action their role may not take is refused in the app with "Your role (<role>) can't do this. Ask the owner or the office coordinator." without calling the server. *(added CR-0003)*
+- **AC-14.5** Given the KaryaHub server, then `GET /api/v1/access/roles` returns the same roles, permissions and action rules as the web app, and a job action whose `actor_role` may not take it (for example a technician closing a job) is answered 403 "Your role (Technician) can't close or manage jobs. Ask the owner or the office coordinator."; an unknown role is refused; calls without a role (WhatsApp, system) are unchanged. *(added CR-0003)*
+
+### US-15: Admin panel
+As an owner I want to manage my team and their access in one place so that I control who can do what.
+- **AC-15.1** Given the owner opens Admin, then it shows active staff counts in total and by role, the team (name, number, role, status, last sign-in), an Add staff form, the Roles and access table (9 permissions by 3 roles) and the access log. *(added CR-0003)*
+- **AC-15.2** Given I add "Neha Kulkarni", 9900000299, Technician, PIN 4321, then she appears in the team, the log records "Added Neha Kulkarni as Technician", and she can sign in with that number and PIN and gets technician access. *(added CR-0003)*
+- **AC-15.3** Given a name shorter than 2 letters, a number that isn't a 10-digit mobile or is already on the team, or a PIN that isn't 4 to 6 digits, then each field shows its own message and nobody is added. *(added CR-0003)*
+- **AC-15.4** Given I change Priya Nair's role from Office coordinator to Technician, then her access follows the new role and the log records the change. *(added CR-0003)*
+- **AC-15.5** Given I turn off someone's access, then they can't sign in and an open session of theirs ends with "Your access has been turned off. Ask the owner if you think this is a mistake."; turning access on restores it. *(added CR-0003)*
+- **AC-15.6** Given I press Reset PIN for someone, then a new 4-digit PIN is shown once ("New PIN for <name>: <PIN>. Share it with them in person; the old PIN no longer works."), the old PIN stops working and the new one works; the PIN itself isn't stored. *(added CR-0003)*
+- **AC-15.7** Given I try to change my own role, turn off my own access, or remove the last active owner, then it's refused with a plain reason and nothing changes. *(added CR-0003)*
+
+### US-16: Business look
+As an owner I want KaryaHub to look like software a business runs on so that I trust it with my firm.
+- **AC-16.1** Given a signed-in owner or coordinator on Home, then a "Today at <business>" row greets them by first name and shows four figures from the data: Jobs recorded, Waiting for customer check, Renewals in 30 days (with the ₹ at stake) and Quotes and invoices. *(added CR-0003)*
+- **AC-16.2** Given any signed-in screen, then the business name and the signed-in person (name, role and Sign out) are visible. *(added CR-0003)*
+
 ## Screens and flows
-Bottom tab bar on phones (side rail on desktop): Home, Chat, Jobs, Renewals, Settings.
+Sign in first (CR-0003). Then a bottom tab bar on phones and a dark sidebar on desktop, showing only the screens the person's role allows: Home, Chat, Jobs, Renewals (Workspace) and Admin, Settings (Manage). An account menu in the top bar shows the person and role, with Settings, Admin and Sign out.
 
 | Screen | Shows | Empty state | Error state |
 |---|---|---|---|
@@ -119,9 +156,12 @@ Bottom tab bar on phones (side rail on desktop): Home, Chat, Jobs, Renewals, Set
 | Jobs | Newest-first jobs with status; job detail with Create quote / Create invoice, Proof of work (status, steps, Send code, code entry, Close, history) and AMC service visits | "No jobs yet, send a sample in Chat" (after reset) | Server unreachable or wrong code: red note with what to do |
 | Document | Quote or invoice with CGST/SGST, DEMO watermark, Download | n/a | "Check quantity and rate" for bad lines |
 | Renewals | Filter chips 30 / 60 / 90 / Lapsed; cards with Send reminder; customer-side preview sheet | "No contracts" (only if demo data removed) | n/a |
+| Sign in (CR-0003) | Pitch in three points, mobile and PIN form, demo accounts | n/a | "That mobile number and PIN don't match…"; "Your access has been turned off…" |
+| Admin (CR-0003, owners) | Staff counts, team with role, status, Reset PIN and access switch, Add staff, Roles and access table, access log | "No sign-ins or team changes yet." | Field messages; refusals with a plain reason |
+| No access (CR-0003) | Who you are, what to do, a button to your start page | n/a | n/a |
 | Settings | Where messages are processed (server, in browser, live keys), server connection, service status and needed keys, Simulate failure switch, Reset demo, theme | "Checking the KaryaHub server…" | "Can't reach the KaryaHub server" |
 
-Demo flow (3 minutes): Home → See how it works → pick voice note → watch processing → Approve → Create invoice → Send code → Verify → Close → Renewals → Send reminder.
+Demo flow (3 minutes): Sign in as the owner → Home → See how it works → pick voice note → watch processing → Approve → Create invoice → Send code → Verify → Close → Renewals → Send reminder. Then (1 minute) Admin → sign out → sign in as Santosh (technician) to show limited access.
 
 ## Look and feel
 - **Personality:** dependable, quick, money-aware.
@@ -133,7 +173,7 @@ Demo flow (3 minutes): Home → See how it works → pick voice note → watch p
 - **Delight moment:** the processing steps tick through and the summary card lands in the chat, then the Home total updates to show the new ₹ at stake.
 
 ## Data model
-All demo data lives in the browser (localStorage in try/catch, data version 2), seeded from bundled demo JSON. The KaryaHub server is stateless: it computes and checks, and the browser stores the results (ADR-0007, ADR-0009). Data saved by v0.1.0 (version 1) is upgraded on load.
+All demo data lives in the browser (localStorage in try/catch, data version 3 since CR-0003), seeded from bundled demo JSON. The KaryaHub server is stateless: it computes and checks, and the browser stores the results (ADR-0007, ADR-0009). Data saved by v0.1.0 (version 1) and the 0.2.0 preview (version 2) is upgraded on load.
 
 | Entity | Fields |
 |---|---|
@@ -143,6 +183,9 @@ All demo data lives in the browser (localStorage in try/catch, data version 2), 
 | Job | id, customer_id, date, work_done, parts, source_sample_id, approved_at, state (NEW, ASSIGNED, IN_PROGRESS, WORK_DONE, VERIFIED, CLOSED, CANCELLED; added CR-0002), events [{id, action, from_state, to_state, client_op_id, actor, channel, detail, received_at}] (added CR-0002), otp {challenge, expires_at, demo_code} (added CR-0002) |
 | Document | id, job_id, type (quote or invoice), lines [{description, qty, rate}], cgst, sgst, total |
 | Settings | business_name, gstin (dummy), mode (server, mock or live; server added CR-0002), simulate_failure, theme |
+| Staff (added CR-0003) | id, name, phone, role (owner, coordinator, technician), active, pin_hash (salted SHA-256), created_at, last_sign_in |
+| Access log entry (added CR-0003) | id, at, who, text |
+| Session (added CR-0003, separate storage key) | staff_id, signed_in_at |
 | Tenant (server) | id, business_name, address, gstin, state_code, vertical, language, amc_visit_every_days, amc_lead_days, is_demo (added CR-0002) |
 
 ## Non-functional requirements
@@ -153,6 +196,7 @@ All demo data lives in the browser (localStorage in try/catch, data version 2), 
 - Accessible: labelled controls, WCAG AA contrast, keyboard use, visible focus; voice-note bubbles show the transcript as text.
 - Light and dark themes following the system setting, with a manual switch.
 - Plain-language errors; ₹ in Indian format (1,00,000).
+- Access (CR-0003): every screen and job action is checked against the role table; PINs are stored only as salted hashes; the role table is identical on the web app and the server.
 - No real personal data: all names, phones and GSTINs are dummy and labelled as demo.
 
 ## Out of scope
@@ -160,7 +204,7 @@ All demo data lives in the browser (localStorage in try/catch, data version 2), 
 - Real speech-to-text, LLM or OCR calls (live adapters fail closed until built and keyed).
 - A server database, background queue, attempt limits on customer codes, and cross-delivery de-duplication (see RISKS.md R-04, R-05, R-07, R-13).
 - Valid tax invoices, e-invoicing, payments or payment links.
-- Logins and real multi-firm data (the server is tenant-ready, ADR-0009).
+- Real server-side accounts, OTP sign-in and PIN attempt limits (the demo sign-in lives on the device, ADR-0010; RISKS.md R-08), and real multi-firm data (the server is tenant-ready, ADR-0009). Changed CR-0003: logins were fully out of scope before.
 - Technician app, GPS or photo-based risk scoring, inventory and attendance (see REFERENCE-REVIEW.md).
 - Regional language UI (sample voice notes may be Hinglish with English transcripts).
 

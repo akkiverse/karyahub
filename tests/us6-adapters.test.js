@@ -81,4 +81,15 @@ describe('US-6 Adapters and demo mode', () => {
     t.go('#/jobs');
     expect(t.$('[data-testid="jobs-empty"]').textContent).toContain('No jobs yet, send a sample in Chat');
   });
+
+  it('AC-6.4 (changed CR-0003): Reset demo keeps the team, their PINs and the access log, and keeps you signed in', () => {
+    t = setup({ hash: '#/settings' });
+    t.app.store.update((s) => { s.staff[1].role = 'technician'; s.access_log.unshift({ id: 'log-x', at: '2027-01-01T09:00:00', who: 'Akash Mehta', text: 'Changed something' }); });
+    t.click('[data-action="reset"]');
+    const s = t.app.store.get();
+    expect(s.staff[1].role).toBe('technician');
+    expect(s.access_log[0].id).toBe('log-x');
+    expect(t.$('[data-testid="account-menu"]')).toBeTruthy();
+  });
 });
+

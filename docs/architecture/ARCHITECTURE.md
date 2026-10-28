@@ -24,7 +24,9 @@ Dotted lines are services the demo does not call: their server adapters answer w
 ```mermaid
 flowchart TB
   subgraph Web[Web app: src/]
-    SH[app.js shell and router] --> V[views: home, chat, jobs, document, renewals, settings]
+    SH[app.js shell, router and access guard] --> V[views: signin, home, chat, jobs, document, renewals, settings, admin]
+    SH --> TEAM[domain/team.js: sign-in and Admin] --> ACC[domain/access.js: roles and permissions]
+    TEAM --> SES[session.js]
     SH --> ACT[domain/actions.js]
     ACT --> AD[adapters/index.js: server, mock, live]
     AD --> SRV[adapters/server.js: calls API, falls back to mock]
@@ -38,27 +40,30 @@ flowchart TB
     API --> SAD[adapters: speech, llm, whatsapp]
     API --> DOM[domain: extraction, workflow, otp, amc, documents, renewals]
     API --> WH[whatsapp/webhook.py]
+    API --> SACC[access.py: same role table, checks actor_role]
   end
 ```
 
 | Component | Responsibility | Code |
 |---|---|---|
-| Shell and router | Top bar, tabs, current screen, events, theme; loads server data for a screen | `src/app.js` |
+| Shell and router | Sign-in gate, sidebar and tabs filtered by role, account menu, no-access page, current screen, events, theme; loads server data for a screen | `src/app.js` |
+| Access (CR-0003) | Roles, permissions, route and action rules, guards, PIN hashing; sign-in, sign-out and Admin actions; who is signed in | `src/domain/access.js`, `src/domain/team.js`, `src/session.js` |
 | Screens | Pure functions from state to HTML | `src/views/*.js` |
 | Actions | The only way to change data; runs the pipeline through adapters; workflow and visit plan through the API | `src/domain/actions.js` |
 | API client | JSON calls, plain errors, unreachable detection, timeout | `src/api/client.js` |
 | Browser adapters | server (default), mock, live | `src/adapters/` |
-| Store | State in localStorage (data version 2), migration from v1, reset | `src/store.js`, `src/migrations.js` |
+| Store | State in localStorage (data version 3), migrations from v1 and v2, reset (keeps the team) | `src/store.js`, `src/migrations.js` |
 | KaryaHub API | Routes, models, dependencies | `backend/karyahub/app.py`, entry `api/index.py` |
 | Server adapters | Speech, LLM, WhatsApp: mock or live, keys from env | `backend/karyahub/adapters/` |
 | Domain engine | Extraction, workflow, customer codes, AMC planner, GST, renewals | `backend/karyahub/domain/` |
 | Webhook | Handshake, signature, parse, de-duplicate, hash phones | `backend/karyahub/whatsapp/webhook.py` |
+| Server access (CR-0003) | Role table, `GET /api/v1/access/roles`, 403 for job actions a role may not take | `backend/karyahub/access.py` |
 
 ## API
 See [LLD.md section 2](LLD.md#2-api) for every route, request, response and error code. OpenAPI: `/api/openapi.json`; docs: `/api/docs`.
 
 ## Data model
-Browser state (`karyahub.demo.v1`, data version 2):
+Browser state (`karyahub.demo.v1`, data version 3; the signed-in person is kept separately in `karyahub.session.v1`):
 
 | Entity | Fields |
 |---|---|
@@ -68,6 +73,8 @@ Browser state (`karyahub.demo.v1`, data version 2):
 | Job | id, customer_id, customer_name, phone, area, equipment, date, work_done, parts, amc_expiry, amc_value, lines, source_sample_id, approved_at, **state**, **events[]**, **otp** |
 | Document | id, job_id, type, customer, lines, subtotal, cgst, sgst, roundOff, total, date, sent |
 | Settings | business_name, address, gstin (dummy), mode (server, mock or live), simulate_failure, theme |
+| Staff (CR-0003) | id, name, phone, role, active, pin_hash (salted SHA-256), created_at, last_sign_in |
+| Access log (CR-0003) | id, at, who, text (newest first, at most 200) |
 
 Server (stateless): Tenant configuration (`tenancy.py`); everything else is computed per request. When a database is added: `tenants`, `customers`, `jobs`, `job_events` (unique `(tenant_id, client_op_id)`), `wa_messages` (unique message id), `amc_visits` (unique key), all with `tenant_id` and row-level security (ADR-0009).
 
@@ -107,3 +114,4 @@ See [../adr/](../adr/):
 - [ADR-0007](../adr/0007-job-workflow-and-events.md) workflow and events (CR-0002)
 - [ADR-0008](../adr/0008-customer-otp-proof.md) customer codes (CR-0002)
 - [ADR-0009](../adr/0009-multi-tenant-ready.md) tenancy (CR-0002)
+- [ADR-0010](../adr/0010-demo-sign-in-and-roles.md) demo sign-in and one shared role table (CR-0003)

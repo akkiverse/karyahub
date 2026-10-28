@@ -14,8 +14,9 @@ KaryaHub is a demo prototype for AMC (annual maintenance contract) service firms
 | | |
 |---|---|
 | Stage | Live: v0.1.0 at https://karyahub-akkiverse.vercel.app |
-| Acceptance tests | 49 of 49 passing on the CR-0002 branch; 23 of 23 in v0.1.0 ([report](docs/quality/TEST-REPORT.md)) |
-| Latest change | [CR-0002](docs/changes/CR-0002-advance-tech.md): KaryaHub server, secure WhatsApp webhook, proof of work, AMC visit plans (in review) |
+| Acceptance tests | 75 of 75 passing on the CR-0002/CR-0003 branch; 23 of 23 in v0.1.0 ([report](docs/quality/TEST-REPORT.md)) |
+| Latest change | [CR-0003](docs/changes/CR-0003-business-look-admin-and-staff-logins.md): business look, Admin panel and staff logins (in review, with [CR-0002](docs/changes/CR-0002-advance-tech.md): KaryaHub server, WhatsApp webhook, proof of work, AMC visit plans) |
+| Demo sign-in | Owner 99000 00201 / PIN 2468 · Coordinator 99000 00202 / 1357 · Technicians 99000 00203 / 8642 and 99000 00204 / 9753 (sample accounts) |
 
 ## Stack
 

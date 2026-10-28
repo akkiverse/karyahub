@@ -40,3 +40,14 @@ The rupee meter: a huge green "₹99,100" with a three-part bar splitting it int
 - **Settings:** a server icon banner for "Server mode: KaryaHub API" and one line under it with the connection status.
 - **States:** loading ("Working out the visit plan…" with a spinner; "Checking the KaryaHub server…"), errors as red notes with what to do ("Couldn't reach the KaryaHub server…", the wrong-code message), and the Chat fallback named in the step detail.
 - No new colours or fonts: existing tokens (`--c-soon`, `--c-money`, `--c-lapsed`, `--c-brand`) carry the new statuses in light and dark.
+
+## Additions in CR-0003 (business look, Admin and staff logins)
+The founder asked for a more professional look that appeals to businesses. Direction: **an operations console for a service firm** — calm, structured and confident, like the ledger and back-office tools owners already trust, rather than a marketing demo.
+- **Sidebar:** deep ink-teal (`--c-nav` `#0C2B28`, dark `#081816`) with light text (`--c-nav-ink`, `--c-nav-muted`), the KaryaHub mark, a firm card ("CoolCare AC Services, Demo workspace"), grouped navigation (Workspace, Manage) with a teal edge on the active item, and the signed-in person with Sign out at the bottom. The work area stays light paper with white panels and hairline borders.
+- **Top bar:** the firm's name on the left; the demo date and an account menu (avatar, first name; menu with name, role, Settings, Admin, Sign out) on the right. Phones show the brand and the avatar, with a bottom tab bar that lists only the screens the role allows.
+- **Role colours** for avatars: owner teal (`--c-owner`), coordinator violet (`--c-coordinator` `#6D4AC2`, dark `#A993F0`), technician brass (`--c-technician` `#B7791F`, dark `#F1B45A`). Only avatars use them.
+- **KPI tiles:** white tiles with a small icon label, a large tabular number and a one-line note; used for "Today at CoolCare" on Home and staff counts in Admin.
+- **Sign in:** split screen on desktop: the dark brand panel with "Your field team on WhatsApp. Your office on KaryaHub." and three points; the form card and demo accounts on the light side. Phones stack the headline, the form, then the demo accounts.
+- **Admin:** a Team panel (avatar, name, number and last sign-in, role select, status pill, Reset PIN, Turn off access), then Add staff beside the Roles and access table, then the Access log.
+- **States:** "You don't have access to <screen>" page with a shield icon and one button to the person's start page; field-level errors on Add staff; refusals as red notes; a spinner on the Sign in button while checking.
+- **Accessibility:** headings that receive focus after navigation no longer draw a focus box when focused by script (keyboard focus still shows); the account menu is a native disclosure; every new control is 44px tall or more.

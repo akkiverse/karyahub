@@ -1,6 +1,6 @@
 # KaryaHub: Build plan
 
-For CR-0002 (Advance Tech). The CR-0001 plan is in the git history of this file.
+For CR-0002 (Advance Tech) and CR-0003 (business look, Admin and staff logins), which ship together in one pull request. The CR-0001 plan is in the git history of this file. CR-0003's part is at the end.
 
 ## Stack
 - **Web app:** plain JavaScript ES modules, Vite 8, Vitest 5 with jsdom, Noto Sans self-hosted (unchanged, ADR-0002).
@@ -34,3 +34,19 @@ See [RISKS.md](../architecture/RISKS.md) for the product risks. For the build it
 - **Vercel routing of the Python function next to a Vite site:** `vercel.json` sets the framework, output and rewrite; checked on the preview with `/api/health`.
 - **Regressions in the 23 existing criteria:** the full Vitest suite runs unchanged except for the two criteria this CR changes.
 - **Demo stalls if the server is cold or down:** Chat falls back; proof of work shows a clear message.
+
+## CR-0003: business look, Admin panel and staff logins
+**Approach.** Build on the open CR-0002 branch so the founder approves one release (v0.2.0). Keep the plain JavaScript UI and the stateless server (ADR-0002, ADR-0007).
+1. One role table (`src/domain/access.js`) drives navigation, screen guards, buttons and job actions; the server mirrors it (`backend/karyahub/access.py`) and checks `actor_role` on job actions; a test keeps them equal (ADR-0010).
+2. Staff accounts and the access log live in the demo data (version 3); the signed-in person in a separate session record so Reset demo doesn't sign anyone out. PINs are stored as salted SHA-256 hashes.
+3. Sign-in and Admin screens; role-aware shell; "Today at" figures on Home; the new look in `src/styles.css` (CR-0003 section), light and dark.
+4. Tests first for each new criterion; the test helper signs in as the demo owner so every earlier test still runs unchanged.
+
+**Existing users' data keeps working.** Data saved by v0.1.0 (version 1) goes v1 → v2 → v3; data from the 0.2.0 preview (version 2) goes to v3 by adding the demo team and an empty log. Nothing is removed. Tests: AC-11.1 and AC-11.3. API routes are unchanged; `actor_role` is optional, so older clients and WhatsApp calls keep working.
+
+| Story | Files |
+|---|---|
+| US-13 Staff sign-in | `src/views/signin.js`, `src/domain/team.js`, `src/session.js`, `src/domain/access.js` |
+| US-14 Roles and limited access | `src/app.js`, `src/views/jobs.js`, `src/domain/actions.js`, `backend/karyahub/access.py`, `backend/karyahub/app.py` |
+| US-15 Admin panel | `src/views/admin.js`, `src/domain/team.js` |
+| US-16 Business look | `src/styles.css`, `src/app.js`, `src/views/home.js` |

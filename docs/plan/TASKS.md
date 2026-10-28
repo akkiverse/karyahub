@@ -1,23 +1,17 @@
 # KaryaHub: Tasks
 
-For CR-0002. Each task names the stories and criteria it serves. (CR-0001's tasks are in the git history of this file.)
+For CR-0003 (business look, Admin panel and staff logins), built on the CR-0002 branch. Each task names the stories and criteria it serves. (Earlier tasks are in the git history of this file.)
 
 | # | Task | Serves | Done |
 |---|---|---|---|
-| 1 | Read kritvo-api and kritvo-web docs (HLD, LLD, ADRs, status) and code layout; write REFERENCE-REVIEW.md | US-12 (AC-12.1) | Yes |
-| 2 | Python project: pyproject, uv.lock, .python-version, requirements.txt, Ruff, pytest; `api/index.py`; `vercel.json` | US-7 | Yes |
-| 3 | Settings, error handlers, tenancy, health and meta | US-7 (AC-7.1, AC-7.4, AC-7.5) | Yes |
-| 4 | Port extraction and samples to the server; server adapters (mock and live) and pipeline routes | US-7 (AC-7.2, AC-7.5) | Yes |
-| 5 | WhatsApp webhook: handshake, signature, parse, de-duplicate, hashed phones | US-8 (AC-8.1 to AC-8.3) | Yes |
-| 6 | Workflow engine with guards, events and idempotency; transition route | US-9 (AC-9.4, AC-9.5) | Yes |
-| 7 | Customer codes: issue and verify; wire into request_otp and verify_otp | US-9 (AC-9.2, AC-9.3) | Yes |
-| 8 | AMC visit planner and route | US-10 (AC-10.1, AC-10.2) | Yes |
-| 9 | GST totals in paise, IGST, reminder text and renewals on the server | US-11 (AC-11.2) | Yes |
-| 10 | Web: API client, server adapters with fallback, default mode "server" | US-6 (AC-6.1), US-7 (AC-7.2 to AC-7.4) | Yes |
-| 11 | Web: proof-of-work section, code form, history; Jobs list status | US-9 (AC-9.1 to AC-9.3, AC-9.6) | Yes |
-| 12 | Web: AMC visits section | US-10 (AC-10.3) | Yes |
-| 13 | Web: Settings modes and server status | US-6 (AC-6.3), US-7 (AC-7.6) | Yes |
-| 14 | Data version 2 and migration from v0.1.0 | US-11 (AC-11.1) | Yes |
-| 15 | Acceptance tests: pytest for the server, Vitest for the web app (fake API) | All | Yes |
-| 16 | End-to-end and visual check at 375px and 1280px, light and dark; fixes | Design | Yes |
-| 17 | HLD, LLD, RISKS, ADR-0005 to ADR-0009, SPEC, ARCHITECTURE, DESIGN, TEST-REPORT, CHANGELOG, README, CR-0002 | US-12, records | Yes |
+| 1 | Role table, permissions, route and action rules, guards, PIN hashing (`src/domain/access.js`) | US-13, US-14, US-15 | Yes |
+| 2 | Session on the device; sign-in, sign-out and Admin actions with the access log (`src/session.js`, `src/domain/team.js`) | US-13 (AC-13.2 to AC-13.6), US-15 | Yes |
+| 3 | Data version 3 with the demo team; migrations from v1 and v2; Reset demo keeps the team | AC-6.4, AC-11.1, AC-11.3 | Yes |
+| 4 | Sign-in screen with demo accounts | AC-13.1, AC-13.4 | Yes |
+| 5 | Shell: role-filtered sidebar and tabs, account menu, no-access page; hide paperwork and closing for technicians; name and role on job actions | US-14 (AC-14.1 to AC-14.4), AC-16.2 | Yes |
+| 6 | Admin panel: counts, team, role change, access on or off, Reset PIN, Add staff, roles table, access log | US-15 (AC-15.1 to AC-15.7) | Yes |
+| 7 | Business look: sidebar, top bar, KPI tiles, "Today at" row on Home, sign-in design, dark theme | US-16 (AC-16.1) | Yes |
+| 8 | Server: `access.py`, `GET /api/v1/access/roles`, role check on job actions | AC-14.5 | Yes |
+| 9 | Tests: Vitest for US-13 to US-16, AC-6.4 and AC-11.3; pytest for AC-14.5; test helper signs in as the owner | All | Yes |
+| 10 | Visual check at 375px and 1280px, light and dark; fixes | Design | Yes |
+| 11 | CR-0003, ADR-0010, SPEC, DESIGN, ARCHITECTURE, RISKS, PLAN, TEST-REPORT, CHANGELOG, README, studio.json | Records | Yes |

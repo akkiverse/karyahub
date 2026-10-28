@@ -1,0 +1,12 @@
+{
+  "name": "KaryaHub",
+  "slug": "karyahub",
+  "tagline": "Turn technicians' WhatsApp voice notes into job records, quotes and AMC renewal reminders.",
+  "accent": "#0F766E",
+  "repo": "https://github.com/akkiverse/karyahub",
+  "live_url": "https://karyahub-akkiverse.vercel.app",
+  "version": "0.1.0",
+  "launched": "",
+  "tests_passed": 0,
+  "tests_total": 0
+}

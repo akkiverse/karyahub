@@ -4,7 +4,7 @@
 - **Requested by:** Founder (board note, sent as an improvement on 2026-10-28)
 - **Date:** 2026-10-28
 - **Release:** (set on release; planned v0.3.0, a minor release)
-- **Pull request:** (added when opened)
+- **Pull request:** [#3](https://github.com/akkiverse/karyahub/pull/3)
 
 ## Why
 Until now KaryaHub only pretended to read technicians' messages: bundled answers for the samples and a small rule-based reader for anything typed. The founder now runs his own AI server (Ollama on his PC with `qwen3.5:9b`, published through Caddy and Tailscale Funnel) and the hub ships the **Studio AI kit** so every Idea Studio app can use it without its own AI keys. The founder asked to replace the pretend AI with that server, keep the demo working until the AI settings are linked, and stay calm and useful when the AI server is switched off.

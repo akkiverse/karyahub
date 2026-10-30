@@ -1,9 +1,9 @@
 # CR-0004: Real AI for job notes and photos (Studio AI)
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (board note, sent as an improvement on 2026-10-28)
 - **Date:** 2026-10-28
-- **Release:** (set on release; planned v0.3.0, a minor release)
+- **Release:** v0.3.0 (2026-10-30)
 - **Pull request:** [#3](https://github.com/akkiverse/karyahub/pull/3)
 
 ## Why

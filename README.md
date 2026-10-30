@@ -13,10 +13,9 @@ KaryaHub is a demo prototype for AMC (annual maintenance contract) service firms
 
 | | |
 |---|---|
-| Stage | Live: v0.2.0 at https://karyahub-akkiverse.vercel.app |
-| Acceptance tests | 75 of 75 passing in v0.2.0 ([report](docs/quality/TEST-REPORT.md)) |
-| In review | [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md): real AI for job notes and photos through Studio AI, with a labelled "Read without AI" fallback; 87 of 87 tests passing on `cr/0004-studio-ai` |
-| Latest release | [CR-0003](docs/changes/CR-0003-business-look-admin-and-staff-logins.md): business look, Admin panel and staff logins (released in v0.2.0 with [CR-0002](docs/changes/CR-0002-advance-tech.md): KaryaHub server, WhatsApp webhook, proof of work, AMC visit plans) |
+| Stage | Live: v0.3.0 at https://karyahub-akkiverse.vercel.app |
+| Acceptance tests | 87 of 87 passing in v0.3.0 ([report](docs/quality/TEST-REPORT.md)) |
+| Latest release | [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md): real AI for job notes and photos through Studio AI, with a labelled "Read without AI" fallback (v0.3.0). Before that, [CR-0003](docs/changes/CR-0003-business-look-admin-and-staff-logins.md): business look, Admin panel and staff logins (released in v0.2.0 with [CR-0002](docs/changes/CR-0002-advance-tech.md): KaryaHub server, WhatsApp webhook, proof of work, AMC visit plans) |
 | Demo sign-in | Owner 99000 00201 / PIN 2468 · Coordinator 99000 00202 / 1357 · Technicians 99000 00203 / 8642 and 99000 00204 / 9753 (sample accounts) |
 
 ## Stack

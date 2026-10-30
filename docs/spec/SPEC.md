@@ -1,6 +1,6 @@
 # KaryaHub: Specification
 
-**Status:** Approved 2026-10-28, changed by CR-0002 and CR-0003 (2026-10-28) · **Source:** https://claude.ai/artifact/AtyPCQQWYaVSmg1K8gPxgC
+**Status:** Approved 2026-10-28, changed by CR-0002 and CR-0003 (2026-10-28) and CR-0004 (2026-10-28) · **Source:** https://claude.ai/artifact/AtyPCQQWYaVSmg1K8gPxgC
 This file is the source of truth for what the product does. Every change to it is made through a change request (see [../changes/](../changes/)).
 
 ## Overview
@@ -9,6 +9,8 @@ KaryaHub Demo is a mobile-first web prototype the founder shows to AMC service f
 **MVP goal:** a 3-minute demo that makes an owner say "I want this for my business", built so real WhatsApp, speech and LLM services can be switched on later without rewriting screens.
 
 **Since CR-0002 ("Advance Tech"):** a Python KaryaHub server (FastAPI) does the processing, receives WhatsApp webhooks securely, runs a job workflow with customer-confirmed proof of work, and plans AMC service visits. It still answers every outside service with mock data, so the demo needs no keys; real services are switched on with server keys. The design follows the founder's reference platform (see `docs/architecture/REFERENCE-REVIEW.md`), with the risks in `docs/architecture/RISKS.md`.
+
+**Since CR-0004 (Studio AI):** technicians' messages and job-sheet photos are read by real AI on the founder's own AI server when it's connected, and by the quick reader, clearly labelled, when it's off.
 
 **Since CR-0003 (business look, Admin and staff logins):** people sign in with a mobile number and PIN, and each role (owner, office coordinator, technician) sees only what its job needs. Owners manage the team in an Admin panel. The look is more businesslike: a dark sidebar with the firm and the signed-in person, and a "Today at" row of figures on Home. Sign-in is a demo kept on the device (ADR-0010); real accounts come with the database.
 
@@ -80,7 +82,7 @@ As the founder I want the processing to run on a Python server so that real serv
 - **AC-7.3** Given the server can't be reached, when a sample is sent, then Chat still completes using the in-browser demo and the step detail says "server unreachable, used the in-browser demo". *(added CR-0002)*
 - **AC-7.4** Given any API error (unknown address, invalid request, a message that can't be read), then the answer is `{"error": {"code", "message"}}` with a plain-English message, and the web app shows that message. *(added CR-0002)*
 - **AC-7.5** Given the server in live mode with no keys, then pipeline and send calls answer 503 "Not configured: add <SERVICE> key", and meta shows each service as "Missing key"; keys are read only from server environment variables. *(added CR-0002)*
-- **AC-7.6** Given Settings in server mode, then it shows "Server mode: KaryaHub API", the API version and business name, each service's status from the server and the `KARYAHUB_*` key it needs; if the server can't be reached it says so and shows "Unreachable". *(added CR-0002)*
+- **AC-7.6** Given Settings in server mode, then it shows "Server mode: KaryaHub API", the API version and business name, each service's status from the server and the key it needs (the `KARYAHUB_*` key, or `AI_ENDPOINTS` for the LLM since it uses Studio AI); if the server can't be reached it says so and shows "Unreachable". *(added CR-0002, changed CR-0004: the LLM key comes from the server and is `AI_ENDPOINTS`)*
 
 ### US-8: WhatsApp webhook
 As the founder I want a secure WhatsApp webhook so that real technician messages can come in as soon as WhatsApp is connected.
@@ -146,6 +148,21 @@ As an owner I want KaryaHub to look like software a business runs on so that I t
 - **AC-16.1** Given a signed-in owner or coordinator on Home, then a "Today at <business>" row greets them by first name and shows four figures from the data: Jobs recorded, Waiting for customer check, Renewals in 30 days (with the ₹ at stake) and Quotes and invoices. *(added CR-0003)*
 - **AC-16.2** Given any signed-in screen, then the business name and the signed-in person (name, role and Sign out) are visible. *(added CR-0003)*
 
+### US-17: Real AI for job notes and photos
+As an owner I want technicians' messages and job-sheet photos read by real AI so that drafts are right more often, and I want the app to keep working when the AI server is off. *(added CR-0004)*
+- **AC-17.1** Given the server has no AI settings (`AI_ENDPOINTS` not set), then messages are read by the bundled demo reader (`reader` "demo"), no AI server is called, `GET /api/ai/status` answers `{"configured": false, "online": false}`, and meta shows the LLM as "Mock" with key `AI_ENDPOINTS`. *(added CR-0004)*
+- **AC-17.2** Given AI is set up and online, when a message is extracted, then the server sends it to `qwen3.5:9b` with the job JSON schema at temperature 0 and the shared key, and answers with the validated job and `reader` "ai"; `/api/ai/status` answers online and meta shows the LLM as "Studio AI". *(added CR-0004)*
+- **AC-17.3** Given the AI finds no customer name, then the answer is `found: false` with `customer_name` missing, so Chat replies "I couldn't find a customer name, can you add it?". *(added CR-0004)*
+- **AC-17.4** Given the AI's answer, then it is treated as untrusted: Mr/Ji are removed from names, phones that aren't 10-digit Indian mobiles, dates that aren't real `YYYY-MM-DD` dates and negative amounts are dropped, and an answer that can't be used falls back to the quick reader with the note "The AI answer couldn't be used, so this was read without AI. Check the details before approving." *(added CR-0004)*
+- **AC-17.5** Given a job-sheet photo (JPEG, PNG or WebP, up to 3 MB) is sent with `image_base64`, then the AI reads its text (`reader` "ai"); another file type answers 422 "That photo isn't a JPEG, PNG or WebP image."; a photo with no readable text answers 422 "Couldn't read any text in this photo. Try a clearer photo, or type the details."; with no image the sample's stored text is used (`reader` "demo"). *(added CR-0004)*
+- **AC-17.6** Given the AI server is offline, then messages are still read by the quick reader with `reader` "quick" and the note "AI is offline right now, so this was read without AI. Check the details before approving."; the sample photo falls back to its stored text the same way; a photo with no stored text answers 503 `ai_unavailable`; `/api/ai/status` answers offline; paperwork, transcripts and every other feature keep working. *(added CR-0004)*
+- **AC-17.7** Given a message read by Studio AI, then the Extract step (and the photo step) says "Read by Studio AI (KaryaHub server)" and the job card shows a "Read by AI" tag. *(added CR-0004)*
+- **AC-17.8** Given a message read without AI, then the steps say "Read without AI (KaryaHub server)", the processing panel shows the server's note, the job card shows a "Read without AI" tag, and the draft can be checked and approved as usual. *(added CR-0004)*
+- **AC-17.9** Given server mode, when the job-sheet photo sample is sent, then the browser draws the sheet as a JPEG and sends it to the server with the request, and the step says who read it; where the browser can't draw it, no image is sent. *(added CR-0004)*
+- **AC-17.10** Given the AI server is offline and a photo can't be read, then the technician's photo stays in the chat with the server's message and a Try again button, and the "AI is offline" banner appears. *(added CR-0004)*
+- **AC-17.11** Given the app is open, then a banner "AI features are offline right now because the AI server is switched off. Everything else works as usual." shows while `/api/ai/status` says AI is set up but offline, hides when it is back, and never shows when AI isn't set up. *(added CR-0004)*
+- **AC-17.12** Given chat saved by v0.2.0 (job cards without a reader), then it loads without reader tags or notes and its drafts approve as before. *(added CR-0004)*
+
 ## Screens and flows
 Sign in first (CR-0003). Then a bottom tab bar on phones and a dark sidebar on desktop, showing only the screens the person's role allows: Home, Chat, Jobs, Renewals (Workspace) and Admin, Settings (Manage). An account menu in the top bar shows the person and role, with Settings, Admin and Sign out.
 
@@ -191,7 +208,8 @@ All demo data lives in the browser (localStorage in try/catch, data version 3 si
 ## Non-functional requirements
 - Works from 360px wide; tap targets at least 44px.
 - Loads in under 2 seconds; no network calls in the in-browser mode. API answers in mock mode in under 1 second.
-- Secrets only in server environment variables (`KARYAHUB_*`); live mode without a needed secret fails closed with a clear message.
+- Secrets only in server environment variables (`KARYAHUB_*`, and the shared `AI_ENDPOINTS` and `AI_GATEWAY_KEY` for Studio AI); live mode without a needed secret fails closed with a clear message.
+- AI (CR-0004): each AI call is limited to 40 seconds inside a 60-second server function; when AI is offline or unusable, messages are read without AI and labelled, never lost.
 - Server code: Python 3.12, FastAPI, Pydantic v2, Ruff, pytest (stack tier R; UI stays plain JavaScript, ADR-0005).
 - Accessible: labelled controls, WCAG AA contrast, keyboard use, visible focus; voice-note bubbles show the transcript as text.
 - Light and dark themes following the system setting, with a manual switch.
@@ -201,7 +219,7 @@ All demo data lives in the browser (localStorage in try/catch, data version 3 si
 
 ## Out of scope
 - Real WhatsApp phone numbers or message sending (the webhook exists and is tested, but no number is connected; changed CR-0002).
-- Real speech-to-text, LLM or OCR calls (live adapters fail closed until built and keyed).
+- Real speech-to-text and paid LLM or OCR services (speech stays a demo adapter). Changed CR-0004: messages and photos are read by Studio AI, the founder's own AI server, once its settings are linked.
 - A server database, background queue, attempt limits on customer codes, and cross-delivery de-duplication (see RISKS.md R-04, R-05, R-07, R-13).
 - Valid tax invoices, e-invoicing, payments or payment links.
 - Real server-side accounts, OTP sign-in and PIN attempt limits (the demo sign-in lives on the device, ADR-0010; RISKS.md R-08), and real multi-firm data (the server is tenant-ready, ADR-0009). Changed CR-0003: logins were fully out of scope before.

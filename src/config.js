@@ -12,10 +12,11 @@ export const STEP_DELAY_MS = 650;
 export const SERVICES = [
   { id: 'whatsapp', name: 'WhatsApp', label: 'WhatsApp Business Cloud API', key: 'WHATSAPP_ACCESS_TOKEN', purpose: 'Receives technician messages and sends quotes and reminders' },
   { id: 'speech', name: 'Speech-to-text', label: 'Speech-to-text (Sarvam AI or OpenAI)', key: 'SPEECH_API_KEY', purpose: 'Turns voice notes into text' },
-  { id: 'llm', name: 'LLM', label: 'LLM (Claude or Sarvam)', key: 'LLM_API_KEY', purpose: 'Reads job sheets and extracts job details' },
+  { id: 'llm', name: 'LLM', label: 'LLM (Studio AI: your own AI server)', key: 'LLM_API_KEY', purpose: 'Reads job sheet photos and pulls out job details' },
 ];
 
 export const configuredKeys = {}; // empty on purpose: the demo has no keys
 
 // Keys the KaryaHub server reads from its environment variables (CR-0002). Shown in Settings.
-export const SERVER_KEYS = { whatsapp: 'KARYAHUB_WHATSAPP_ACCESS_TOKEN', speech: 'KARYAHUB_SPEECH_API_KEY', llm: 'KARYAHUB_LLM_API_KEY' };
+// CR-0004: the LLM uses Studio AI, set up with the shared AI_ENDPOINTS and AI_GATEWAY_KEY variables.
+export const SERVER_KEYS = { whatsapp: 'KARYAHUB_WHATSAPP_ACCESS_TOKEN', speech: 'KARYAHUB_SPEECH_API_KEY', llm: 'AI_ENDPOINTS' };

@@ -5,7 +5,7 @@ import { fakeApi } from './fake-api.js';
 
 // Screens need a signed-in person since CR-0003. Tests sign in as the demo owner unless told
 // otherwise (signedInAs: 'st-coord', 'st-santosh', or null for the sign-in screen).
-export function setup({ stepDelay = 0, hash = '#/', realTiming = false, api = fakeApi(), saved = null, signedInAs = 'st-owner', random } = {}) {
+export function setup({ stepDelay = 0, hash = '#/', realTiming = false, api = fakeApi(), saved = null, signedInAs = 'st-owner', random, photoImage } = {}) {
   localStorage.clear();
   if (saved) localStorage.setItem('karyahub.demo.v1', JSON.stringify(saved));
   if (signedInAs) localStorage.setItem('karyahub.session.v1', JSON.stringify({ staff_id: signedInAs, signed_in_at: '2027-01-01T09:00:00' }));
@@ -13,7 +13,7 @@ export function setup({ stepDelay = 0, hash = '#/', realTiming = false, api = fa
   window.location.hash = hash;
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.getElementById('app');
-  const app = mountApp(root, realTiming ? { api, random } : { stepDelay, api, random });
+  const app = mountApp(root, realTiming ? { api, random, photoImage } : { stepDelay, api, random, photoImage });
   const $ = (sel) => root.querySelector(sel);
   const $$ = (sel) => [...root.querySelectorAll(sel)];
   const click = (sel) => {

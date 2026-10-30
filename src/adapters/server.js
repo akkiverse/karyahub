@@ -28,8 +28,8 @@ export function serverAdapters(api) {
     },
     llm: {
       name: 'server',
-      readImage: (media, { fail = false } = {}) =>
-        viaServer('LLM', () => api.readImage(media?.id || '', fail), () => mockLlm.readImage(media, { fail })),
+      readImage: (media, { fail = false, image = null } = {}) =>
+        viaServer('LLM', () => api.readImage(media?.id || '', fail, image), () => mockLlm.readImage(media, { fail })),
       extractJob: (text, { fail = false } = {}) =>
         viaServer('LLM', () => api.extract(text, fail), () => mockLlm.extractJob(text, { fail })),
     },

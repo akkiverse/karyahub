@@ -58,6 +58,10 @@ class Extraction(BaseModel):
     found: bool
     job: JobDraft | None = None
     missing: list[str] = []
+    # Who read the message (CR-0004): "ai" (Studio AI), "quick" (the quick reader, used when AI is
+    # offline), or "demo" (bundled demo answers). Empty from versions before 0.3.0.
+    reader: str = ""
+    notice: str = ""
 
 
 @lru_cache

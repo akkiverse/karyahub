@@ -42,6 +42,7 @@ function processCard(m) {
     <ol class="steps">${m.steps
       .map((s) => `<li class="step is-${s.status}" data-step="${s.id}" data-status="${s.status}"><span class="step-icon">${stepIcon(s)}</span><span class="step-body"><strong>${s.label}</strong> <span class="step-state">${statusText[s.status]}</span>${s.detail ? `<span class="step-detail">${escapeHtml(s.detail)}</span>` : ''}</span></li>`)
       .join('')}</ol>
+    ${m.notice ? `<p class="process-note" role="status" data-testid="process-note">${icon('alert', { size: 16 })}<span>${escapeHtml(m.notice)}</span></p>` : ''}
     ${m.transcript ? `<div class="transcript" data-testid="transcript"><span class="label">Transcript</span><p>${escapeHtml(m.transcript)}</p></div>` : ''}
     ${m.error ? `<div class="step-error" role="alert" data-testid="process-error">${icon('alert', { size: 16 })}<span>${escapeHtml(m.error)}</span><button type="button" class="btn btn-small" data-action="retry" data-id="${m.id}">${icon('rotate', { size: 16 })} Try again</button></div>` : ''}
   </div>`;
@@ -62,7 +63,7 @@ function summaryCard(m, ui) {
     </form>`;
   }
   return `<div class="summary ${m.status === 'approved' ? 'is-approved' : ''}" data-testid="summary-card" data-id="${m.id}">
-    <p class="summary-title">${icon('jobs', { size: 16 })} Job summary ${m.status === 'approved' ? `<span class="badge badge-ok">${icon('check', { size: 14 })} Approved</span>` : '<span class="badge">Draft</span>'}</p>
+    <p class="summary-title">${icon('jobs', { size: 16 })} Job summary ${m.reader === 'quick' ? '<span class="badge badge-warn" data-testid="reader-tag">Read without AI</span>' : m.reader === 'ai' ? `<span class="badge" data-testid="reader-tag">${icon('sparkle', { size: 12 })} Read by AI</span>` : ''} ${m.status === 'approved' ? `<span class="badge badge-ok">${icon('check', { size: 14 })} Approved</span>` : '<span class="badge">Draft</span>'}</p>
     <dl class="summary-fields">${FIELDS.map(([k, label]) => `<div data-field="${k}"><dt>${label}</dt><dd>${fieldValue(m.job, k)}</dd></div>`).join('')}</dl>
     ${linesHtml}
     ${m.status === 'draft'
@@ -127,7 +128,7 @@ export function chat({ state, ui, busy }) {
         <li>KaryaHub transcribes it, pulls out the customer, the work and the AMC, and saves a draft.</li>
         <li>The owner checks it, corrects anything, and approves. A quote or invoice and a renewal reminder follow.</li>
       </ol>
-      <p class="aside-note">${icon('plug', { size: 16 })} WhatsApp, speech and LLM are answered by mock adapters in this demo. Real services plug in later without changing these screens.</p>
+      <p class="aside-note">${icon('plug', { size: 16 })} Messages and job-sheet photos are read by Studio AI, the firm's own AI server, once it's connected; until then, and whenever it's offline, a quick reader fills in the details and the card says "Read without AI". WhatsApp and speech-to-text are still demo adapters, so nothing is really sent.</p>
     </aside>
   </section>`;
 }

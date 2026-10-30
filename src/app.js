@@ -18,6 +18,7 @@ import { createTeamActions, ACCESS_OFF } from './domain/team.js';
 import { can, canOpen, landingFor, roleName, initials, DEMO_PINS } from './domain/access.js';
 import { signIn, logo } from './views/signin.js';
 import { admin, denied } from './views/admin.js';
+import { jobsheetImage } from './data/jobsheet.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
 // [route, label, href, icon, section, on the phone tab bar]
@@ -52,7 +53,7 @@ export function mountApp(root, options = {}) {
   const api = options.api || defaultApi;
   const session = options.session || createSession();
   const team = createTeamActions({ store, session, random: options.random });
-  const actions = createActions({ store, getAdapters, stepDelay, api, currentUser: () => team.me() });
+  const actions = createActions({ store, getAdapters, stepDelay, api, currentUser: () => team.me(), photoImage: options.photoImage || jobsheetImage });
   const ui = { signin: {}, admin: {}, renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null };
   let alive = true;
 

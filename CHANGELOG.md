@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-30
+
+### Added
+- Real AI for technicians' messages and job-sheet photos through Studio AI, the founder's own AI server, with the job read from a JSON schema and checked before it's shown. See [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md).
+- "AI is offline right now" banner and a note on the processing panel when the AI server is off; messages are then read without AI and labelled, never lost. See [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md).
+- `GET /api/ai/status`, and `image_base64` on `/api/v1/pipeline/read-image`. See [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md).
+
+### Changed
+- Processing steps and job cards say who read each message: "Read by Studio AI" or "Read without AI". Settings shows the LLM as Studio AI with `AI_ENDPOINTS`. See [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md).
+
 ## [0.2.0] - 2026-10-28
 
 ### Added
@@ -32,5 +42,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.3.0]: https://github.com/akkiverse/karyahub/pull/3
 [0.2.0]: https://github.com/akkiverse/karyahub/pull/2
 [0.1.0]: https://github.com/akkiverse/karyahub/pull/1

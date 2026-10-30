@@ -13,12 +13,12 @@ function serviceRows(mode, meta) {
     let status;
     let key = sv.key;
     if (mode === 'server') {
-      key = SERVER_KEYS[sv.id];
       const m = meta && meta.data && meta.data.services ? meta.data.services.find((x) => x.id === sv.id) : null;
+      key = (m && m.key) || SERVER_KEYS[sv.id];
       status = meta && meta.error ? 'Unreachable' : m ? m.status : 'Checking';
     } else if (mode === 'live') status = configuredKeys[sv.key] ? 'Live' : 'Missing key';
     else status = 'Mock';
-    const cls = status === 'Mock' ? 'status-mock' : status === 'Live' ? 'status-live' : status === 'Checking' ? 'status-mock' : 'status-missing';
+    const cls = status === 'Mock' ? 'status-mock' : status === 'Live' || status === 'Studio AI' ? 'status-live' : status === 'Checking' ? 'status-mock' : 'status-missing';
     return `<li class="service" data-service="${sv.id}"><div><strong>${sv.label}</strong><span class="muted">${sv.purpose}</span><span class="key">Needs <code>${key}</code>${mode === 'server' ? ' on the server' : ''}</span></div><span class="status ${cls}" data-testid="service-status">${status}</span></li>`;
   }).join('');
 }

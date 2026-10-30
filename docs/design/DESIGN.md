@@ -51,3 +51,9 @@ The founder asked for a more professional look that appeals to businesses. Direc
 - **Admin:** a Team panel (avatar, name, number and last sign-in, role select, status pill, Reset PIN, Turn off access), then Add staff beside the Roles and access table, then the Access log.
 - **States:** "You don't have access to <screen>" page with a shield icon and one button to the person's start page; field-level errors on Add staff; refusals as red notes; a spinner on the Sign in button while checking.
 - **Accessibility:** headings that receive focus after navigation no longer draw a focus box when focused by script (keyboard focus still shows); the account menu is a native disclosure; every new control is 44px tall or more.
+
+## Additions in CR-0004 (Studio AI)
+- **Reader tags** on the job card title: "Read by AI" uses the neutral badge with a small sparkle icon; "Read without AI" uses a brass warning badge (`.badge-warn`, from `--c-soon`) so the owner checks it more carefully.
+- **Processing note:** a soft brass panel (`.process-note`) with the alert icon inside the processing card, carrying the server's note (for example "AI is offline right now, so this was read without AI. Check the details before approving.").
+- **Offline banner:** the Studio AI kit's banner (`src/ui/ai-status.js`, unchanged) at the very top of the page, restyled through `.studio-ai-offline` to KaryaHub's tokens (brass-tinted surface, ink text, hairline border) in light and dark. It's calm, never red: AI being off is a normal state, not an error.
+- **States:** AI online (tags only), AI offline (banner, note, "Read without AI" tag), AI answer unusable (note, "Read without AI" tag), photo unreadable while offline (the existing red error with Try again; the photo stays in the chat).

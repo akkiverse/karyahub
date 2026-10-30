@@ -1,5 +1,9 @@
 // Thin client for the KaryaHub API (FastAPI, Python) under /api/v1 (CR-0002).
 // Business rules live on the server; the browser keeps the demo data and draws the screens.
+import { isAiOffline } from '../ui/ai-status.js';
+
+// Reading with Studio AI (CR-0004) can take a while on the founder's own AI server.
+export const AI_TIMEOUT_MS = 60000;
 
 export class ApiError extends Error {
   constructor(message, { code = 'api_error', status = 0 } = {}) {
@@ -18,9 +22,9 @@ export class ApiUnreachable extends Error {
 }
 
 export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => globalThis.fetch(...a), timeoutMs = 8000 } = {}) {
-  async function call(method, path, body) {
+  async function call(method, path, body, { timeout = timeoutMs } = {}) {
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
     let res;
     try {
       res = await fetchImpl(`${base}${path}`, {
@@ -34,6 +38,7 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     } finally {
       if (timer) clearTimeout(timer);
     }
+    if (res.status === 503) await isAiOffline(res); // shows the "AI is offline" banner (CR-0004)
     let data = null;
     try {
       data = await res.json();
@@ -50,8 +55,9 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
   return {
     meta: () => call('GET', '/meta'),
     transcribe: (mediaId, simulateFailure = false) => call('POST', '/pipeline/transcribe', { media_id: mediaId, simulate_failure: simulateFailure }),
-    readImage: (mediaId, simulateFailure = false) => call('POST', '/pipeline/read-image', { media_id: mediaId, simulate_failure: simulateFailure }),
-    extract: (text, simulateFailure = false) => call('POST', '/pipeline/extract', { text, simulate_failure: simulateFailure }),
+    readImage: (mediaId, simulateFailure = false, imageBase64 = null) =>
+      call('POST', '/pipeline/read-image', { media_id: mediaId, simulate_failure: simulateFailure, ...(imageBase64 ? { image_base64: imageBase64 } : {}) }, { timeout: AI_TIMEOUT_MS }),
+    extract: (text, simulateFailure = false) => call('POST', '/pipeline/extract', { text, simulate_failure: simulateFailure }, { timeout: AI_TIMEOUT_MS }),
     send: (to, kind, body) => call('POST', '/messages/send', { to, kind: kind === 'document' ? 'document' : 'text', body }),
     transition: (jobId, request) => call('POST', `/jobs/${encodeURIComponent(jobId)}/transitions`, request),
     amcPlan: (contract, today, existingKeys = []) => call('POST', '/amc/plan', { contract, today, existing_keys: existingKeys }),

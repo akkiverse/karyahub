@@ -54,7 +54,7 @@ describe('US-7 KaryaHub server (web app side)', () => {
     expect(t.$('[data-testid="server-line"]').textContent).toContain('Connected to KaryaHub API v0.2.0 for CoolCare AC Services');
     const rows = t.$$('[data-testid="services"] .service');
     expect(rows.map((r) => r.querySelector('[data-testid="service-status"]').textContent)).toEqual(['Mock', 'Mock', 'Mock']);
-    expect(rows.map((r) => r.querySelector('code').textContent)).toEqual(['KARYAHUB_WHATSAPP_ACCESS_TOKEN', 'KARYAHUB_SPEECH_API_KEY', 'KARYAHUB_LLM_API_KEY']);
+    expect(rows.map((r) => r.querySelector('code').textContent)).toEqual(['KARYAHUB_WHATSAPP_ACCESS_TOKEN', 'KARYAHUB_SPEECH_API_KEY', 'AI_ENDPOINTS']);
     t.app.unmount();
     t = setup({ hash: '#/settings', api: fakeApi({ unreachable: true }) });
     await new Promise((r) => setTimeout(r, 0));

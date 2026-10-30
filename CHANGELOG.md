@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [0.4.2] - 2026-10-30
 
 ### Fixed
-- Signing in no longer fails with "Couldn't reach the KaryaHub server": sign-in made about a dozen database round trips and a new connection each time, taking over 8 seconds. It now makes 6 statements, reuses connections, and the app waits longer (20 seconds, 30 for opening and signing in). `/api/health` shows how long the database takes to answer. See [CR-0007](docs/changes/CR-0007-faster-sign-in.md).
+- Signing in no longer fails with "Couldn't reach the KaryaHub server": sign-in made about a dozen database round trips and a new connection each time, taking over 8 seconds. It now makes 6 statements, reuses connections, and the app waits longer (20 seconds, 30 for opening and signing in), and the server now runs in Singapore, next to the database (it ran in US East). `/api/health` shows how long the database takes to answer. See [CR-0007](docs/changes/CR-0007-faster-sign-in.md).
 
 ## [0.4.1] - 2026-10-30
 

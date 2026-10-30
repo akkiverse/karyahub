@@ -384,3 +384,12 @@ def test_health_reports_how_long_the_database_takes_but_nothing_secret(client):
     body = client.get("/api/health").json()
     assert set(body["database_ms"]) == {"connect", "query"}
     assert all(isinstance(v, int) and v >= 0 for v in body["database_ms"].values())
+
+
+def test_the_server_runs_in_the_same_region_as_the_database():
+    """Non-functional: Neon is in Singapore, so the Vercel function must be too (it was in US East, 250 ms away)."""
+    import json
+    from pathlib import Path
+
+    config = json.loads((Path(__file__).resolve().parents[2] / "vercel.json").read_text(encoding="utf-8"))
+    assert config["regions"] == ["sin1"]

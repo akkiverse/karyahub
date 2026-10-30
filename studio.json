@@ -7,7 +7,7 @@
   "live_url": "https://karyahub-akkiverse.vercel.app",
   "version": "0.4.2",
   "launched": "2026-10-28",
-  "tests_passed": 169,
-  "tests_total": 169,
+  "tests_passed": 170,
+  "tests_total": 170,
   "stack": "R: plain JavaScript UI (Vite) + FastAPI under /api"
 }

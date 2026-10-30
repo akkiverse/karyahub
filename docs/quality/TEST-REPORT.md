@@ -223,4 +223,4 @@ Fixes made after looking at the screenshots:
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.
 - v0.3.0 (2026-10-30): CR-0004 released; 87 of 87 acceptance tests passing.
-- CR-0005 in review: 161 of 161 tests passing; not yet released.
+- v0.4.0 (2026-10-30): CR-0005 released; 161 of 161 tests passing. Live check: `/api/health` reports `database: ok`, the demo owner signs in, the demo team is read-only, and the AI read answers.

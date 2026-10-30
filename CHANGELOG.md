@@ -5,6 +5,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-30
 ### Added
 - Accounts and businesses on the server (Neon Postgres): sign in with mobile number and PIN on any phone, a platform admin who creates businesses and their first owners, and owners who add people one by one or from a CSV, set roles, switch single permissions on or off per role or per person, reset PINs and read an activity log. See [CR-0005](docs/changes/CR-0005-accounts-and-businesses.md).
 - Forgot your PIN: a 6-digit code to choose a new PIN (sent over WhatsApp once it is live; the demo shows its code on screen). People on a temporary PIN must choose their own first.
@@ -58,6 +59,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.4.0]: https://github.com/akkiverse/karyahub/pull/4
 [0.3.0]: https://github.com/akkiverse/karyahub/pull/3
 [0.2.0]: https://github.com/akkiverse/karyahub/pull/2
 [0.1.0]: https://github.com/akkiverse/karyahub/pull/1

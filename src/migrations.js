@@ -1,11 +1,11 @@
 // Upgrades data saved by earlier versions so nobody loses their demo state (CR-0002).
 // v1 (KaryaHub 0.1.0): jobs had no workflow state. In v2 every approved job starts at
 // WORK_DONE (the technician reported the finished work) with one event explaining why.
+// v2 -> v3 (CR-0003) added a demo team and an access log on this device.
+// v3 -> v4 (CR-0005): the team, PINs and access log now live on the server, so they are dropped here.
+// Jobs, documents, chat and reminders are untouched.
 
-import { demoStaff } from './domain/access.js';
-
-// v2 (KaryaHub 0.2.0 preview): no staff accounts. In v3 the demo team (owner, coordinator,
-// two technicians) is added and an empty access log starts (CR-0003). Nothing else changes.
+const DEMO_TEAM_PLACEHOLDER = [];
 
 export function migrate(saved) {
   if (!saved || typeof saved !== 'object') return null;
@@ -27,7 +27,16 @@ export function migrate(saved) {
     };
   }
   if (s.version === 2) {
-    s = { ...s, version: 3, staff: Array.isArray(s.staff) ? s.staff : demoStaff(), access_log: Array.isArray(s.access_log) ? s.access_log : [], seq: { staff: 0, log: 0, ...(s.seq || {}) } };
+    s = { ...s, version: 3, staff: DEMO_TEAM_PLACEHOLDER, access_log: [], seq: { staff: 0, log: 0, ...(s.seq || {}) } };
   }
-  return s.version === 3 ? s : null;
+  if (s.version === 3) {
+    const rest = { ...s };
+    delete rest.staff;
+    delete rest.access_log;
+    const seq = { ...(s.seq || {}) };
+    delete seq.staff;
+    delete seq.log;
+    s = { ...rest, version: 4, seq };
+  }
+  return s.version === 4 ? s : null;
 }

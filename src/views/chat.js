@@ -106,23 +106,23 @@ export function chat({ state, ui, busy }) {
     <div class="phone" data-testid="chat-phone">
       <header class="phone-bar">
         <span class="avatar" aria-hidden="true">K</span>
-        <span class="who"><strong data-testid="chat-title">KaryaHub</strong><small>Business account · demo, nothing is really sent</small></span>
+        <span class="who"><strong data-testid="chat-title">KaryaHub</strong><small>Business account · ${state.settings.is_demo ? 'demo, nothing is really sent' : 'WhatsApp is simulated until it is connected'}</small></span>
       </header>
       <ol class="thread" data-testid="thread">
         ${state.messages.map((m) => message(m, state, ui)).join('')}
-        ${!started ? `<li class="hint" data-testid="chat-hint">Pick a sample to start</li>` : ''}
+        ${!started ? `<li class="hint" data-testid="chat-hint">${state.settings.is_demo ? 'Pick a sample to start' : 'Type a technician\'s message below to start'}</li>` : ''}
       </ol>
-      <div class="picker" role="group" aria-label="Send a sample technician message" data-testid="sample-picker">
+      ${state.settings.is_demo ? `<div class="picker" role="group" aria-label="Send a sample technician message" data-testid="sample-picker">
         ${SAMPLES.map(sample).join('')}
-      </div>
+      </div>` : ''}
       <form class="composer" data-form="send-text">
         <label class="sr-only" for="composer-input">Type a message as the technician</label>
         <input id="composer-input" name="text" autocomplete="off" placeholder="Type as the technician, e.g. Gas refill for Mr Anil Kumar, 9900000150" value="${escapeHtml(ui.draft || '')}" ${busy ? 'disabled' : ''}>
         <button type="submit" class="send" aria-label="Send" ${busy ? 'disabled' : ''}>${icon('send', { size: 20 })}</button>
       </form>
     </div>
-    <aside class="chat-aside" aria-label="About this demo">
-      <h2>What you are seeing</h2>
+    <aside class="chat-aside" aria-label="${state.settings.is_demo ? 'About this demo' : 'How it works'}">
+      <h2>${state.settings.is_demo ? 'What you are seeing' : 'How it works'}</h2>
       <ol class="script">
         <li>A technician sends a voice note, a photo of a paper job sheet, or a text, just like on WhatsApp today.</li>
         <li>KaryaHub transcribes it, pulls out the customer, the work and the AMC, and saves a draft.</li>

@@ -27,7 +27,7 @@ export function renewals({ state, ui }) {
       </div>
       <div class="renewal-side">
         <strong class="amount">${rupees(c.amc_value)}</strong>
-        ${c.reminded_at ? `<span class="badge badge-ok" data-testid="reminded">${icon('check', { size: 14 })} Reminded (demo)</span>` : ''}
+        ${c.reminded_at ? `<span class="badge badge-ok" data-testid="reminded">${icon('check', { size: 14 })} Reminded${state.settings.is_demo ? ' (demo)' : ''}</span>` : ''}
         <button type="button" class="btn btn-small ${c.reminded_at ? 'btn-ghost' : 'btn-primary'}" data-action="remind" data-id="${c.id}">${icon('bell', { size: 16 })} ${c.reminded_at ? 'Preview again' : 'Send reminder'}</button>
       </div>
     </li>`;
@@ -48,7 +48,7 @@ function sheetHtml(sh, state) {
   return `<div class="sheet-backdrop" data-action="close-sheet"></div>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-testid="reminder-sheet">
     <div class="sheet-head"><h2 id="sheet-title">What ${escapeHtml(c.name.split(' ')[0])} would see</h2><button type="button" class="icon-btn" data-action="close-sheet" aria-label="Close">${icon('x')}</button></div>
-    ${sh.error ? `<p class="notice notice-error" role="alert">${escapeHtml(sh.error)}</p>` : `<p class="notice" role="status">${icon('check', { size: 16 })} Preview only. No message was sent. Marked "Reminded (demo)".</p>`}
+    ${sh.error ? `<p class="notice notice-error" role="alert">${escapeHtml(sh.error)}</p>` : `<p class="notice" role="status">${icon('check', { size: 16 })} Preview only. No message was sent. Marked "Reminded${state.settings.is_demo ? ' (demo)' : ''}".</p>`}
     <div class="mini-phone">
       <div class="phone-bar small"><span class="avatar" aria-hidden="true">C</span><span class="who"><strong>${escapeHtml(state.settings.business_name)}</strong><small>Customer's WhatsApp, simulated</small></span></div>
       <div class="mini-thread"><p class="bubble in-bubble" data-testid="reminder-text">${escapeHtml(sh.text)}</p>

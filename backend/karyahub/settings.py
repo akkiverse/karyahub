@@ -8,12 +8,14 @@ every secret must be set, or the feature that needs it refuses to run (fails clo
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Demo-only secrets. They protect nothing real: mock mode stores nothing and sends nothing.
 DEMO_APP_SECRET = "karyahub-demo-app-secret"
 DEMO_VERIFY_TOKEN = "karyahub-demo-verify-token"
 DEMO_OTP_SECRET = "karyahub-demo-otp-secret"
+DEMO_PIN_PEPPER = "karyahub-demo-pin-pepper"
 
 
 class Settings(BaseSettings):
@@ -28,6 +30,22 @@ class Settings(BaseSettings):
     otp_secret: str = ""
     otp_ttl_seconds: int = 600
 
+    # Accounts and businesses (CR-0005). The Neon database "karyahub_master_db" is reached through
+    # DATABASE_URL (set by the Neon integration in Vercel) or KARYAHUB_DATABASE_URL. Without one,
+    # KaryaHub uses a throwaway in-memory database, which is only for local runs and tests.
+    database_url: str = Field(
+        "", validation_alias=AliasChoices("KARYAHUB_DATABASE_URL", "DATABASE_URL", "POSTGRES_URL")
+    )
+    pin_pepper: str = (
+        ""  # KARYAHUB_PIN_PEPPER: secret mixed into every PIN hash; required with a real database
+    )
+    bootstrap_token: str = (
+        ""  # KARYAHUB_BOOTSTRAP_TOKEN: lets the founder create (or recover) the platform admin
+    )
+    session_hours: int = 12
+    lockout_failures: int = 5
+    lockout_minutes: int = 15
+
     def secret(self, name: str) -> str:
         """Return a secret, falling back to the demo value only in mock mode."""
         value = getattr(self, name)
@@ -40,6 +58,16 @@ class Settings(BaseSettings):
                 "otp_secret": DEMO_OTP_SECRET,
             }.get(name, "")
         return ""
+
+    @property
+    def uses_real_database(self) -> bool:
+        return bool(self.database_url)
+
+    def pepper(self) -> str:
+        """Secret for PIN hashes. Required with a real database; the demo value is for local runs only."""
+        if self.pin_pepper:
+            return self.pin_pepper
+        return "" if self.uses_real_database else DEMO_PIN_PEPPER
 
 
 @lru_cache

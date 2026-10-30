@@ -1,6 +1,6 @@
 # ADR-0010: Demo sign-in on the device, one role table shared with the server
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0012](0012-accounts-businesses-and-a-shared-database.md) (CR-0005)
 - **Date:** 2026-10-28
 - **Change request:** CR-0003
 

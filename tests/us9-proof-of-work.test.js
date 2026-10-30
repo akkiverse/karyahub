@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { businessStorageKey } from '../src/store.js';
 import { setup, sendSample } from './helpers.js';
 import { fakeApi } from './fake-api.js';
 
@@ -64,7 +65,7 @@ describe('US-9 Proof of work', () => {
     t.click('[data-action="approve"]');
     const id = t.app.store.get().jobs[0].id;
     t.app.unmount();
-    const saved = JSON.parse(localStorage.getItem('karyahub.demo.v1'));
+    const saved = JSON.parse(localStorage.getItem(businessStorageKey('b-demo')));
     t = setup({ api: fakeApi({ unreachable: true }), saved, hash: `#/jobs/${id}` });
     t.click('[data-wf="request_otp"]');
     await tick();

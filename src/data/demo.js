@@ -1,11 +1,11 @@
 import { DEFAULT_MODE } from '../config.js';
-import { demoStaff } from '../domain/access.js';
 
 // Bundled demo data. Every name, phone number, address and GSTIN here is invented and labelled as demo.
 export const BUSINESS = {
   business_name: 'CoolCare AC Services',
   address: 'Shop 4, Demo Lane, Kothrud, Pune 411038',
   gstin: '27AAAAA0000A1Z5',
+  is_demo: true,
 };
 
 export const DEMO_CUSTOMERS = [
@@ -97,16 +97,24 @@ export const SAMPLES = [
   },
 ];
 
-export const WELCOME_MESSAGE = {
+const WELCOME_TEXT = 'Technicians send me voice notes, photos of job sheets or plain text, and I turn them into job records, quotes and renewal reminders.';
+export const welcomeMessage = (businessName) => ({
   id: 'm-welcome',
   from: 'bot',
   kind: 'text',
-  body: "Namaste! I'm KaryaHub, CoolCare AC Services' job assistant. Technicians send me voice notes, photos of job sheets or plain text, and I turn them into job records, quotes and renewal reminders.",
+  body: `Namaste! I'm KaryaHub, the job assistant for ${businessName}. ${WELCOME_TEXT}`,
   at: '2027-01-01T09:00:00',
+});
+export const WELCOME_MESSAGE = {
+  ...welcomeMessage(BUSINESS.business_name),
+  body: `Namaste! I'm KaryaHub, CoolCare AC Services' job assistant. ${WELCOME_TEXT}`,
 };
 
-export const DATA_VERSION = 3; // 3: staff accounts and access log (CR-0003)
+export const DATA_VERSION = 4; // 4: staff and the access log moved to the server (CR-0005)
 
+const SEQ = { job: 0, quote: 0, invoice: 0, msg: 0, customer: 0 };
+
+/** The sample business: bundled customers and a welcome message. Only the demo business uses it. */
 export function demoState() {
   return {
     version: DATA_VERSION,
@@ -115,8 +123,22 @@ export function demoState() {
     jobs: [],
     documents: [],
     messages: [{ ...WELCOME_MESSAGE }],
-    seq: { job: 0, quote: 0, invoice: 0, msg: 0, customer: 0, staff: 0, log: 0 },
-    staff: demoStaff(),
-    access_log: [],
+    seq: { ...SEQ },
+  };
+}
+
+/** A real business starts empty: no sample customers, no sample chat. */
+export function emptyState(business) {
+  return {
+    version: DATA_VERSION,
+    settings: {
+      business_name: business.name, address: business.address || '', gstin: business.gstin || '', is_demo: false,
+      mode: DEFAULT_MODE, simulate_failure: false, theme: 'system',
+    },
+    customers: [],
+    jobs: [],
+    documents: [],
+    messages: [welcomeMessage(business.name)],
+    seq: { ...SEQ },
   };
 }

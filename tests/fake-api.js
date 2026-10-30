@@ -5,11 +5,12 @@ import { mockLlm } from '../src/adapters/llm.js';
 import { mockWhatsApp } from '../src/adapters/whatsapp.js';
 import { ApiError, ApiUnreachable } from '../src/api/client.js';
 import { SAMPLES } from '../src/data/demo.js';
+import { fakeAccounts } from './fake-accounts.js';
 
 const NEXT = { request_otp: 'WORK_DONE', verify_otp: 'VERIFIED', close: 'CLOSED' };
 const FROM = { request_otp: ['WORK_DONE'], verify_otp: ['WORK_DONE'], close: ['VERIFIED'] };
 
-export function fakeApi({ unreachable = false, code = '123456' } = {}) {
+export function fakeApi({ unreachable = false, code = '123456', accounts: accountOptions } = {}) {
   const calls = [];
   const rec = (name, args, fn) => {
     calls.push({ name, args });
@@ -17,10 +18,13 @@ export function fakeApi({ unreachable = false, code = '123456' } = {}) {
     return fn();
   };
   const wrapErr = async (p) => { try { return await p; } catch (e) { throw new ApiError(e.message, { code: e.code || 'read_failed', status: 422 }); } };
+  const accounts = fakeAccounts(accountOptions);
   return {
+    ...accounts,
     calls,
+    accountCalls: accounts.calls,
     meta: () => rec('meta', [], async () => ({
-      version: '0.2.0', mode: 'mock', tenant: { id: 't-coolcare-demo', business_name: 'CoolCare AC Services' },
+      version: '0.4.0', mode: 'mock', tenant: { id: 'b-demo', business_name: 'CoolCare AC Services' },
       services: ['whatsapp', 'speech', 'llm'].map((id) => ({ id, status: 'Mock', configured: false })),
     })),
     transcribe: (id, fail) => rec('transcribe', [id, fail], () => wrapErr(mockSpeech.transcribe(SAMPLES.find((s) => s.id === id), { fail }))),
@@ -34,7 +38,7 @@ export function fakeApi({ unreachable = false, code = '123456' } = {}) {
       }
       const to = NEXT[req.action];
       return {
-        job_id: jobId, tenant_id: 't-coolcare-demo', state: to, duplicate: false, next_actions: [],
+        job_id: jobId, tenant_id: 'b-demo', state: to, duplicate: false, next_actions: [],
         event: { id: `ev-${req.client_op_id}`, action: req.action, from_state: req.state, to_state: to, client_op_id: req.client_op_id, actor: 'Owner', channel: 'web', detail: req.action === 'verify_otp' ? 'Customer confirmed with the code' : req.action === 'close' ? 'Close job' : 'Code sent to the customer' },
         otp: req.action === 'request_otp' ? { challenge: 'challenge-1', expires_at: '2027-01-01T10:10:00', demo_code: code } : null,
       };

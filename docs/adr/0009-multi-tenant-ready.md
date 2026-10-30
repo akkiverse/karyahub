@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-28
 - **Change request:** CR-0002
+- **Update (CR-0005):** tenants are now real database rows and every request resolves its business from the signed-in person's session; the `X-Tenant-Id` header is ignored. See [ADR-0012](0012-accounts-businesses-and-a-shared-database.md).
 
 ## Context
 KaryaHub's business model is many small firms on one system ("onboarding a business is a row in a tenant table"). The reference platform isolates tenants with `tenant_id` on every table and forced PostgreSQL row-level security set per transaction (Kritvo ADR-0001). KaryaHub has no database yet.

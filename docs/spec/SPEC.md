@@ -1,6 +1,6 @@
 # KaryaHub: Specification
 
-**Status:** Approved 2026-10-28, changed by CR-0002 and CR-0003 (2026-10-28) and CR-0004 (2026-10-28) · **Source:** https://claude.ai/artifact/AtyPCQQWYaVSmg1K8gPxgC
+**Status:** Approved 2026-10-28, changed by CR-0002 and CR-0003 (2026-10-28), CR-0004 (2026-10-28) and CR-0005 (2026-10-30) · **Source:** https://claude.ai/artifact/AtyPCQQWYaVSmg1K8gPxgC
 This file is the source of truth for what the product does. Every change to it is made through a change request (see [../changes/](../changes/)).
 
 ## Overview
@@ -13,6 +13,8 @@ KaryaHub Demo is a mobile-first web prototype the founder shows to AMC service f
 **Since CR-0004 (Studio AI):** technicians' messages and job-sheet photos are read by real AI on the founder's own AI server when it's connected, and by the quick reader, clearly labelled, when it's off.
 
 **Since CR-0003 (business look, Admin and staff logins):** people sign in with a mobile number and PIN, and each role (owner, office coordinator, technician) sees only what its job needs. Owners manage the team in an Admin panel. The look is more businesslike: a dark sidebar with the firm and the signed-in person, and a "Today at" row of figures on Home. Sign-in is a demo kept on the device (ADR-0010); real accounts come with the database.
+
+**Since CR-0005 (accounts and businesses):** KaryaHub serves many firms from one database. The founder (platform admin) creates a business and its first owner; people sign in with a mobile number and PIN stored on the server, see only their own business, and each owner manages their own team, roles and access. Forgotten PINs are reset with a code. The public demo is one flagged business.
 
 Founder notes applied: build "a basic prototype to display to the client or vendor with dummy data and processing" that "can explain what problem it will be resolving"; keep the idea open for review.
 
@@ -116,32 +118,28 @@ As a returning viewer I want my saved demo to keep working after the update so t
 As the founder I want the architecture, design and risks written down so that any engineer can understand and continue the work.
 - **AC-12.1** Given the repository, then `docs/architecture/` has HLD.md (context, building blocks, flows, deployment), LLD.md (API, errors, workflow, code, visit planner, webhook), RISKS.md (each risk with likelihood, impact, resolution and status) and REFERENCE-REVIEW.md (what was learned from the reference repositories and what KaryaHub adopts, adapts or defers). *(added CR-0002)*
 
-### US-13: Staff sign-in
+### US-13: Staff sign-in (retired in CR-0005)
+The on-device demo sign-in below is replaced by server sign-in, [US-18](#us-18-sign-in-on-the-server) and its screens, [US-22](#us-22-sign-in-admin-and-business-screens). The criteria stay listed as history, as the process requires.
 As a member of a firm's team I want to sign in with my mobile number and a PIN so that KaryaHub knows who I am and what I may do.
-- **AC-13.1** Given nobody is signed in, when the app opens at any address, then only the Sign-in screen shows: mobile number and PIN fields (the PIN hidden) and the demo accounts (Akash Mehta, Priya Nair, Santosh Pawar, Imran Khan) with their roles and demo PINs. *(added CR-0003)*
-- **AC-13.2** Given the owner's number 9900000201 and PIN 2468, when I sign in, then Home opens, the account menu shows "Akash Mehta" and "Owner (admin)", and the access log records "Signed in as Owner (admin)". *(added CR-0003)*
-- **AC-13.3** Given a wrong PIN or a number not on the team, when I sign in, then I see "That mobile number and PIN don't match an active staff account. Check them, or ask the owner to reset your PIN." and stay on Sign in; a wrong PIN for someone on the team is logged as a failed sign-in. *(added CR-0003)*
-- **AC-13.4** Given the demo accounts, when I tap one, then its number and PIN are filled in. *(added CR-0003)*
-- **AC-13.5** Given I'm signed in, then reloading keeps me signed in; when I press Sign out, the Sign-in screen says "You have signed out.", the session is removed and the log records it. *(added CR-0003)*
-- **AC-13.6** Given any staff record, then it holds a salted SHA-256 hash of the PIN, never the PIN itself. *(added CR-0003)*
-
+- **AC-13.1** Given nobody is signed in, when the app opens at any address, then only the Sign-in screen shows: mobile number and PIN fields (the PIN hidden) and the demo accounts (Akash Mehta, Priya Nair, Santosh Pawar, Imran Khan) with their roles and demo PINs. *(added CR-0003; Retired in CR-0005)*- **AC-13.2** Given the owner's number 9900000201 and PIN 2468, when I sign in, then Home opens, the account menu shows "Akash Mehta" and "Owner (admin)", and the access log records "Signed in as Owner (admin)". *(added CR-0003; Retired in CR-0005)*- **AC-13.3** Given a wrong PIN or a number not on the team, when I sign in, then I see "That mobile number and PIN don't match an active staff account. Check them, or ask the owner to reset your PIN." and stay on Sign in; a wrong PIN for someone on the team is logged as a failed sign-in. *(added CR-0003; Retired in CR-0005)*- **AC-13.4** Given the demo accounts, when I tap one, then its number and PIN are filled in. *(added CR-0003; Retired in CR-0005)*- **AC-13.5** Given I'm signed in, then reloading keeps me signed in; when I press Sign out, the Sign-in screen says "You have signed out.", the session is removed and the log records it. *(added CR-0003; Retired in CR-0005)*- **AC-13.6** Given any staff record, then it holds a salted SHA-256 hash of the PIN, never the PIN itself. *(added CR-0003; Retired in CR-0005)*
 ### US-14: Roles and limited access
 As an owner I want each person to see only what their job needs so that money, paperwork and settings stay with the office.
 - **AC-14.1** Given a technician signs in, then Chat opens and the navigation offers only Chat and Jobs; a job screen hides Create quote, Create invoice and Documents ("Quotes and invoices are made by the office."), and a verified job shows "Verified. The office closes the job." instead of Close job. *(added CR-0003)*
-- **AC-14.2** Given a technician opens Home, Renewals, Settings, Admin or a document by its address, then they see "You don't have access to <screen>" with their name and role and "Ask the owner to change your role in Admin", and none of that screen's content. *(added CR-0003)*
+- **AC-14.2** Given a technician opens Home, Renewals, Settings, Admin or a document by its address, then they see "You don't have access to <screen>" with their name and role and "Ask your business owner to change your access in Admin", and none of that screen's content. *(changed CR-0005: the screen is decided by the server's permissions for that person, so an owner's switches change what opens)* *(added CR-0003)*
 - **AC-14.3** Given an office coordinator signs in, then the navigation offers Home, Chat, Jobs and Renewals; they can create quotes and invoices and close verified jobs; Admin and Settings aren't offered and are refused if opened. *(added CR-0003)*
-- **AC-14.4** Given a signed-in person moves a job through proof of work, then the server request carries their name and role (for example "Santosh Pawar (Technician)", `technician`); an action their role may not take is refused in the app with "Your role (<role>) can't do this. Ask the owner or the office coordinator." without calling the server. *(added CR-0003)*
-- **AC-14.5** Given the KaryaHub server, then `GET /api/v1/access/roles` returns the same roles, permissions and action rules as the web app, and a job action whose `actor_role` may not take it (for example a technician closing a job) is answered 403 "Your role (Technician) can't close or manage jobs. Ask the owner or the office coordinator."; an unknown role is refused; calls without a role (WhatsApp, system) are unchanged. *(added CR-0003)*
+- **AC-14.4** Given a signed-in person moves a job through proof of work, then the history names them (for example "Santosh Pawar (Technician)") and the request carries no role: the server knows who they are. An action their access doesn't cover is refused in the app with "Your access doesn't include this. Ask your business owner." and nothing is sent. *(changed CR-0005)*
+- **AC-14.5** Given the KaryaHub server, then `GET /api/v1/access/roles` returns the same starting roles, permissions and action rules as the web app, and a job action the signed-in person's permissions don't cover (for example a technician closing a job) is answered 403 "Your access doesn't include permission to close or manage jobs. Ask your business owner.". *(changed CR-0005)*
 
-### US-15: Admin panel
+### US-15: Admin panel (retired in CR-0005)
+The on-device Admin below is replaced by team management on the server, [US-19](#us-19-team-and-access-for-a-business), shown by [US-22](#us-22-sign-in-admin-and-business-screens).
 As an owner I want to manage my team and their access in one place so that I control who can do what.
-- **AC-15.1** Given the owner opens Admin, then it shows active staff counts in total and by role, the team (name, number, role, status, last sign-in), an Add staff form, the Roles and access table (9 permissions by 3 roles) and the access log. *(added CR-0003)*
-- **AC-15.2** Given I add "Neha Kulkarni", 9900000299, Technician, PIN 4321, then she appears in the team, the log records "Added Neha Kulkarni as Technician", and she can sign in with that number and PIN and gets technician access. *(added CR-0003)*
-- **AC-15.3** Given a name shorter than 2 letters, a number that isn't a 10-digit mobile or is already on the team, or a PIN that isn't 4 to 6 digits, then each field shows its own message and nobody is added. *(added CR-0003)*
-- **AC-15.4** Given I change Priya Nair's role from Office coordinator to Technician, then her access follows the new role and the log records the change. *(added CR-0003)*
-- **AC-15.5** Given I turn off someone's access, then they can't sign in and an open session of theirs ends with "Your access has been turned off. Ask the owner if you think this is a mistake."; turning access on restores it. *(added CR-0003)*
-- **AC-15.6** Given I press Reset PIN for someone, then a new 4-digit PIN is shown once ("New PIN for <name>: <PIN>. Share it with them in person; the old PIN no longer works."), the old PIN stops working and the new one works; the PIN itself isn't stored. *(added CR-0003)*
-- **AC-15.7** Given I try to change my own role, turn off my own access, or remove the last active owner, then it's refused with a plain reason and nothing changes. *(added CR-0003)*
+- **AC-15.1** Given the owner opens Admin, then it shows active staff counts in total and by role, the team (name, number, role, status, last sign-in), an Add staff form, the Roles and access table (9 permissions by 3 roles) and the access log. *(added CR-0003)* *(Retired in CR-0005)*
+- **AC-15.2** Given I add "Neha Kulkarni", 9900000299, Technician, PIN 4321, then she appears in the team, the log records "Added Neha Kulkarni as Technician", and she can sign in with that number and PIN and gets technician access. *(added CR-0003)* *(Retired in CR-0005)*
+- **AC-15.3** Given a name shorter than 2 letters, a number that isn't a 10-digit mobile or is already on the team, or a PIN that isn't 4 to 6 digits, then each field shows its own message and nobody is added. *(added CR-0003)* *(Retired in CR-0005)*
+- **AC-15.4** Given I change Priya Nair's role from Office coordinator to Technician, then her access follows the new role and the log records the change. *(added CR-0003)* *(Retired in CR-0005)*
+- **AC-15.5** Given I turn off someone's access, then they can't sign in and an open session of theirs ends with "Your access has been turned off. Ask the owner if you think this is a mistake."; turning access on restores it. *(added CR-0003)* *(Retired in CR-0005)*
+- **AC-15.6** Given I press Reset PIN for someone, then a new 4-digit PIN is shown once ("New PIN for <name>: <PIN>. Share it with them in person; the old PIN no longer works."), the old PIN stops working and the new one works; the PIN itself isn't stored. *(added CR-0003)* *(Retired in CR-0005)*
+- **AC-15.7** Given I try to change my own role, turn off my own access, or remove the last active owner, then it's refused with a plain reason and nothing changes. *(added CR-0003)* *(Retired in CR-0005)*
 
 ### US-16: Business look
 As an owner I want KaryaHub to look like software a business runs on so that I trust it with my firm.
@@ -162,6 +160,52 @@ As an owner I want technicians' messages and job-sheet photos read by real AI so
 - **AC-17.10** Given the AI server is offline and a photo can't be read, then the technician's photo stays in the chat with the server's message and a Try again button, and the "AI is offline" banner appears. *(added CR-0004)*
 - **AC-17.11** Given the app is open, then a banner "AI features are offline right now because the AI server is switched off. Everything else works as usual." shows while `/api/ai/status` says AI is set up but offline, hides when it is back, and never shows when AI isn't set up. *(added CR-0004)*
 - **AC-17.12** Given chat saved by v0.2.0 (job cards without a reader), then it loads without reader tags or notes and its drafts approve as before. *(added CR-0004)*
+
+### US-18: Sign-in on the server
+As a member of a firm's team I want to sign in with my mobile number and PIN, on any phone, so that KaryaHub knows who I am and which business I belong to. *(added CR-0005; replaces US-13)*
+- **AC-18.1** Given a right mobile number and PIN of an active person in an active business, when I sign in, then the server starts a session (an HttpOnly cookie that ends after 12 hours), answers who I am, my business and my permissions, `GET /api/v1/auth/me` says the same afterwards, and signing out ends the session at once. *(added CR-0005)*
+- **AC-18.2** Given a wrong PIN, a number with no account, a switched-off person or a switched-off business, then every case gets the same plain message and nothing says which part was wrong. *(added CR-0005)*
+- **AC-18.3** Given 5 wrong PINs for one number (account or not), then sign-in for that number is blocked for 15 minutes with a message that points to Forgot PIN, even for the right PIN. *(added CR-0005)*
+- **AC-18.4** Given any person, then the database holds only a salted scrypt hash of the PIN mixed with a server secret, never the PIN; PINs of repeated digits or simple runs (1111, 1234) and PINs that aren't 4 to 6 digits are refused; PINs the server makes are 6 digits. *(added CR-0005)*
+- **AC-18.5** Given no session, then job, AI, paperwork and team routes answer 401 `signin_required`; a request that carries the session cookie but not the app's own header is refused 403, so other websites can't act for a signed-in person; a made-up or expired session counts as signed out. *(added CR-0005)*
+- **AC-18.6** Given a person on a temporary PIN (new people, reset PINs), then everything except choosing their own PIN is refused until they do; a weak, unchanged or wrongly confirmed PIN is refused with a reason. *(added CR-0005)*
+- **AC-18.7** Given any request, then what the person may do comes from the server's records; a role named in the request body is ignored. *(added CR-0005)*
+
+### US-19: Team and access for a business
+As a business owner I want to add my people, give them a role and decide what each may do, so that every person sees only what their job needs. *(added CR-0005; replaces US-15)*
+- **AC-19.1** Given I'm an owner (or someone allowed to manage the team), when I add a person with name, mobile number and role (and optionally a PIN), then they join my team, a generated 6-digit PIN is shown to me once, and they can sign in; a mobile number belongs to one account across all businesses, and bad names, numbers, roles or PINs are refused in plain words. *(added CR-0005)*
+- **AC-19.2** Given a CSV with the columns name, phone, role and an optional pin (up to 200 rows), when I import it, then every good row is added (a PIN is generated when empty), bad rows are listed with their row number and reason, and a file without the needed columns, or empty, is refused. *(added CR-0005)*
+- **AC-19.3** Given a person on my team, then I can change their role, turn their access off (their open sessions end at once) and on, and reset their PIN; I can't change my own role or switch myself off, only an owner can add or change owners, and a business always keeps an active owner. *(added CR-0005)*
+- **AC-19.4** Given a coordinator or technician role, then I can switch single permissions on or off for everyone with that role, and allow, block or reset a permission for one person; the change applies on the very next request; owners always keep the team and settings; people without "manage team" can't open the team screens. *(added CR-0005)*
+- **AC-19.5** Given another business, then its people, team, activity log and settings can't be listed, changed or reset from mine. *(added CR-0005)*
+- **AC-19.6** Given team changes, then each is recorded in an activity log (who, what, when) the owner can read; PINs are never written to it. *(added CR-0005)*
+- **AC-19.7** Given the demo business, then its team can be read but not changed by anyone, since its PINs are public. *(added CR-0005)*
+- **AC-19.8** Given I'm an owner, then I can change my business's name, address, GSTIN and state code, they're checked, and quotes, invoices and reminders use them. *(added CR-0005)*
+
+### US-20: Businesses and the platform admin
+As the founder running KaryaHub I want to create each business and its first owner, so that firms can start without me handling their data. *(added CR-0005)*
+- **AC-20.1** Given no platform admin exists, then First-time setup creates one, but only with the setup token from the server's settings (`KARYAHUB_BOOTSTRAP_TOKEN`); with the token and the same number it resets that admin's PIN; a wrong token, another number or no token set is refused. *(added CR-0005)*
+- **AC-20.2** Given I'm the platform admin, then I can create a business with its first owner (a temporary 6-digit PIN is shown once), list every business with its people count and owners, and turn a business off or on (when off, its people are signed out and can't sign in); the demo business always stays on; bad details, and a number that's already in use, are refused with nothing half-created. *(added CR-0005)*
+- **AC-20.3** Given I'm the platform admin, then I see no business data: team, jobs, AI and paperwork routes are closed to me. *(added CR-0005)*
+- **AC-20.4** Given an owner has lost their PIN, then the platform admin can issue a new temporary PIN (never for the demo accounts); the owner's open sessions end and they must choose their own. *(added CR-0005)*
+- **AC-20.5** Given anyone who isn't the platform admin, then business routes are refused (403 when signed in, 401 when not). *(added CR-0005)*
+
+### US-21: Forgot PIN with a code
+As someone who forgot their PIN I want to set a new one with a code, so that I'm not stuck until the owner is free. *(added CR-0005)*
+- **AC-21.1** Given a mobile number, when I ask for a code, then a 6-digit code (valid 10 minutes, 5 tries, at most 3 codes per 15 minutes) lets me choose a new PIN; the code works once, my old sessions end and a lock-out is cleared; wrong, used and expired codes are refused. *(added CR-0005)*
+- **AC-21.2** Given codes travel by WhatsApp, then until WhatsApp is live only the demo business's accounts get a (simulated) code on screen; for every other number, known or not, the answer is the same: text-message codes aren't switched on, ask your business owner. When WhatsApp is live the code is sent through the WhatsApp adapter and never appears in the reply. *(added CR-0005)*
+
+### US-22: Sign-in, Admin and business screens
+As any signed-in person I want clear screens for signing in, my account, my team and my business, so that KaryaHub looks and works like a finished product. *(added CR-0005)*
+- **AC-22.1** Given nobody is signed in, then any address shows "Sign in to KaryaHub" with a mobile number and a PIN (hidden), "Forgot your PIN?", and no business name; the demo accounts sit under "Explore a demo business" and tapping one fills the number and PIN. *(added CR-0005)*
+- **AC-22.2** Given a real business, then no screen carries demo wording: no Demo pill, no "Sample data", no watermark or "dummy" tags, no sample-message chips, no Reset demo or mode switches; Home shows a "Get started" panel instead of the sales story; and Settings has the business details form. The demo business keeps all of these. *(added CR-0005)*
+- **AC-22.3** Given the server's permissions for the signed-in person, then the navigation, the screens that open, the no-access page and the start page follow them; a person with no access at all lands on My account with a plain explanation. *(added CR-0005)*
+- **AC-22.4** Given I'm the platform admin, then Businesses shows each business with people, owners and status, a form to create one with its owner, the temporary PIN once, turn off and on, and reset an owner's PIN. *(added CR-0005)*
+- **AC-22.5** Given I manage a team, then Admin shows counts by role, the team with role, status and per-person access, an Add a person form, a CSV import with row-by-row problems, the role table with switches, any new PINs once (with a CSV download) and the activity log; in the demo business every control is switched off with a plain note. *(added CR-0005)*
+- **AC-22.6** Given I'm signed in, then My account shows who I am, what I can do and a form to change my PIN. *(added CR-0005)*
+- **AC-22.7** Given a temporary PIN, forgotten PIN or no platform admin yet, then the matching screen (choose your own PIN, forgot PIN and reset, first-time setup) explains each problem in plain words. *(added CR-0005)*
+- **AC-22.8** Given data saved on this device by v0.3.0 or earlier, then it loads for the demo business with jobs, documents and reminders kept (the on-device team and log are dropped, they live on the server now); each business keeps its own data on the device, and a new business starts empty. *(added CR-0005)*
+- **AC-22.9** Given the app opens, then it asks the server who is signed in; if the server can't be reached, a calm "Can't reach KaryaHub" screen with Try again shows, and a platform admin sees only Businesses. *(added CR-0005)*
 
 ## Screens and flows
 Sign in first (CR-0003). Then a bottom tab bar on phones and a dark sidebar on desktop, showing only the screens the person's role allows: Home, Chat, Jobs, Renewals (Workspace) and Admin, Settings (Manage). An account menu in the top bar shows the person and role, with Settings, Admin and Sign out.
@@ -214,15 +258,16 @@ All demo data lives in the browser (localStorage in try/catch, data version 3 si
 - Accessible: labelled controls, WCAG AA contrast, keyboard use, visible focus; voice-note bubbles show the transcript as text.
 - Light and dark themes following the system setting, with a manual switch.
 - Plain-language errors; ₹ in Indian format (1,00,000).
-- Access (CR-0003): every screen and job action is checked against the role table; PINs are stored only as salted hashes; the role table is identical on the web app and the server.
-- No real personal data: all names, phones and GSTINs are dummy and labelled as demo.
+- Access (CR-0003, changed CR-0005): every screen and job action is checked against the signed-in person's permissions on the server; PINs are stored only as salted hashes with a server secret; sessions are HttpOnly cookies; the starting role table is identical on the web app and the server.
+- Data (CR-0005): people, businesses, sessions and the activity log live in one Postgres database (Neon, `karyahub_master_db`) with `business_id` on every business-owned row and every query filtered by it. With a real database `KARYAHUB_PIN_PEPPER` must be set or accounts refuse to run. The address is never printed or returned.
+- The demo business holds only dummy names, phones and GSTINs, labelled as demo. Real businesses' people are real; jobs and customers still live on the device until CR-0007.
 
 ## Out of scope
 - Real WhatsApp phone numbers or message sending (the webhook exists and is tested, but no number is connected; changed CR-0002).
 - Real speech-to-text and paid LLM or OCR services (speech stays a demo adapter). Changed CR-0004: messages and photos are read by Studio AI, the founder's own AI server, once its settings are linked.
 - A server database, background queue, attempt limits on customer codes, and cross-delivery de-duplication (see RISKS.md R-04, R-05, R-07, R-13).
 - Valid tax invoices, e-invoicing, payments or payment links.
-- Real server-side accounts, OTP sign-in and PIN attempt limits (the demo sign-in lives on the device, ADR-0010; RISKS.md R-08), and real multi-firm data (the server is tenant-ready, ADR-0009). Changed CR-0003: logins were fully out of scope before.
+- Real server-side accounts, PIN attempt limits and a database for people (done in CR-0005; ADR-0012). Still out of scope: jobs, customers and documents on the server (CR-0007), inventory (CR-0006), and delivering sign-in codes by SMS or WhatsApp to real numbers until WhatsApp is live.
 - Technician app, GPS or photo-based risk scoring, inventory and attendance (see REFERENCE-REVIEW.md).
 - Regional language UI (sample voice notes may be Hinglish with English transcripts).
 

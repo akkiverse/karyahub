@@ -1,5 +1,5 @@
 // Thin client for the KaryaHub API (FastAPI, Python) under /api/v1 (CR-0002).
-// Business rules live on the server; the browser keeps the demo data and draws the screens.
+// Business rules and, since CR-0005, people and sign-in live on the server; the browser draws the screens.
 import { isAiOffline } from '../ui/ai-status.js';
 
 // Reading with Studio AI (CR-0004) can take a while on the founder's own AI server.
@@ -21,16 +21,18 @@ export class ApiUnreachable extends Error {
   }
 }
 
-export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => globalThis.fetch(...a), timeoutMs = 8000 } = {}) {
-  async function call(method, path, body, { timeout = timeoutMs } = {}) {
+export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => globalThis.fetch(...a), timeoutMs = 8000, onSessionEnded = () => {} } = {}) {
+  async function call(method, path, body, { timeout = timeoutMs, quiet = false } = {}) {
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
     let res;
     try {
       res = await fetchImpl(`${base}${path}`, {
         method,
-        headers: body ? { 'Content-Type': 'application/json' } : {},
+        // The session cookie is HttpOnly and same-site; this header is the app's own mark so other sites can't act for a signed-in person.
+        headers: { 'X-Requested-With': 'karyahub', ...(body ? { 'Content-Type': 'application/json' } : {}) },
         body: body ? JSON.stringify(body) : undefined,
+        credentials: 'same-origin',
         signal: ctrl?.signal,
       });
     } catch {
@@ -48,10 +50,12 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     }
     if (!res.ok) {
       const err = (data && data.error) || {};
+      if (res.status === 401 && err.code === 'signin_required' && !quiet) onSessionEnded();
       throw new ApiError(err.message || 'Something went wrong on the server. Try again.', { code: err.code, status: res.status });
     }
     return data;
   }
+  const put = (path, body) => call('PUT', path, body);
   return {
     meta: () => call('GET', '/meta'),
     transcribe: (mediaId, simulateFailure = false) => call('POST', '/pipeline/transcribe', { media_id: mediaId, simulate_failure: simulateFailure }),
@@ -61,6 +65,33 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     send: (to, kind, body) => call('POST', '/messages/send', { to, kind: kind === 'document' ? 'document' : 'text', body }),
     transition: (jobId, request) => call('POST', `/jobs/${encodeURIComponent(jobId)}/transitions`, request),
     amcPlan: (contract, today, existingKeys = []) => call('POST', '/amc/plan', { contract, today, existing_keys: existingKeys }),
+
+    // Sign-in and accounts (CR-0005)
+    authState: () => call('GET', '/auth/state'),
+    me: () => call('GET', '/auth/me', undefined, { quiet: true }),
+    signIn: (phone, pin) => call('POST', '/auth/sign-in', { phone, pin }, { quiet: true }),
+    signOut: () => call('POST', '/auth/sign-out', undefined, { quiet: true }),
+    bootstrap: (form) => call('POST', '/auth/bootstrap', form),
+    changePin: (currentPin, newPin) => call('POST', '/auth/change-pin', { current_pin: currentPin, new_pin: newPin }),
+    forgotPin: (phone) => call('POST', '/auth/forgot', { phone }),
+    resetPin: (phone, code, newPin) => call('POST', '/auth/reset-pin', { phone, code, new_pin: newPin }),
+
+    // Team and access for a business
+    team: () => call('GET', '/team'),
+    addMember: (form) => call('POST', '/team', form),
+    importMembers: (csv) => call('POST', '/team/import', { csv }),
+    updateMember: (id, change) => call('PATCH', `/team/${encodeURIComponent(id)}`, change),
+    resetMemberPin: (id, pin) => call('POST', `/team/${encodeURIComponent(id)}/reset-pin`, pin ? { pin } : {}),
+    memberPermissions: (id, overrides) => put(`/team/${encodeURIComponent(id)}/permissions`, { overrides }),
+    rolePermissions: (role, permissions) => put(`/team/roles/${encodeURIComponent(role)}/permissions`, { permissions }),
+    audit: () => call('GET', '/team/audit'),
+    saveBusinessProfile: (fields) => put('/business/profile', fields),
+
+    // Businesses (platform admin)
+    businesses: () => call('GET', '/platform/businesses'),
+    createBusiness: (form) => call('POST', '/platform/businesses', form),
+    setBusinessActive: (id, active) => call('PATCH', `/platform/businesses/${encodeURIComponent(id)}`, { active }),
+    resetOwnerPin: (id, pin) => call('POST', `/platform/owners/${encodeURIComponent(id)}/reset-pin`, pin ? { pin } : {}),
   };
 }
 

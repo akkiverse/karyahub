@@ -2,9 +2,9 @@
 
 from datetime import UTC, datetime, timedelta
 
+from karyahub.accounts.demo import DEMO_BUSINESS_ID
 from karyahub.domain import otp, workflow
 from karyahub.settings import DEMO_OTP_SECRET
-from karyahub.tenancy import DEMO_TENANT
 
 
 def move(client, state, action, op, payload=None, applied=None, job="J-0001"):
@@ -55,12 +55,12 @@ def test_ac_9_3_wrong_expired_or_other_job_codes_fail(client):
     )
     assert other.status_code == 422
     past = datetime.now(UTC) - timedelta(hours=1)
-    old_challenge, old_code, _ = otp.issue("J-0001", DEMO_TENANT.id, DEMO_OTP_SECRET, 600, now=past)
+    old_challenge, old_code, _ = otp.issue("J-0001", DEMO_BUSINESS_ID, DEMO_OTP_SECRET, 600, now=past)
     expired = move(
         client, "WORK_DONE", "verify_otp", "op-000013", {"code": old_code, "challenge": old_challenge}
     )
     assert expired.json()["error"]["message"] == msg
-    assert not otp.verify("garbage", "123456", "J-0001", DEMO_TENANT.id, DEMO_OTP_SECRET)
+    assert not otp.verify("garbage", "123456", "J-0001", DEMO_BUSINESS_ID, DEMO_OTP_SECRET)
 
 
 def test_ac_9_4_actions_not_allowed_in_this_state_are_refused(client):
@@ -92,4 +92,4 @@ def test_ac_9_5_the_same_operation_never_counts_twice(client):
     assert again["duplicate"] is True
     assert again["event"] is None
     assert again["state"] == "WORK_DONE"
-    assert first["event"]["id"] == workflow.event_id(DEMO_TENANT.id, "J-0001", "op-000030")
+    assert first["event"]["id"] == workflow.event_id(DEMO_BUSINESS_ID, "J-0001", "op-000030")

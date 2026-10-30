@@ -7,14 +7,15 @@ Turn technicians' WhatsApp voice notes into job records, quotes and AMC renewal 
 
 ## What it does
 
-KaryaHub is a demo prototype for AMC (annual maintenance contract) service firms such as AC service companies. It explains the problem owners face (lapsed renewals, re-typed job sheets, no view of field work), then plays a simulated WhatsApp conversation: a technician's voice note or job-sheet photo is transcribed, turned into a structured job record the owner can correct and approve, then into a quotation or GST-format invoice and a renewal reminder. Every outside service (WhatsApp, speech-to-text, LLM) sits behind an adapter; WhatsApp and speech-to-text return mock responses, and the LLM uses Studio AI (the founder's own AI server) when it's connected, so the demo runs with no accounts, keys or payments. All names, phone numbers and GSTINs are dummy data.
+KaryaHub is a portal for AMC (annual maintenance contract) service firms such as AC service companies. Each firm is a separate business with its own people, who sign in with a mobile number and PIN; a public demo business shows how it works. It explains the problem owners face (lapsed renewals, re-typed job sheets, no view of field work), then plays a simulated WhatsApp conversation: a technician's voice note or job-sheet photo is transcribed, turned into a structured job record the owner can correct and approve, then into a quotation or GST-format invoice and a renewal reminder. Every outside service (WhatsApp, speech-to-text, LLM) sits behind an adapter; WhatsApp and speech-to-text return mock responses, and the LLM uses Studio AI (the founder's own AI server) when it's connected, so the demo runs with no accounts, keys or payments. All names, phone numbers and GSTINs are dummy data.
 
 ## Status
 
 | | |
 |---|---|
 | Stage | Live: v0.3.0 at https://karyahub-akkiverse.vercel.app |
-| Acceptance tests | 87 of 87 passing in v0.3.0 ([report](docs/quality/TEST-REPORT.md)) |
+| Acceptance tests | 87 of 87 passing in v0.3.0; 156 of 156 on the CR-0005 branch ([report](docs/quality/TEST-REPORT.md)) |
+| In review | [CR-0005](docs/changes/CR-0005-accounts-and-businesses.md): accounts and businesses on the server (mobile-and-PIN sign-in, platform admin, owners' team and access, forgot-PIN codes, real-business look); planned v0.4.0 |
 | Latest release | [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md): real AI for job notes and photos through Studio AI, with a labelled "Read without AI" fallback (v0.3.0). Before that, [CR-0003](docs/changes/CR-0003-business-look-admin-and-staff-logins.md): business look, Admin panel and staff logins (released in v0.2.0 with [CR-0002](docs/changes/CR-0002-advance-tech.md): KaryaHub server, WhatsApp webhook, proof of work, AMC visit plans) |
 | Demo sign-in | Owner 99000 00201 / PIN 2468 · Coordinator 99000 00202 / 1357 · Technicians 99000 00203 / 8642 and 99000 00204 / 9753 (sample accounts) |
 
@@ -38,7 +39,14 @@ uv run ruff check . && uv run ruff format --check .
 npm run build                                  # production build into dist/
 ```
 
-No environment variables are needed: the server runs in mock mode with built-in demo secrets. To go live, set `KARYAHUB_MODE=live` and the `KARYAHUB_*` keys listed in [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md#integrations-and-adapters); live mode refuses to run a feature whose key is missing.
+No environment variables are needed to run locally: the server runs in mock mode with built-in demo secrets and a throwaway in-memory database (so accounts you create disappear when it stops). Sign in with a demo account, or set `KARYAHUB_BOOTSTRAP_TOKEN=anything` and use **First-time setup** to create a platform admin. To go live, set `KARYAHUB_MODE=live` and the `KARYAHUB_*` keys listed in [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md#integrations-and-adapters); live mode refuses to run a feature whose key is missing.
+
+**Accounts and businesses (CR-0005).** On Vercel the server needs these variables (Settings > Environment Variables, Production and Preview):
+- `DATABASE_URL`: the Neon database `karyahub_master_db`; the Neon integration sets it. (`KARYAHUB_DATABASE_URL` or `POSTGRES_URL` also work.) Never commit it.
+- `KARYAHUB_PIN_PEPPER`: a long random secret mixed into every PIN hash. Required with a real database; keep it, because changing it makes every PIN fail.
+- `KARYAHUB_BOOTSTRAP_TOKEN`: another random secret, used once on the **First-time setup** screen to create the platform admin (and to recover that admin's PIN).
+
+Then open the live address, choose **First-time setup**, create the platform admin, sign in, and add a business under **Businesses**: you give the business owner their temporary PIN, and they add their own team in **Admin**. `/api/health` shows `"database": "ok"` when the connection works. Schema changes run automatically when the server starts (Alembic).
 
 **Studio AI (CR-0004):** messages and job-sheet photos are read by the founder's own AI server when the shared Vercel variables `AI_ENDPOINTS` and `AI_GATEWAY_KEY` are linked to this project (see the hub's `templates/product/studio-ai/README.md`). Without them the demo reader is used; when the AI server is off, messages are read without AI and labelled, and a banner says AI is offline. `GET /api/ai/status` reports `{configured, online}`.
 

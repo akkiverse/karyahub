@@ -18,6 +18,8 @@ come from environment variables, set once in Vercel as shared environment variab
   AI_API          "ollama" (default) or "openai" for any OpenAI-compatible service later.
   AI_TIMEOUT      Seconds to wait for a whole answer, across all servers (default 120).
   AI_CONTEXT      Ollama context length in tokens (default 8192).
+  AI_CONNECT_TIMEOUT  Seconds allowed to open a connection, including the secure handshake (default 20).
+  AI_STATUS_TIMEOUT   Seconds the "is the AI server online?" check may take (default 12).
 
 Use:
     from .studio_ai import ask, chat, AIUnavailable
@@ -33,7 +35,9 @@ FastAPI apps call `studio_ai.install(app)` once: it turns `AIUnavailable` into
 
 from __future__ import annotations
 
+import asyncio
 import base64
+from contextlib import asynccontextmanager
 import json
 import os
 import time
@@ -57,7 +61,10 @@ __all__ = [
 
 DEFAULT_MODEL = "qwen3.5:9b"
 DEFAULT_LARGE = "gpt-oss:20b"
-CONNECT_SECONDS = 5.0
+# The secure handshake with a PC published through Tailscale Funnel can take 5 to 11 seconds, so waiting only 5
+# cut real calls off and marked a working server "down". Both waits are settings (seconds).
+DEFAULT_CONNECT_SECONDS = 20.0  # AI_CONNECT_TIMEOUT: opening a connection, including the secure handshake
+DEFAULT_STATUS_SECONDS = 12.0  # AI_STATUS_TIMEOUT: how long the "is the AI server online?" check may take
 DOWN_SECONDS = 30.0  # after a failure, try other servers first for this long
 OFFLINE_MESSAGE = "The AI server is offline right now, so AI features are paused. Everything else still works; please try again later."
 NOT_SET_UP_MESSAGE = "AI isn't set up for this app yet."
@@ -152,12 +159,36 @@ def _order(endpoints: list[str]) -> list[tuple[int, str]]:
     return up + down
 
 
-def _client(timeout: float) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        timeout=httpx.Timeout(timeout, connect=min(CONNECT_SECONDS, timeout)),
+def _connect_seconds() -> float:
+    return _float_env("AI_CONNECT_TIMEOUT", DEFAULT_CONNECT_SECONDS)
+
+
+def _timeout(total: float) -> httpx.Timeout:
+    return httpx.Timeout(total, connect=min(_connect_seconds(), total))
+
+
+# One client per process (and event loop), so a connection that took seconds to open is kept open and reused by
+# later calls and by the app's once-a-minute status check, which also keeps it warm.
+_shared: tuple[object, object, httpx.AsyncClient] | None = None
+
+
+def _client() -> httpx.AsyncClient:
+    global _shared
+    loop = asyncio.get_running_loop()
+    if _shared and _shared[0] is loop and _shared[1] is TRANSPORT:
+        return _shared[2]
+    client = httpx.AsyncClient(
         transport=TRANSPORT,
         follow_redirects=False,
+        limits=httpx.Limits(max_connections=8, max_keepalive_connections=4, keepalive_expiry=120.0),
     )
+    _shared = (loop, TRANSPORT, client)  # an older client (another loop, or a test transport) is simply dropped
+    return client
+
+
+@asynccontextmanager
+async def _session():
+    yield _client()  # shared: not closed when the call ends
 
 
 def image_b64(data: bytes) -> str:
@@ -261,7 +292,7 @@ async def chat(
     deadline = time.monotonic() + budget
     tried: list[str] = []
     refused = 0
-    async with _client(budget) as client:
+    async with _session() as client:
         for index, url in _order(endpoints):
             left = deadline - time.monotonic()
             if left <= 1:
@@ -269,7 +300,7 @@ async def chat(
             started = time.monotonic()
             tried.append(_label(index))
             try:
-                r = await client.post(url + path, json=body, headers=_headers(), timeout=httpx.Timeout(left, connect=min(CONNECT_SECONDS, left)))
+                r = await client.post(url + path, json=body, headers=_headers(), timeout=_timeout(left))
             except httpx.TransportError:  # off, asleep, unreachable, or too slow
                 _down_until[url] = time.monotonic() + DOWN_SECONDS
                 continue
@@ -319,11 +350,12 @@ def _error_text(r: httpx.Response) -> str:
 
 
 # ---------------- status ----------------
-async def status(*, quick: bool = False, timeout: float = 4.0) -> dict:
+async def status(*, quick: bool = False, timeout: float | None = None) -> dict:
     """Which servers answer, and the models each has. quick=True stops at the first one online.
 
     Returns {"configured", "online", "api", "model", "model_large", "servers": [{"name", "host", "online", "ms", "models", "error"}]}.
     """
+    timeout = timeout or _float_env("AI_STATUS_TIMEOUT", DEFAULT_STATUS_SECONDS)
     endpoints = _endpoints()
     api = _api()
     out: dict[str, Any] = {
@@ -332,12 +364,12 @@ async def status(*, quick: bool = False, timeout: float = 4.0) -> dict:
         "servers": [],
     }
     path = "/v1/models" if api == "openai" else "/api/tags"
-    async with _client(timeout) as client:
+    async with _session() as client:
         for index, url in enumerate(endpoints):
             s: dict[str, Any] = {"name": _label(index), "host": _host(url), "online": False, "ms": None, "models": [], "error": ""}
             started = time.monotonic()
             try:
-                r = await client.get(url + path, headers=_headers())
+                r = await client.get(url + path, headers=_headers(), timeout=_timeout(timeout))
                 s["ms"] = int((time.monotonic() - started) * 1000)
                 if r.status_code in (401, 403):
                     s["error"] = "Refused the key (check AI_GATEWAY_KEY and the Caddyfile)"
@@ -379,5 +411,5 @@ def install(app, *, status_path: str = "/api/ai/status") -> None:
 
     @app.get(status_path, include_in_schema=False)
     async def _ai_status():
-        s = await status(quick=True, timeout=3.0)
+        s = await status(quick=True)
         return JSONResponse({"configured": s["configured"], "online": s["online"]}, headers={"Cache-Control": "no-store"})

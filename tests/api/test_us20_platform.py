@@ -272,7 +272,7 @@ def test_a_real_database_needs_the_pin_secret(monkeypatch, make_client):
 def test_health_reports_the_database_without_secrets(client):
     """/api/health says whether the database answers, and never shows its address."""
     body = client.get("/api/health").json()
-    assert body["database"] == "memory" and body["version"] == "0.4.1"
+    assert body["database"] == "memory" and body["version"] == "0.4.2"
     assert "postgres" not in str(body)
 
 
@@ -332,3 +332,55 @@ def test_health_names_the_kind_of_database_fault_but_nothing_else(monkeypatch, c
     body = client.get("/api/health").json()
     assert body["database"] == "error: ConnectionRefusedError"
     assert "secret" not in str(body) and "postgres" not in str(body)
+
+
+def _count_statements(engine):
+    from sqlalchemy import event
+
+    seen: list[str] = []
+    event.listen(engine.sync_engine, "before_cursor_execute", lambda _c, _cur, stmt, *_a: seen.append(stmt))
+    return seen
+
+
+def test_nfr_sign_in_and_requests_use_few_database_round_trips(client, make_client):
+    """Non-functional: the database may be far from the server, so a sign-in and a signed-in request stay cheap."""
+    from karyahub.db.engine import get_engine
+
+    seen = _count_statements(get_engine(get_settings()))
+    c = make_client(signed_in=False)
+    assert sign_in(c, "9900000202", "1357").status_code == 200
+    sign_in_count = len(seen)
+    seen.clear()
+    assert c.get("/api/v1/auth/me").json()["signed_in"] is True
+    me_count = len(seen)
+    seen.clear()
+    assert sign_in(c, "9900000202", "0000").status_code == 401  # a wrong PIN is cheap too
+    wrong_count = len(seen)
+    assert (sign_in_count, me_count) <= (8, 2), (sign_in_count, me_count)
+    assert wrong_count <= 4, wrong_count
+
+
+def test_postgres_connections_are_reused_on_one_loop_and_replaced_on_another(monkeypatch):
+    """Connections are kept between requests, but never carried onto a different event loop."""
+    import asyncio
+
+    from karyahub.db import engine as eng
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@localhost:5432/none")
+    get_settings.cache_clear()
+    settings = get_settings()
+
+    async def two_calls():
+        return eng.get_engine(settings), eng.get_engine(settings)
+
+    first, again = asyncio.run(two_calls())
+    assert first is again
+    other_loop, _ = asyncio.run(two_calls())
+    assert other_loop is not first
+
+
+def test_health_reports_how_long_the_database_takes_but_nothing_secret(client):
+    """/api/health shows connect and query times in milliseconds, so slowness can be told from distance."""
+    body = client.get("/api/health").json()
+    assert set(body["database_ms"]) == {"connect", "query"}
+    assert all(isinstance(v, int) and v >= 0 for v in body["database_ms"].values())

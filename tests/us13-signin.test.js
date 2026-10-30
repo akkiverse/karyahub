@@ -197,4 +197,25 @@ describe('US-22 Sign-in screens (CR-0005)', () => {
     await expect(client.signIn('9900000201', '0000')).rejects.toThrow();
     expect(ended).toBe(1); // a failed sign-in isn't "session ended"
   });
+
+  it('Non-functional: the app waits 20 seconds (30 for opening and signing in) before saying it cannot reach the server', async () => {
+    vi.useFakeTimers();
+    try {
+      const make = (name) => {
+        const fetchImpl = (url, init) => new Promise((_r, reject) => { init.signal.addEventListener('abort', () => reject(new Error('aborted'))); });
+        return createApiClient({ fetchImpl })[name];
+      };
+      const settled = { team: false, signIn: false };
+      make('team')().catch((e) => { settled.team = e.name; });
+      make('signIn')('9900000201', '2468').catch((e) => { settled.signIn = e.name; });
+      await vi.advanceTimersByTimeAsync(19_000);
+      expect(settled).toEqual({ team: false, signIn: false });
+      await vi.advanceTimersByTimeAsync(2_000); // 21 s: an ordinary request gives up, sign-in is still waiting
+      expect(settled).toEqual({ team: 'ApiUnreachable', signIn: false });
+      await vi.advanceTimersByTimeAsync(10_000); // 31 s
+      expect(settled.signIn).toBe('ApiUnreachable');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

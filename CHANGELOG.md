@@ -5,6 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-30
+
+### Fixed
+- Signing in no longer fails with "Couldn't reach the KaryaHub server": sign-in made about a dozen database round trips and a new connection each time, taking over 8 seconds. It now makes 6 statements, reuses connections, and the app waits longer (20 seconds, 30 for opening and signing in). `/api/health` shows how long the database takes to answer. See [CR-0007](docs/changes/CR-0007-faster-sign-in.md).
+
 ## [0.4.1] - 2026-10-30
 
 ### Fixed
@@ -64,6 +69,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.4.2]: https://github.com/akkiverse/karyahub/pull/7
 [0.4.1]: https://github.com/akkiverse/karyahub/pull/6
 [0.4.0]: https://github.com/akkiverse/karyahub/pull/4
 [0.3.0]: https://github.com/akkiverse/karyahub/pull/3

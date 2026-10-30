@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 from datetime import date
 from typing import Annotated, Any, Literal
 
@@ -25,20 +26,27 @@ from karyahub.whatsapp import webhook
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
-async def database_status(settings: Settings) -> str:
-    """'ok', 'not_configured' or 'error'. Never includes the address or any secret."""
+async def database_status(settings: Settings) -> tuple[str, dict[str, int]]:
+    """(status, timings in ms). Status: ok, memory, not_configured or error: <kind>. No address, no secret."""
     if settings.uses_real_database and not settings.pepper():
-        return "not_configured"
+        return "not_configured", {}
     try:
         engine = get_engine(settings)
         await ensure_ready(engine, settings.database_url or MEMORY_URL)
+        started = time.perf_counter()
         async with engine.connect() as conn:
+            got_connection = time.perf_counter()
             await conn.execute(text("select 1"))
+            answered = time.perf_counter()
     except Exception as exc:
         # The kind of fault only (for example "InvalidPasswordError"), never the address or any secret.
         logging.getLogger("karyahub").error("Database check failed: %s", type(exc).__name__, exc_info=exc)
-        return f"error: {type(exc).__name__}"
-    return "ok" if settings.uses_real_database else "memory"
+        return f"error: {type(exc).__name__}", {}
+    timings = {
+        "connect": round((got_connection - started) * 1000),
+        "query": round((answered - got_connection) * 1000),
+    }
+    return ("ok" if settings.uses_real_database else "memory"), timings
 
 
 def adapters_dep(settings: SettingsDep) -> Adapters:
@@ -131,14 +139,19 @@ def create_app() -> FastAPI:
     v1 = APIRouter(prefix="/api/v1")
 
     @api.get("/health")
-    async def health(settings: SettingsDep) -> dict[str, str]:
-        return {
+    async def health(settings: SettingsDep) -> dict[str, Any]:
+        status, timings = await database_status(settings)
+        body: dict[str, Any] = {
             "status": "ok",
             "service": "karyahub-api",
             "version": __version__,
             "mode": settings.mode,
-            "database": await database_status(settings),
+            "database": status,
         }
+        if timings:
+            # How long the database takes to answer from this server: tells apart "far away" from "slow".
+            body["database_ms"] = timings
+        return body
 
     @v1.get("/meta")
     async def meta(settings: SettingsDep, tenant: TenantDep) -> dict[str, Any]:

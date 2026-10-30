@@ -260,6 +260,7 @@ All demo data lives in the browser (localStorage in try/catch, data version 3 si
 - Light and dark themes following the system setting, with a manual switch.
 - Plain-language errors; ₹ in Indian format (1,00,000).
 - Access (CR-0003, changed CR-0005): every screen and job action is checked against the signed-in person's permissions on the server; PINs are stored only as salted hashes with a server secret; sessions are HttpOnly cookies; the starting role table is identical on the web app and the server.
+- Speed (CR-0007): the database may be far from the server, so a sign-in makes at most 8 database statements and a signed-in request at most 2; the app waits 20 seconds (30 for opening the app and signing in) before saying it can't reach the server.
 - Data (CR-0005): people, businesses, sessions and the activity log live in one Postgres database (Neon, `karyahub_master_db`) with `business_id` on every business-owned row and every query filtered by it. With a real database `KARYAHUB_PIN_PEPPER` must be set or accounts refuse to run. The address is never printed or returned.
 - The demo business holds only dummy names, phones and GSTINs, labelled as demo. Real businesses' people are real; jobs and customers still live on the device until CR-0007.
 

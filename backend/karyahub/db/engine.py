@@ -12,7 +12,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool, StaticPool
+from sqlalchemy.pool import StaticPool
 
 from karyahub.settings import Settings
 
@@ -22,6 +22,7 @@ MEMORY_URL = "sqlite+aiosqlite://"
 SCHEMA_HEAD = "0001"
 _ADVISORY_LOCK = 727_001
 _engines: dict[str, AsyncEngine] = {}
+_loops: dict[str, asyncio.AbstractEventLoop] = {}
 _ready: dict[str, asyncio.Lock | bool] = {}
 
 
@@ -42,15 +43,35 @@ def async_url(url: str) -> tuple[str, dict]:
 
 
 def get_engine(settings: Settings) -> AsyncEngine:
+    """The engine for this database. For Postgres, connections are kept and reused between requests.
+
+    A connection can only be used on the event loop that opened it. If the server ever runs a request on a
+    different loop, the old pool is dropped (without touching the dead loop) and a fresh one is made, so
+    reuse is a speed-up that can never turn into an error.
+    """
     key = settings.database_url or MEMORY_URL
-    if key not in _engines:
-        url, args = async_url(settings.database_url)
-        if url.startswith("sqlite"):
+    url, args = async_url(settings.database_url)
+    if url.startswith("sqlite"):
+        if key not in _engines:
             _engines[key] = create_async_engine(
                 url, poolclass=StaticPool, connect_args={"check_same_thread": False}
             )
-        else:
-            _engines[key] = create_async_engine(url, poolclass=NullPool, connect_args=args)
+        return _engines[key]
+    loop = asyncio.get_running_loop()
+    if key in _engines and _loops.get(key) is loop:
+        return _engines[key]
+    if key in _engines:
+        _engines[key].sync_engine.dispose(close=False)
+    _engines[key] = create_async_engine(
+        url,
+        connect_args=args,
+        pool_size=3,
+        max_overflow=2,
+        pool_pre_ping=True,  # a connection that went stale while the server slept is replaced, not failed on
+        pool_recycle=240,
+        pool_timeout=15,
+    )
+    _loops[key] = loop
     return _engines[key]
 
 
@@ -98,6 +119,7 @@ async def ensure_ready(engine: AsyncEngine, key: str) -> None:
 def forget_engines() -> None:
     """For tests: drop cached engines so each test starts with a fresh in-memory database."""
     _engines.clear()
+    _loops.clear()
     _ready.clear()
 
 

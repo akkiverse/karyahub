@@ -4,7 +4,7 @@ import { isAiOffline } from '../ui/ai-status.js';
 
 // Reading with Studio AI (CR-0004) can take a while on the founder's own AI server.
 export const AI_TIMEOUT_MS = 60000;
-export const BOOT_TIMEOUT_MS = 30000;
+export const BOOT_TIMEOUT_MS = 30000; // opening the app and signing in: a sleeping server and database may need a while
 
 export class ApiError extends Error {
   constructor(message, { code = 'api_error', status = 0 } = {}) {
@@ -22,7 +22,7 @@ export class ApiUnreachable extends Error {
   }
 }
 
-export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => globalThis.fetch(...a), timeoutMs = 8000, onSessionEnded = () => {} } = {}) {
+export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => globalThis.fetch(...a), timeoutMs = 20000, onSessionEnded = () => {} } = {}) {
   async function call(method, path, body, { timeout = timeoutMs, quiet = false } = {}) {
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
@@ -71,7 +71,7 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     // The first requests may wake a sleeping function and database, so they get longer than the usual 8 seconds.
     authState: () => call('GET', '/auth/state', undefined, { timeout: BOOT_TIMEOUT_MS }),
     me: () => call('GET', '/auth/me', undefined, { quiet: true, timeout: BOOT_TIMEOUT_MS }),
-    signIn: (phone, pin) => call('POST', '/auth/sign-in', { phone, pin }, { quiet: true }),
+    signIn: (phone, pin) => call('POST', '/auth/sign-in', { phone, pin }, { quiet: true, timeout: BOOT_TIMEOUT_MS }),
     signOut: () => call('POST', '/auth/sign-out', undefined, { quiet: true }),
     bootstrap: (form) => call('POST', '/auth/bootstrap', form),
     changePin: (currentPin, newPin) => call('POST', '/auth/change-pin', { current_pin: currentPin, new_pin: newPin }),

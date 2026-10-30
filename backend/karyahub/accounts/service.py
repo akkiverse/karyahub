@@ -16,7 +16,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, literal, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,17 +65,21 @@ class Principal:
 
 # ---------- permissions ----------
 async def _overrides(db: AsyncSession, user: User) -> tuple[dict[str, bool], dict[str, bool]]:
-    role_rows = []
+    """The owner's switches for this person's role, and for the person: one round trip to the database."""
+    person = select(UserPermission.permission, UserPermission.allowed, literal("u").label("src")).where(
+        UserPermission.user_id == user.id
+    )
+    query = person
     if user.business_id:
-        role_rows = (
-            await db.execute(
-                select(RolePermission).where(
-                    RolePermission.business_id == user.business_id, RolePermission.role == user.role
-                )
-            )
-        ).scalars()
-    user_rows = (await db.execute(select(UserPermission).where(UserPermission.user_id == user.id))).scalars()
-    return {r.permission: r.allowed for r in role_rows}, {r.permission: r.allowed for r in user_rows}
+        role = select(RolePermission.permission, RolePermission.allowed, literal("r").label("src")).where(
+            RolePermission.business_id == user.business_id, RolePermission.role == user.role
+        )
+        query = union_all(role, person)
+    role_over: dict[str, bool] = {}
+    user_over: dict[str, bool] = {}
+    for permission, allowed, src in (await db.execute(query)).all():
+        (role_over if src == "r" else user_over)[permission] = bool(allowed)
+    return role_over, user_over
 
 
 async def permissions_for(db: AsyncSession, user: User) -> frozenset[str]:
@@ -96,14 +100,18 @@ async def audit(db: AsyncSession, business_id: str | None, actor: str, action: s
 async def principal_for_token(db: AsyncSession, token: str | None) -> Principal | None:
     if not token:
         return None
-    sess = await db.get(Session, security.token_hash(token))
-    if not sess or sess.expires_at <= utcnow():
+    row = (
+        await db.execute(
+            select(Session, User, Business)
+            .join(User, User.id == Session.user_id)
+            .outerjoin(Business, Business.id == User.business_id)
+            .where(Session.id == security.token_hash(token))
+        )
+    ).first()
+    if row is None:
         return None
-    user = await db.get(User, sess.user_id)
-    if not user or not user.active:
-        return None
-    business = await db.get(Business, user.business_id) if user.business_id else None
-    if business is not None and not business.active:
+    sess, user, business = row
+    if sess.expires_at <= utcnow() or not user.active or (business is not None and not business.active):
         return None
     return Principal(user, business, await permissions_for(db, user))
 
@@ -111,7 +119,10 @@ async def principal_for_token(db: AsyncSession, token: str | None) -> Principal 
 async def _start_session(db: AsyncSession, settings: Settings, user: User) -> str:
     token, hashed = security.new_token()
     now = utcnow()
-    await db.execute(delete(Session).where(Session.user_id == user.id, Session.expires_at <= now))
+    if (
+        secrets.randbelow(20) == 0
+    ):  # tidy up old sessions now and then, without paying for it on every sign-in
+        await db.execute(delete(Session).where(Session.expires_at <= now))
     db.add(
         Session(
             id=hashed,
@@ -134,15 +145,15 @@ async def sign_out(db: AsyncSession, token: str | None) -> None:
 
 
 # ---------- sign-in ----------
-async def _locked_minutes(db: AsyncSession, phone: str) -> int:
-    row = await db.get(SignInThrottle, phone)
+def _locked_minutes(row: SignInThrottle | None) -> int:
     if row and row.locked_until and row.locked_until > utcnow():
         return max(1, int((row.locked_until - utcnow()).total_seconds() // 60) + 1)
     return 0
 
 
-async def _register_failure(db: AsyncSession, settings: Settings, phone: str) -> None:
-    row = await db.get(SignInThrottle, phone)
+async def _register_failure(
+    db: AsyncSession, settings: Settings, phone: str, row: SignInThrottle | None
+) -> None:
     if row is None:
         row = SignInThrottle(phone=phone, failures=0)
         db.add(row)
@@ -157,29 +168,35 @@ async def sign_in(db: AsyncSession, settings: Settings, phone_raw: str, pin: str
     phone = security.normalise_phone(phone_raw)
     if not security.valid_phone(phone) or not re.fullmatch(r"\d{4,6}", pin or ""):
         raise AppError("sign_in_failed", SIGN_IN_FAILED, 401)
-    wait = await _locked_minutes(db, phone)
+    throttle = await db.get(SignInThrottle, phone)
+    wait = _locked_minutes(throttle)
     if wait:
         raise AppError(
             "locked",
             f"Too many wrong tries. Wait about {wait} minutes, or use Forgot PIN to set a new one.",
             429,
         )
-    user = (await db.execute(select(User).where(User.phone == phone))).scalar_one_or_none()
+    row = (
+        await db.execute(
+            select(User, Business)
+            .outerjoin(Business, Business.id == User.business_id)
+            .where(User.phone == phone)
+        )
+    ).first()
+    user, business = (row[0], row[1]) if row else (None, None)
     ok = security.verify_pin(pin, user.pin_hash if user else None, settings.pepper())
-    business = await db.get(Business, user.business_id) if user and user.business_id else None
     usable = bool(user and user.active and (business is None or business.active))
     if not (ok and usable):
-        await _register_failure(db, settings, phone)
+        await _register_failure(db, settings, phone, throttle)
         raise AppError("sign_in_failed", SIGN_IN_FAILED, 401)
     assert user is not None
-    throttle = await db.get(SignInThrottle, phone)
     if throttle:
         await db.delete(throttle)
     token = await _start_session(db, settings, user)
     user.last_sign_in = utcnow()
     await audit(db, user.business_id, user.name, "sign_in", f"Signed in as {user.role}")
     await db.commit()
-    return await _principal(db, user), token
+    return Principal(user, business, await permissions_for(db, user)), token
 
 
 # ---------- the platform admin ----------

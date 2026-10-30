@@ -254,7 +254,7 @@ All demo data lives in the browser (localStorage in try/catch, data version 3 si
 - Works from 360px wide; tap targets at least 44px.
 - Loads in under 2 seconds; no network calls in the in-browser mode. API answers in mock mode in under 1 second.
 - Secrets only in server environment variables (`KARYAHUB_*`, and the shared `AI_ENDPOINTS` and `AI_GATEWAY_KEY` for Studio AI); live mode without a needed secret fails closed with a clear message.
-- AI (CR-0004): each AI call is limited to 40 seconds inside a 60-second server function; when AI is offline or unusable, messages are read without AI and labelled, never lost.
+- AI (CR-0004, changed CR-0008): opening a connection to the AI server may take up to 20 seconds and the online check up to 12 (the founder's AI PC is reached through Tailscale Funnel, which can be slow), and one connection is reused; each AI call is limited to 40 seconds inside a 60-second server function; when AI is offline or unusable, messages are read without AI and labelled, never lost.
 - Server code: Python 3.12, FastAPI, Pydantic v2, Ruff, pytest (stack tier R; UI stays plain JavaScript, ADR-0005).
 - Accessible: labelled controls, WCAG AA contrast, keyboard use, visible focus; voice-note bubbles show the transcript as text.
 - Light and dark themes following the system setting, with a manual switch.

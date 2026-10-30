@@ -4,6 +4,7 @@ Every change to KaryaHub is recorded here: what changed, why, and how it affecte
 
 | CR | Change | Why (short) | Status | Release |
 |---|---|---|---|---|
+| [CR-0008](CR-0008-ai-over-a-slow-link.md) | AI over a slow link: the shared AI kit waits longer to connect and for the online check, and reuses one connection | The AI PC is up but KaryaHub said the AI server was down | Released | v0.4.3 |
 | [CR-0007](CR-0007-faster-sign-in.md) | Faster sign-in: fewer database round trips, reused connections, more patience in the app, health timings | Founder could not sign in: sign-in took 8.4 s and the app gave up after 8 | In review | v0.4.2 (planned) |
 | [CR-0006](CR-0006-clear-feedback-while-saving.md) | Clear feedback while saving: progress on buttons, one press = one change, results brought into view | Founder pressed Create business several times and saw nothing happen | Released | v0.4.1 |
 | [CR-0005](CR-0005-accounts-and-businesses.md) | Accounts and businesses on the server: mobile-and-PIN sign-in, platform admin, owners' team and access, forgot-PIN codes, real-business look | Founder: a portal many firms use, each with its own people; not a prototype | Released | v0.4.0 |

@@ -5,6 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-30
+
+### Fixed
+- KaryaHub no longer says "AI is offline" when the AI PC is up but its connection is slow: the AI kit now allows up to 20 seconds to connect and 12 for the online check, and reuses one connection, so real AI reads are cut off far less often. See [CR-0008](docs/changes/CR-0008-ai-over-a-slow-link.md).
+
 ## [0.4.2] - 2026-10-30
 
 ### Fixed
@@ -69,6 +74,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.4.3]: https://github.com/akkiverse/karyahub/pull/8
 [0.4.2]: https://github.com/akkiverse/karyahub/pull/7
 [0.4.1]: https://github.com/akkiverse/karyahub/pull/6
 [0.4.0]: https://github.com/akkiverse/karyahub/pull/4

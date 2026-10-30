@@ -1,10 +1,10 @@
 # CR-0006: Clear feedback while saving
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (chat, 2026-10-30: "once I clicked the button still it was not showing if it was clicked or on, I did multiple hit")
 - **Date:** 2026-10-30
-- **Release:** v0.4.1 (patch, once released)
-- **Pull request:** (added when opened)
+- **Release:** v0.4.1 (2026-10-30)
+- **Pull request:** [#6](https://github.com/akkiverse/karyahub/pull/6)
 
 ## Why
 On the live Businesses screen, pressing **Create business** looked like nothing happened: the button stayed as it was, and the temporary PIN for the new owner appeared in a panel at the top of a long page while the button was at the bottom. The founder pressed it several times, and could not tell the business had been created or see the PIN. The same gap was in Admin (Add a person, Import, Reset PIN, Turn off access), Settings (Save details) and My account (Change PIN).

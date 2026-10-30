@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-30
+
 ### Fixed
 - Buttons that save now show progress, ignore a second press, and bring the result (such as a new owner's PIN) into view, so pressing Create business no longer looks like nothing happened. See [CR-0006](docs/changes/CR-0006-clear-feedback-while-saving.md).
 
@@ -62,6 +64,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.4.1]: https://github.com/akkiverse/karyahub/pull/6
 [0.4.0]: https://github.com/akkiverse/karyahub/pull/4
 [0.3.0]: https://github.com/akkiverse/karyahub/pull/3
 [0.2.0]: https://github.com/akkiverse/karyahub/pull/2

@@ -4,7 +4,7 @@
 - **Requested by:** Founder (chat, 2026-10-30: the AI feature showed "server is down" although the AI PC was up and running)
 - **Date:** 2026-10-30
 - **Release:** v0.4.3 (2026-10-30)
-- **Pull request:** (added when opened)
+- **Pull request:** [#8](https://github.com/akkiverse/karyahub/pull/8)
 
 ## Why
 The founder's AI PC is healthy (the local gateway answers in 2 ms, the processor is at 3 to 8%, Tailscale reports a good connection), but reaching it from outside through Tailscale Funnel is slow: opening a secure connection takes 4.5 to 11 seconds and a first answer 6 to 15 seconds. The shared Studio AI kit gave a connection only 5 seconds and the "is it online?" check 3 seconds, so on most tries a working server was marked down for 30 seconds. KaryaHub then showed "AI is offline" and fell back to "Read without AI", and the banner came and went. Measured from the Singapore server: 9 of 10 status checks timed out at 3 seconds.

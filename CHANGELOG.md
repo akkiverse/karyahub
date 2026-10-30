@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+- Buttons that save now show progress, ignore a second press, and bring the result (such as a new owner's PIN) into view, so pressing Create business no longer looks like nothing happened. See [CR-0006](docs/changes/CR-0006-clear-feedback-while-saving.md).
+
 ## [0.4.0] - 2026-10-30
 ### Added
 - Accounts and businesses on the server (Neon Postgres): sign in with mobile number and PIN on any phone, a platform admin who creates businesses and their first owners, and owners who add people one by one or from a CSV, set roles, switch single permissions on or off per role or per person, reset PINs and read an activity log. See [CR-0005](docs/changes/CR-0005-accounts-and-businesses.md).

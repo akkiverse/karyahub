@@ -565,3 +565,5 @@ summary.demo-accounts-title { cursor: pointer; min-height: 44px; display: flex; 
 .start-step { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
 .start-step h3 { margin: 0 0 2px; font-size: 1rem; }
 .start-step p { margin: 0 0 4px; }
+/* Results brought into view must land below the sticky header (CR-0006). */
+.panel-credentials, .notice, .field-error { scroll-margin-top: 88px; }

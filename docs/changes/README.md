@@ -4,6 +4,7 @@ Every change to KaryaHub is recorded here: what changed, why, and how it affecte
 
 | CR | Change | Why (short) | Status | Release |
 |---|---|---|---|---|
+| [CR-0006](CR-0006-clear-feedback-while-saving.md) | Clear feedback while saving: progress on buttons, one press = one change, results brought into view | Founder pressed Create business several times and saw nothing happen | In review | v0.4.1 (planned) |
 | [CR-0005](CR-0005-accounts-and-businesses.md) | Accounts and businesses on the server: mobile-and-PIN sign-in, platform admin, owners' team and access, forgot-PIN codes, real-business look | Founder: a portal many firms use, each with its own people; not a prototype | Released | v0.4.0 |
 | [CR-0004](CR-0004-real-ai-studio-ai.md) | Real AI for job notes and photos (Studio AI), with a labelled "Read without AI" fallback when the AI server is off | Founder asked to replace the pretend AI with his own AI server | Released | v0.3.0 |
 | [CR-0003](CR-0003-business-look-admin-and-staff-logins.md) | Business look, Admin panel and staff logins with limited access (owner, office coordinator, technician) | Founder asked for a more professional look, an admin panel and staff logins with limited access | Released | v0.2.0 |

@@ -51,6 +51,25 @@ const VIEWS = { home, chat, jobs, job, doc: documentView, renewals, settings, ad
 const TITLES = { home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in' };
 
 const PERMISSION_LABELS = PERMISSIONS;
+// What the submit button says while the server is working (the button is switched off meanwhile).
+const WORKING = { 'add-staff': 'Adding…', 'import-staff': 'Importing…', 'add-business': 'Creating…', 'business-profile': 'Saving…', 'account-pin': 'Changing…' };
+function showWorking(form, label) {
+  const btn = form.querySelector('button[type="submit"]');
+  form.dataset.busy = '1';
+  if (!btn) return () => {};
+  const html = btn.innerHTML;
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+  btn.innerHTML = `<span class="spinner" aria-hidden="true"></span> ${label}`;
+  return () => {
+    // Most results redraw the page; if this form is still there (an error), switch it back on.
+    if (!form.isConnected) return;
+    delete form.dataset.busy;
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    btn.innerHTML = html;
+  };
+}
 const OFFLINE = "Couldn't reach the KaryaHub server. Check your connection and try again.";
 const msg = (e) => (e instanceof ApiUnreachable ? OFFLINE : e.message);
 
@@ -126,6 +145,8 @@ export function mountApp(root, options = {}) {
     if (route.name === 'businesses' && can(me, 'manage_businesses') && !ui.businesses.list) loadBusinesses();
   }
   async function loadAdmin(extra = {}) {
+    if (extra.credentials && extra.credentials.length) ui.focusNext = '[data-testid="admin-credentials"]';
+    else if (extra.notice) ui.focusNext = '[data-testid="admin-notice"]';
     try {
       const [data, log] = await Promise.all([api.team(), api.audit()]);
       ui.admin = { ...ui.admin, ...extra, data, audit: log.entries, error: '' };
@@ -135,6 +156,8 @@ export function mountApp(root, options = {}) {
     if (alive && route.name === 'admin') render();
   }
   async function loadBusinesses(extra = {}) {
+    if (extra.issued) ui.focusNext = '[data-testid="biz-credentials"]';
+    else if (extra.notice) ui.focusNext = '[data-testid="biz-notice"]';
     try {
       ui.businesses = { ...ui.businesses, ...extra, list: (await api.businesses()).businesses, error: '' };
     } catch (e) {
@@ -229,6 +252,16 @@ export function mountApp(root, options = {}) {
     }
     const t2 = root.querySelector('.thread');
     if (t2) t2.scrollTop = nearBottom || name !== lastRouteName ? t2.scrollHeight : oldTop;
+    if (ui.focusNext) {
+      // Results appear away from the button that caused them (new PINs at the top of the page), so bring them into view.
+      const target = root.querySelector(ui.focusNext);
+      if (target) {
+        ui.focusNext = null;
+        target.setAttribute('tabindex', '-1');
+        target.scrollIntoView?.({ block: 'start', behavior: win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        target.focus({ preventScroll: true });
+      }
+    }
     if (name !== lastRouteName) {
       root.ownerDocument.title = `${TITLES[name]} · KaryaHub${me && me.business && me.business.is_demo ? ' demo' : ''}`;
       const h = root.querySelector('#page-title');
@@ -284,6 +317,9 @@ export function mountApp(root, options = {}) {
     if (a === 'dismiss-credentials') { ui.admin.credentials = null; render(); return; }
     if (a === 'dismiss-issued') { ui.businesses.issued = null; render(); return; }
     if (a === 'reset-pin') {
+      if (el.disabled) return;
+      el.disabled = true; // one press at a time
+      el.setAttribute('aria-busy', 'true');
       const m = (ui.admin.data?.members || []).find((x) => x.id === el.dataset.staff);
       try {
         const res = await api.resetMemberPin(el.dataset.staff);
@@ -292,6 +328,9 @@ export function mountApp(root, options = {}) {
       return;
     }
     if (a === 'toggle-access') {
+      if (el.disabled) return;
+      el.disabled = true; // one press at a time
+      el.setAttribute('aria-busy', 'true');
       try {
         const res = await api.updateMember(el.dataset.staff, { active: el.dataset.active === 'true' });
         await loadAdmin({ notice: { text: `${res.name}: access ${res.active ? 'turned on' : 'turned off'}.` } });
@@ -299,6 +338,9 @@ export function mountApp(root, options = {}) {
       return;
     }
     if (a === 'toggle-business') {
+      if (el.disabled) return;
+      el.disabled = true; // one press at a time
+      el.setAttribute('aria-busy', 'true');
       try {
         const res = await api.setBusinessActive(el.dataset.business, el.dataset.active === 'true');
         await loadBusinesses({ notice: { text: `${res.name} is now ${res.active ? 'on' : 'turned off'}.` } });
@@ -306,6 +348,9 @@ export function mountApp(root, options = {}) {
       return;
     }
     if (a === 'reset-owner-pin') {
+      if (el.disabled) return;
+      el.disabled = true; // one press at a time
+      el.setAttribute('aria-busy', 'true');
       try {
         const res = await api.resetOwnerPin(el.dataset.owner);
         const owner = (ui.businesses.list || []).flatMap((b) => b.owners).find((o) => o.id === el.dataset.owner);
@@ -475,8 +520,10 @@ export function mountApp(root, options = {}) {
         session.set({ ...cur, business: saved });
         store.update((s) => { s.settings.business_name = saved.name; s.settings.address = saved.address; s.settings.gstin = saved.gstin; });
         ui.profile = { notice: { text: 'Saved. Your quotes and reminders now use these details.' } };
+        ui.focusNext = '[data-testid="profile-notice"]';
       } catch (err) {
         ui.profile = { ...fields, notice: { text: msg(err), error: true } };
+        ui.focusNext = '[data-testid="profile-notice"]';
       }
       render();
     } else if (kind === 'account-pin') {
@@ -487,6 +534,7 @@ export function mountApp(root, options = {}) {
       } catch (err) {
         ui.account = { notice: { text: msg(err), error: true } };
       }
+      ui.focusNext = '[data-testid="account-notice"]';
       render();
     }
   }
@@ -497,7 +545,12 @@ export function mountApp(root, options = {}) {
     e.preventDefault();
     const kind = form.dataset.form;
     if (['signin', 'forgot', 'reset', 'setup', 'change-pin'].includes(kind)) { submitAuth(form); return; }
-    if (['add-staff', 'import-staff', 'add-business', 'business-profile', 'account-pin'].includes(kind)) { submitTeam(form); return; }
+    if (['add-staff', 'import-staff', 'add-business', 'business-profile', 'account-pin'].includes(kind)) {
+      if (form.dataset.busy === '1') return; // a second press while the first is still working
+      const done = showWorking(form, WORKING[kind]);
+      Promise.resolve(submitTeam(form)).finally(done);
+      return;
+    }
     if (kind === 'send-text') {
       const text = form.elements.text.value.trim();
       if (!text) return;

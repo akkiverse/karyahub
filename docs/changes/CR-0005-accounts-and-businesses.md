@@ -1,10 +1,10 @@
 # CR-0005: Accounts and businesses on the server
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (chat, 2026-10-30: "KaryaHub login is not fixed yet... it should not look like only a prototype")
 - **Date:** 2026-10-30
-- **Release:** v0.4.0 (once released)
-- **Pull request:** (added when opened)
+- **Release:** v0.4.0 (2026-10-30)
+- **Pull request:** [#4](https://github.com/akkiverse/karyahub/pull/4)
 
 ## Why
 KaryaHub is a portal many firms will use, like Outlook is used by many companies: each business has its own staff and its own stock, and a person who signs in with their mobile number sees only the business they belong to. Until now accounts and PINs lived in one browser, so an owner could "add staff" but the person couldn't sign in from their own phone, and nothing separated one firm from another. The founder also asked for an admin who can add users one by one or from a CSV and switch what each role or person may do, a platform admin who creates businesses, a forgot-PIN code, no "CoolCare AC Services" line on the sign-in card, and a product that no longer looks like a prototype.

@@ -50,7 +50,7 @@ export function businesses({ ui }) {
           ${field('owner_phone', "Owner's mobile number", form.owner_phone, 'inputmode="numeric" autocomplete="off"')}
           ${field('owner_pin', 'First PIN (optional)', form.owner_pin, 'inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Leave empty to make one"')}
         </div>
-        ${b.formError ? `<p class="field-error" role="alert" data-testid="biz-error">${escapeHtml(b.formError)}</p>` : ''}
+        ${b.formError ? `<p class="field-error" role="alert" tabindex="-1" data-testid="biz-error">${escapeHtml(b.formError)}</p>` : ''}
         <button type="submit" class="btn btn-primary">${icon('check', { size: 18 })} Create business</button>
       </form>
     </section>

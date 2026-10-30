@@ -188,6 +188,10 @@ Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see 
 | AC-22.9 | `tests/us13-signin.test.js` › AC-22.9: the real app asks the server who is signed in; a network failure shows a calm retry screen | Pass |
 | AC-22.9 | `tests/us13-signin.test.js` › AC-22.9: when the server answers with a problem the screen says so instead of blaming the internet | Pass |
 | AC-22.9 | `tests/us14-roles.test.js` › AC-22.9: a platform admin sees only the Businesses screen and no business screens | Pass |
+| AC-22.10 | `tests/us15-admin.test.js` › AC-22.10: adding a person shows progress, ignores a second press and brings the new PIN into view | Pass |
+| AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: pressing Create business shows progress, a second press is ignored, and the new PIN is brought into view | Pass |
+| AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: after a refused attempt the button comes back and keeps what was typed | Pass |
+| AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: Reset PIN and Turn off can only be pressed once at a time | Pass |
 
 ## Design checklist
 | Check | Result |
@@ -223,4 +227,5 @@ Fixes made after looking at the screenshots:
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.
 - v0.3.0 (2026-10-30): CR-0004 released; 87 of 87 acceptance tests passing.
-- CR-0005 in review: 161 of 161 tests passing; not yet released.
+- v0.4.1 (2026-10-30): CR-0006 released; 165 of 165 tests passing (78 server, 87 web).
+- v0.4.0 (2026-10-30): CR-0005 released; 161 of 161 tests passing. Live check: `/api/health` reports `database: ok`, the demo owner signs in, the demo team is read-only, and the AI read answers.

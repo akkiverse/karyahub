@@ -5,9 +5,9 @@
   "accent": "#0F766E",
   "repo": "https://github.com/akkiverse/karyahub",
   "live_url": "https://karyahub-akkiverse.vercel.app",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "launched": "2026-10-28",
-  "tests_passed": 87,
-  "tests_total": 87,
+  "tests_passed": 165,
+  "tests_total": 165,
   "stack": "R: plain JavaScript UI (Vite) + FastAPI under /api"
 }

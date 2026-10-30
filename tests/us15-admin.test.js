@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setup, until } from './helpers.js';
 import { fakeApi } from './fake-api.js';
 import { REAL_BUSINESS, PEOPLE, meFor } from './fake-accounts.js';
@@ -167,5 +167,23 @@ describe('US-19 Admin: team and access (screens, CR-0005)', () => {
     await until(() => t.$('[data-testid="account-notice"]'));
     expect(t.$('[data-testid="account-notice"]').textContent).toBe('Your PIN is changed.');
     expect(PEOPLE['st-santosh'].name).toBe('Santosh Pawar');
+  });
+
+  it('AC-22.10: adding a person shows progress, ignores a second press and brings the new PIN into view', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    await open();
+    const original = t.api.addMember;
+    t.api.addMember = async (form) => { await new Promise((r) => setTimeout(r, 30)); return original(form); };
+    const f = t.$('form[data-form="add-staff"]');
+    f.elements.name.value = 'Neha Kulkarni'; f.elements.phone.value = '9900000299'; f.elements.role.value = 'technician';
+    const button = f.querySelector('button[type="submit"]');
+    f.requestSubmit();
+    f.requestSubmit();
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toContain('Adding…');
+    await until(() => t.$('[data-testid="admin-credentials"]'));
+    expect(calls('addMember')).toHaveLength(1);
+    expect(document.activeElement).toBe(t.$('[data-testid="admin-credentials"]'));
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 });

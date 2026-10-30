@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setup, until } from './helpers.js';
 import { fakeApi } from './fake-api.js';
 
@@ -73,5 +73,50 @@ describe('US-20 Businesses (platform admin screens, CR-0005)', () => {
     t = setup({ hash: '#/businesses' });
     expect(t.$('[data-testid="access-denied"]')).toBeTruthy();
     expect(t.$('form[data-form="add-business"]')).toBeNull();
+  });
+
+  it('AC-22.10: pressing Create business shows progress, a second press is ignored, and the new PIN is brought into view', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    await open();
+    const original = t.api.createBusiness;
+    t.api.createBusiness = async (form) => { await new Promise((r) => setTimeout(r, 30)); return original(form); };
+    const f = t.$('form[data-form="add-business"]');
+    for (const [k, v] of Object.entries({ name: 'Cool Breeze', owner_name: 'Ravi Kale', owner_phone: '9822200002' })) f.elements[k].value = v;
+    const button = f.querySelector('button[type="submit"]');
+    f.requestSubmit();
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toContain('Creating…');
+    expect(button.getAttribute('aria-busy')).toBe('true');
+    f.requestSubmit(); // an impatient second press
+    f.requestSubmit();
+    await until(() => t.$('[data-testid="biz-credentials"]'));
+    expect(calls('createBusiness')).toHaveLength(1);
+    const panel = t.$('[data-testid="biz-credentials"]');
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    expect(document.activeElement).toBe(panel);
+    expect(t.$$('[data-testid="business-list"] .member')).toHaveLength(3);
+  });
+
+  it('AC-22.10: after a refused attempt the button comes back and keeps what was typed', async () => {
+    await open();
+    const f = t.$('form[data-form="add-business"]');
+    for (const [k, v] of Object.entries({ name: 'Another Firm', owner_name: 'Mina Again', owner_phone: '9811100001' })) f.elements[k].value = v;
+    f.requestSubmit();
+    await until(() => t.$('[data-testid="biz-error"]'));
+    const button = t.$('form[data-form="add-business"] button[type="submit"]');
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).toContain('Create business');
+    expect(button.getAttribute('aria-busy')).toBeNull();
+    expect(document.activeElement.dataset.testid).toBe('biz-error');
+  });
+
+  it('AC-22.10: Reset PIN and Turn off can only be pressed once at a time', async () => {
+    await open();
+    const button = t.$('[data-action="reset-owner-pin"]');
+    button.click();
+    expect(button.disabled).toBe(true);
+    button.click();
+    await until(() => t.$('[data-testid="biz-credentials"]'));
+    expect(calls('resetOwnerPin')).toHaveLength(1);
   });
 });

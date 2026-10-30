@@ -90,7 +90,7 @@ export function admin({ ui, me }) {
           ${field('phone', 'Mobile number', 'tel', form.phone, 'inputmode="numeric" autocomplete="off"')}
           <label class="field"><span>Role</span><select name="role">${data.roles.map((r) => `<option value="${r.id}" ${(form.role || 'technician') === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}</select></label>
           ${field('pin', 'First PIN (optional, 4 to 6 digits)', 'text', form.pin, 'inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Leave empty to make one"')}
-          ${errs.message ? `<p class="field-error" role="alert" data-testid="add-error">${escapeHtml(errs.message)}</p>` : ''}
+          ${errs.message ? `<p class="field-error" role="alert" tabindex="-1" data-testid="add-error">${escapeHtml(errs.message)}</p>` : ''}
           <p class="muted small">They sign in with their mobile number and this PIN, then choose their own PIN.</p>
           <button type="submit" class="btn btn-primary" ${locked ? 'disabled' : ''}>${icon('check', { size: 18 })} Add to team</button>
         </form>

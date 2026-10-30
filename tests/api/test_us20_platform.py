@@ -272,7 +272,7 @@ def test_a_real_database_needs_the_pin_secret(monkeypatch, make_client):
 def test_health_reports_the_database_without_secrets(client):
     """/api/health says whether the database answers, and never shows its address."""
     body = client.get("/api/health").json()
-    assert body["database"] == "memory" and body["version"] == "0.4.0"
+    assert body["database"] == "memory" and body["version"] == "0.4.1"
     assert "postgres" not in str(body)
 
 

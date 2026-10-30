@@ -1,111 +1,171 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { setup } from './helpers.js';
+import { describe, it, expect, afterEach } from 'vitest';
+import { setup, until } from './helpers.js';
+import { fakeApi } from './fake-api.js';
+import { REAL_BUSINESS, PEOPLE, meFor } from './fake-accounts.js';
 
 let t;
 afterEach(() => t?.app.unmount());
-const tick = () => new Promise((r) => setTimeout(r, 0));
-const waitFor = (fn) => vi.waitFor(fn, { timeout: 2000, interval: 5 });
 
-async function addStaff(t, { name, phone, role, pin }) {
-  const f = t.$('form[data-form="add-staff"]');
-  f.elements.name.value = name; f.elements.phone.value = phone; f.elements.role.value = role; f.elements.pin.value = pin;
-  f.requestSubmit();
-  await waitFor(() => { if (!t.$('[data-testid="admin-notice"]') && !t.$('[data-form="add-staff"] [aria-invalid="true"]')) throw new Error('waiting'); });
-}
-async function trySignIn(t, phone, pin) {
-  const res = await t.app.team.signIn(phone, pin);
-  return res;
-}
+const shree = meFor({ id: 'u-owner', name: 'Akash Mehta', phone: '9900000201', role: 'owner' }, REAL_BUSINESS);
+const open = async (opts = {}) => {
+  t = setup({ me: shree, hash: '#/admin', api: fakeApi({ accounts: opts.accounts }) });
+  await until(() => t.$('[data-testid="team-list"]'));
+};
+const notice = () => t.$('[data-testid="admin-notice"]')?.textContent || '';
+const calls = (name) => t.api.accountCalls.filter((c) => c.name === name);
 
-describe('US-15 Admin panel', () => {
-  it('AC-15.1: Admin shows staff counts by role, the team, Add staff, the roles table and the access log', () => {
-    t = setup({ hash: '#/admin' });
-    const kpis = t.$('[data-testid="admin-kpis"]').textContent;
-    expect(kpis).toContain('Active staff');
-    expect(t.$$('[data-testid="admin-kpis"] .kpi-value').map((e) => e.textContent)).toEqual(['4', '1', '1', '2']);
+describe('US-19 Admin: team and access (screens, CR-0005)', () => {
+  it('AC-19.1 and AC-22.5 (screen): Admin shows counts by role, the team, add and import forms, the role table and the activity log', async () => {
+    await open();
+    expect(t.$('[data-testid="admin-kpis"]').textContent).toContain('Active people');
+    expect(t.$$('[data-testid="admin-kpis"] .kpi-value').map((e) => e.textContent)).toEqual(['3', '1', '1', '1']);
     const rows = t.$$('[data-testid="team-list"] .member');
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(3);
     expect(rows[1].textContent).toContain('Priya Nair');
     expect(rows[1].textContent).toContain('99000 00202');
-    expect(rows[1].querySelector('select').value).toBe('coordinator');
+    expect(rows[1].querySelector('select[data-action="set-role"]').value).toBe('coordinator');
     expect(rows[1].querySelector('[data-testid="member-status"]').textContent).toBe('Active');
     expect(t.$('form[data-form="add-staff"]')).toBeTruthy();
+    expect(t.$('form[data-form="import-staff"]')).toBeTruthy();
     expect(t.$$('[data-testid="role-matrix"] tbody tr')).toHaveLength(9);
-    expect(t.root.textContent).toContain('Access log');
+    expect(t.$('[data-testid="access-log"]').textContent).toContain('Akash Mehta signed in as owner');
+    expect(t.$('[data-testid="demo-locked"]')).toBeNull();
   });
 
-  it('AC-15.2: a new technician is added, logged, and can sign in with technician access', async () => {
-    t = setup({ hash: '#/admin' });
-    await addStaff(t, { name: 'Neha Kulkarni', phone: '9900000299', role: 'technician', pin: '4321' });
-    expect(t.$('[data-testid="admin-notice"]').textContent).toContain('Neha Kulkarni was added as Technician');
-    expect(t.$('[data-testid="team-list"]').textContent).toContain('Neha Kulkarni');
-    expect(t.app.store.get().access_log[0].text).toBe('Added Neha Kulkarni as Technician');
-    t.click('.account-menu [data-action="sign-out"]');
-    const res = await trySignIn(t, '9900000299', '4321');
-    expect(res.user).toMatchObject({ name: 'Neha Kulkarni', role: 'technician' });
-    t.app.navigate('#/chat');
-    expect(t.$$('nav.tabs .tab span').map((s) => s.textContent)).toEqual(['Chat', 'Jobs']);
+  it('AC-19.1 and AC-22.5 (screen): adding a person shows their PIN once, in a panel that can be dismissed or downloaded', async () => {
+    await open();
+    const f = t.$('form[data-form="add-staff"]');
+    f.elements.name.value = 'Neha Kulkarni'; f.elements.phone.value = '9900000299'; f.elements.role.value = 'technician';
+    f.requestSubmit();
+    await until(() => t.$('[data-testid="admin-credentials"]'));
+    expect(notice()).toContain('Neha Kulkarni was added as Technician');
+    expect(t.$('[data-testid="issued-pin"]').textContent).toBe('482913');
+    expect(t.$('[data-testid="admin-credentials"] a[download]').href).toContain('data:text/csv');
+    expect(t.$$('[data-testid="team-list"] .member')).toHaveLength(4);
+    expect(calls('addMember')[0].args[0]).toMatchObject({ name: 'Neha Kulkarni', phone: '9900000299', role: 'technician', must_change_pin: true });
+    expect(calls('addMember')[0].args[0]).not.toHaveProperty('pin'); // empty means "make one"
+    t.click('[data-action="dismiss-credentials"]');
+    expect(t.$('[data-testid="admin-credentials"]')).toBeNull();
   });
 
-  it('AC-15.3: bad name, number or PIN each show their own message and nobody is added', async () => {
-    t = setup({ hash: '#/admin' });
-    await addStaff(t, { name: 'N', phone: '12345', role: 'technician', pin: '12' });
-    const errs = t.$$('[data-form="add-staff"] .field-error').map((e) => e.textContent);
-    expect(errs).toEqual(["Enter the person's name (2 to 60 letters).", 'Use a 10-digit mobile number.', 'Use a PIN of 4 to 6 digits.']);
-    await addStaff(t, { name: 'Copy Cat', phone: '9900000202', role: 'technician', pin: '1234' });
-    expect(t.$('[data-form="add-staff"] .field-error').textContent).toBe('Someone on the team already uses this number.');
-    expect(t.app.store.get().staff).toHaveLength(4);
+  it('AC-19.1 and AC-22.5 (screen): a number that already has an account is explained and the form keeps what was typed', async () => {
+    await open();
+    const f = t.$('form[data-form="add-staff"]');
+    f.elements.name.value = 'Someone Else'; f.elements.phone.value = '9900000202'; f.elements.role.value = 'coordinator'; f.elements.pin.value = '6402';
+    f.requestSubmit();
+    await until(() => t.$('[data-testid="add-error"]'));
+    expect(t.$('[data-testid="add-error"]').textContent).toContain('already has a KaryaHub account');
+    const again = t.$('form[data-form="add-staff"]');
+    expect(again.elements.name.value).toBe('Someone Else');
+    expect(again.elements.pin.value).toBe(''); // the PIN is never put back
+    expect(t.$$('[data-testid="team-list"] .member')).toHaveLength(3);
   });
 
-  it("AC-15.4: changing Priya's role to Technician changes what she can open and is logged", async () => {
-    t = setup({ hash: '#/admin' });
-    const sel = t.$('select[data-action="set-role"][data-staff="st-coord"]');
+  it('AC-19.2 and AC-22.5 (screen): importing a file adds good rows, lists bad ones with the row number, and shows the PINs once', async () => {
+    await open();
+    const f = t.$('form[data-form="import-staff"]');
+    f.elements.csv.value = 'name,phone,role,pin\nAsha Menon,9833300011,technician,\nBala Iyer,12,coordinator,\n';
+    f.requestSubmit();
+    await until(() => t.$('[data-testid="import-errors"]'));
+    expect(notice()).toBe('1 person added, 1 row needs fixing.');
+    expect(t.$('[data-testid="import-errors"]').textContent).toContain('Row 3: Use a 10-digit mobile number.');
+    expect(t.$('[data-testid="admin-credentials"]').textContent).toContain('Asha Menon');
+    expect(t.$('[data-testid="issued-pin"]').textContent).toBe('739105');
+    expect(t.$$('[data-testid="team-list"] .member')).toHaveLength(4);
+    expect(t.$('a[download="karyahub-team-template.csv"]')).toBeTruthy();
+  });
+
+  it('AC-19.3 and AC-22.5 (screen): changing a role, turning access off and on, and resetting a PIN each say what happened', async () => {
+    await open();
+    const priya = () => t.$$('[data-testid="team-list"] .member')[1];
+    const sel = priya().querySelector('select[data-action="set-role"]');
     sel.value = 'technician';
     sel.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(t.app.store.get().staff.find((s) => s.id === 'st-coord').role).toBe('technician');
-    expect(t.app.store.get().access_log[0].text).toBe("Changed Priya Nair's role from Office coordinator to Technician");
-    t.app.session.start('st-coord', '2027-01-01T10:00:00');
-    t.go('#/renewals');
+    await until(() => notice().includes('Priya Nair is now Technician'));
+    expect(calls('updateMember')[0].args).toEqual(['u-coord', { role: 'technician' }]);
+    t.click(priya().querySelector('[data-action="toggle-access"]'));
+    await until(() => notice().includes('access turned off'));
+    expect(priya().querySelector('[data-testid="member-status"]').textContent).toBe('Access off');
+    t.click(priya().querySelector('[data-action="toggle-access"]'));
+    await until(() => notice().includes('access turned on'));
+    t.click(priya().querySelector('[data-action="reset-pin"]'));
+    await until(() => t.$('[data-testid="admin-credentials"]'));
+    expect(t.$('[data-testid="issued-pin"]').textContent).toBe('739105');
+    expect(notice()).toContain('New PIN made for Priya Nair');
+  });
+
+  it('AC-19.3 and AC-22.5 (screen): owners cannot change or switch off themselves', async () => {
+    await open();
+    const me = t.$$('[data-testid="team-list"] .member')[0];
+    expect(me.textContent).toContain('You');
+    expect(me.querySelector('select[data-action="set-role"]').disabled).toBe(true);
+    expect(me.querySelector('[data-action="toggle-access"]')).toBeNull();
+  });
+
+  it('AC-19.4 and AC-22.5 (screen): the role table has switches that save at once; owners are locked on', async () => {
+    await open();
+    const cell = (perm, role) => t.$(`input[data-action="role-permission"][data-permission="${perm}"][data-role="${role}"]`);
+    expect(cell('close_jobs', 'technician').checked).toBe(false);
+    expect(cell('close_jobs', 'owner').disabled).toBe(true);
+    expect(cell('close_jobs', 'owner').checked).toBe(true);
+    cell('close_jobs', 'technician').checked = true;
+    cell('close_jobs', 'technician').dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => notice().includes('everyone with the Technician role'));
+    expect(calls('rolePermissions')[0].args).toEqual(['technician', { close_jobs: true }]);
+    expect(cell('close_jobs', 'technician').checked).toBe(true);
+  });
+
+  it('AC-19.4 and AC-22.5 (screen): one person can be given or refused a single permission, then put back to the role default', async () => {
+    await open();
+    const select = () => t.$('select[data-action="member-permission"][data-staff="u-santosh"][data-permission="close_jobs"]');
+    expect(select().value).toBe('default');
+    expect([...select().options].map((o) => o.textContent)).toEqual(['Role default', 'Allow', 'Block']);
+    select().value = 'allow';
+    select().dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => notice().includes('Access updated for Santosh Pawar'));
+    expect(calls('memberPermissions')[0].args).toEqual(['u-santosh', { close_jobs: 'allow' }]);
+    expect(select().value).toBe('allow');
+    select().value = 'default';
+    select().dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => calls('memberPermissions').length === 2);
+  });
+
+  it('AC-19.7 and AC-22.5 (screen): the demo business shows its team but every control is switched off, with a plain note', async () => {
+    t = setup({ hash: '#/admin', api: fakeApi({ accounts: { editable: false } }) });
+    await until(() => t.$('[data-testid="team-list"]'));
+    expect(t.$('[data-testid="demo-locked"]').textContent).toContain("demo business");
+    for (const sel of ['form[data-form="add-staff"] button[type="submit"]', 'form[data-form="import-staff"] button[type="submit"]', '[data-action="reset-pin"]', 'select[data-action="set-role"]', 'input[data-action="role-permission"]']) {
+      expect(t.$(sel).disabled, sel).toBe(true);
+    }
+  });
+
+  it('AC-19.4 and AC-22.5 (screen): people without "manage team" get the no-access page for Admin', () => {
+    t = setup({ signedInAs: 'st-coord', hash: '#/admin' });
     expect(t.$('[data-testid="access-denied"]')).toBeTruthy();
+    expect(t.api.accountCalls.some((c) => c.name === 'addMember')).toBe(false);
   });
 
-  it("AC-15.5: turning off access blocks sign-in and ends that person's open session; turning it on restores it", async () => {
-    t = setup({ hash: '#/admin' });
-    t.click('[data-action="toggle-access"][data-staff="st-santosh"]');
-    expect(t.$('[data-staff="st-santosh"] [data-testid="member-status"]').textContent).toBe('Access off');
-    expect((await trySignIn(t, '9900000203', '8642')).error).toContain("don't match an active staff account");
-    t.app.session.start('st-santosh', '2027-01-01T10:00:00');
-    t.app.render();
-    expect(t.$('[data-testid="signin-notice"]').textContent).toBe('Your access has been turned off. Ask the owner if you think this is a mistake.');
-    t.app.session.start('st-owner', '2027-01-01T10:00:00');
-    t.go('#/admin');
-    t.click('[data-action="toggle-access"][data-staff="st-santosh"]');
-    expect((await trySignIn(t, '9900000203', '8642')).user.name).toBe('Santosh Pawar');
+  it('AC-19.8 and AC-22.5 (screen): the owner saves business details in Settings and the whole app uses them', async () => {
+    t = setup({ me: shree, hash: '#/settings', api: fakeApi() });
+    const f = t.$('form[data-form="business-profile"]');
+    f.elements.name.value = 'Shree Cool Services'; f.elements.address.value = '12 MG Road, Nashik'; f.elements.gstin.value = '27aaaaa0000a1z5';
+    f.requestSubmit();
+    await until(() => t.$('[data-testid="profile-notice"]'));
+    expect(t.$('[data-testid="profile-notice"]').textContent).toContain('Saved');
+    expect(t.api.accountCalls.find((c) => c.name === 'saveBusinessProfile').args[0]).toEqual({ name: 'Shree Cool Services', address: '12 MG Road, Nashik', gstin: '27AAAAA0000A1Z5' });
+    expect(t.app.store.get().settings.business_name).toBe('Shree Cool Services');
+    expect(t.$('.topbar-biz').textContent).toBe('Shree Cool Services');
   });
 
-  it('AC-15.6: Reset PIN shows a new 4-digit PIN once; the old PIN stops working and the new one works', async () => {
-    t = setup({ hash: '#/admin', random: () => 0.5 });
-    t.click('[data-action="reset-pin"][data-staff="st-imran"]');
-    await waitFor(() => { if (!t.$('[data-testid="admin-notice"]')) throw new Error('waiting'); });
-    expect(t.$('[data-testid="admin-notice"]').textContent).toBe('New PIN for Imran Khan: 5500. Share it with them in person; the old PIN no longer works.');
-    expect(JSON.stringify(t.app.store.get())).not.toContain('5500');
-    expect((await trySignIn(t, '9900000204', '9753')).error).toBeTruthy();
-    expect((await trySignIn(t, '9900000204', '5500')).user.name).toBe('Imran Khan');
-  });
-
-  it('AC-15.7: owners cannot change their own role, turn off their own access, or remove the last active owner', async () => {
-    t = setup({ hash: '#/admin' });
-    expect(t.$('select[data-action="set-role"][data-staff="st-owner"]').disabled).toBe(true);
-    expect(t.$('[data-action="toggle-access"][data-staff="st-owner"]')).toBeNull();
-    expect(t.app.team.updateStaff('st-owner', { role: 'technician' }).error).toBe("You can't change your own role or turn off your own access. Ask another owner.");
-    // A second owner may not demote the only other owner either.
-    t.app.store.update((s) => { s.staff.find((x) => x.id === 'st-coord').role = 'owner'; });
-    t.app.session.start('st-coord', '2027-01-01T10:00:00');
-    expect(t.app.team.updateStaff('st-owner', { active: false }).text).toBe('Turned off access for Akash Mehta');
-    t.app.store.update((s) => { s.staff.find((x) => x.id === 'st-owner').active = true; s.staff.find((x) => x.id === 'st-owner').role = 'technician'; });
-    expect(t.app.team.updateStaff('st-coord', { role: 'technician' }).error).toBe("You can't change your own role or turn off your own access. Ask another owner.");
-    const { changeBlocked } = await import('../src/domain/access.js');
-    expect(changeBlocked(t.app.store.get().staff, 'st-x', 'st-coord', { active: false })).toBe('KaryaHub needs at least one active owner. Make someone else an owner first.');
-    await tick();
+  it('AC-22.6: My account shows the person, what they can do, and changes their PIN', async () => {
+    t = setup({ signedInAs: 'st-santosh', hash: '#/account' });
+    expect(t.$('[data-testid="my-permissions"]').textContent).toContain('Send and review job reports in Chat');
+    expect(t.$('[data-testid="my-permissions"]').textContent).not.toContain('Close jobs');
+    const f = t.$('form[data-form="account-pin"]');
+    f.elements.current.value = '8642'; f.elements.pin.value = '6402'; f.elements.pin2.value = '6402';
+    f.requestSubmit();
+    await until(() => t.$('[data-testid="account-notice"]'));
+    expect(t.$('[data-testid="account-notice"]').textContent).toBe('Your PIN is changed.');
+    expect(PEOPLE['st-santosh'].name).toBe('Santosh Pawar');
   });
 });

@@ -1,27 +1,10 @@
-// Who is signed in on this device (CR-0003). Kept apart from the demo data so Reset demo
-// doesn't sign anyone out. Storage can be blocked; then the session lasts until the page closes.
-export const SESSION_KEY = 'karyahub.session.v1';
-
-export function createSession() {
-  let current = null;
-  try {
-    const raw = globalThis.localStorage?.getItem(SESSION_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    if (parsed && typeof parsed.staff_id === 'string') current = parsed;
-  } catch {
-    current = null;
-  }
-  const save = () => {
-    try {
-      if (current) globalThis.localStorage?.setItem(SESSION_KEY, JSON.stringify(current));
-      else globalThis.localStorage?.removeItem(SESSION_KEY);
-    } catch {
-      /* blocked storage: keep the session in memory */
-    }
-  };
+// Who is signed in (CR-0005). The server holds the session in an HttpOnly cookie; the browser only
+// keeps what the server last said about the person, in memory, so nothing sensitive is stored on the device.
+export function createSession(initial = null) {
+  let current = initial && initial.signed_in ? initial : null;
   return {
     get: () => current,
-    start(staffId, at) { current = { staff_id: staffId, signed_in_at: at }; save(); },
-    end() { current = null; save(); },
+    set(me) { current = me && me.signed_in ? me : null; },
+    end() { current = null; },
   };
 }

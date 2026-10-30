@@ -1,31 +1,44 @@
 """KaryaHub API (FastAPI). All routes live under /api; the web app calls /api/v1/*."""
 
 import json
+import logging
 from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from karyahub import __version__, access, studio_ai
+from karyahub.accounts import routes as account_routes
+from karyahub.accounts.deps import BusinessPrincipalDep, TenantDep, require
 from karyahub.adapters import Adapters, get_adapters
+from karyahub.db.engine import MEMORY_URL, ensure_ready, get_engine
 from karyahub.domain import amc, otp, renewals, workflow
 from karyahub.domain.documents import DocLine, Totals, compute_totals
 from karyahub.domain.extraction import Extraction
 from karyahub.errors import AppError, install_error_handlers
 from karyahub.settings import Settings, get_settings
-from karyahub.tenancy import Tenant, get_tenant
 from karyahub.whatsapp import webhook
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
-def tenant_dep(x_tenant_id: Annotated[str | None, Header()] = None) -> Tenant:
-    return get_tenant(x_tenant_id)
-
-
-TenantDep = Annotated[Tenant, Depends(tenant_dep)]
+async def database_status(settings: Settings) -> str:
+    """'ok', 'not_configured' or 'error'. Never includes the address or any secret."""
+    if settings.uses_real_database and not settings.pepper():
+        return "not_configured"
+    try:
+        engine = get_engine(settings)
+        await ensure_ready(engine, settings.database_url or MEMORY_URL)
+        async with engine.connect() as conn:
+            await conn.execute(text("select 1"))
+    except Exception as exc:
+        # The kind of fault only (for example "InvalidPasswordError"), never the address or any secret.
+        logging.getLogger("karyahub").error("Database check failed: %s", type(exc).__name__, exc_info=exc)
+        return f"error: {type(exc).__name__}"
+    return "ok" if settings.uses_real_database else "memory"
 
 
 def adapters_dep(settings: SettingsDep) -> Adapters:
@@ -119,7 +132,13 @@ def create_app() -> FastAPI:
 
     @api.get("/health")
     async def health(settings: SettingsDep) -> dict[str, str]:
-        return {"status": "ok", "service": "karyahub-api", "version": __version__, "mode": settings.mode}
+        return {
+            "status": "ok",
+            "service": "karyahub-api",
+            "version": __version__,
+            "mode": settings.mode,
+            "database": await database_status(settings),
+        }
 
     @v1.get("/meta")
     async def meta(settings: SettingsDep, tenant: TenantDep) -> dict[str, Any]:
@@ -156,40 +175,42 @@ def create_app() -> FastAPI:
         }
 
     # ---------- processing pipeline: Transcribe -> Extract ----------
-    @v1.post("/pipeline/transcribe")
+    @v1.post("/pipeline/transcribe", dependencies=[Depends(require("use_chat"))])
     async def transcribe(req: MediaRequest, a: AdaptersDep) -> TextResult:
         r = await a.speech.transcribe(req.media_id, fail=req.simulate_failure)
         return TextResult(text=r["text"], language=r.get("language", ""), adapter=a.mode)
 
-    @v1.post("/pipeline/read-image")
+    @v1.post("/pipeline/read-image", dependencies=[Depends(require("use_chat"))])
     async def read_image(req: ImageRequest, a: AdaptersDep) -> TextResult:
         r = await a.llm.read_image(req.media_id, image_b64=req.image_base64, fail=req.simulate_failure)
         return TextResult(
             text=r["text"], adapter=a.mode, reader=r.get("reader", ""), notice=r.get("notice", "")
         )
 
-    @v1.post("/pipeline/extract")
+    @v1.post("/pipeline/extract", dependencies=[Depends(require("use_chat"))])
     async def extract(req: TextRequest, a: AdaptersDep) -> ExtractResult:
         r = await a.llm.extract_job(req.text, fail=req.simulate_failure)
         return ExtractResult(**r.model_dump(), adapter=a.mode)
 
-    @v1.post("/messages/send")
+    @v1.post(
+        "/messages/send", dependencies=[Depends(require("use_chat", "create_documents", "manage_renewals"))]
+    )
     async def send(req: SendRequest, a: AdaptersDep) -> dict[str, str]:
         return await a.whatsapp.send(req.to, req.kind, req.body)
 
     # ---------- paperwork and renewals ----------
-    @v1.post("/documents/totals")
+    @v1.post("/documents/totals", dependencies=[Depends(require("create_documents"))])
     async def totals(req: TotalsRequest) -> Totals:
         return compute_totals(req.lines, inter_state=req.inter_state)
 
-    @v1.post("/renewals/due")
+    @v1.post("/renewals/due", dependencies=[Depends(require("manage_renewals"))])
     async def due(req: RenewalsRequest) -> dict[str, Any]:
         today = req.today.isoformat()
         listed = renewals.due_within(req.customers, today, req.days)
         gone = renewals.lapsed(req.customers, today)
         return {"due": listed, "lapsed": gone, "money_at_stake": renewals.money_at_stake(listed)}
 
-    @v1.post("/renewals/reminder-text")
+    @v1.post("/renewals/reminder-text", dependencies=[Depends(require("manage_renewals"))])
     async def reminder(req: ReminderRequest, tenant: TenantDep) -> dict[str, str]:
         if not req.customer.amc_expiry:
             raise AppError("no_expiry", "This customer has no AMC end date yet.", 422)
@@ -198,9 +219,14 @@ def create_app() -> FastAPI:
     # ---------- job workflow and proof of work ----------
     @v1.post("/jobs/{job_id}/transitions")
     async def transition(
-        job_id: str, req: workflow.TransitionRequest, settings: SettingsDep, tenant: TenantDep, a: AdaptersDep
+        job_id: str,
+        req: workflow.TransitionRequest,
+        settings: SettingsDep,
+        tenant: TenantDep,
+        a: AdaptersDep,
+        who: BusinessPrincipalDep,
     ) -> workflow.TransitionResult:
-        access.check_action(req.actor_role, req.action)
+        access.check_action(who.permissions, req.action)  # the server's own record of who this is
         secret = settings.secret("otp_secret")
         ctx: dict[str, Any] = {}
         if req.action == "verify_otp":
@@ -235,7 +261,7 @@ def create_app() -> FastAPI:
         }
 
     # ---------- AMC visit planning ----------
-    @v1.post("/amc/plan")
+    @v1.post("/amc/plan", dependencies=[Depends(require("view_jobs"))])
     async def amc_plan(req: PlanRequest) -> amc.Plan:
         return amc.plan(req.contract, req.today, req.existing_keys)
 
@@ -292,6 +318,7 @@ def create_app() -> FastAPI:
         return {"received": len(messages), "duplicates": dupes, "results": results}
 
     app.include_router(api)
+    app.include_router(account_routes.router)
     app.include_router(v1)
     return app
 

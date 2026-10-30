@@ -51,7 +51,7 @@ describe('US-7 KaryaHub server (web app side)', () => {
     t = setup({ hash: '#/settings' });
     await new Promise((r) => setTimeout(r, 0));
     expect(t.$('[data-testid="mode-banner"]').textContent).toContain('Server mode: KaryaHub API');
-    expect(t.$('[data-testid="server-line"]').textContent).toContain('Connected to KaryaHub API v0.2.0 for CoolCare AC Services');
+    expect(t.$('[data-testid="server-line"]').textContent).toContain('Connected to KaryaHub API v0.4.0 for CoolCare AC Services');
     const rows = t.$$('[data-testid="services"] .service');
     expect(rows.map((r) => r.querySelector('[data-testid="service-status"]').textContent)).toEqual(['Mock', 'Mock', 'Mock']);
     expect(rows.map((r) => r.querySelector('code').textContent)).toEqual(['KARYAHUB_WHATSAPP_ACCESS_TOKEN', 'KARYAHUB_SPEECH_API_KEY', 'AI_ENDPOINTS']);

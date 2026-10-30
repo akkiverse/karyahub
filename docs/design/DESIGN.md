@@ -57,3 +57,11 @@ The founder asked for a more professional look that appeals to businesses. Direc
 - **Processing note:** a soft brass panel (`.process-note`) with the alert icon inside the processing card, carrying the server's note (for example "AI is offline right now, so this was read without AI. Check the details before approving.").
 - **Offline banner:** the Studio AI kit's banner (`src/ui/ai-status.js`, unchanged) at the very top of the page, restyled through `.studio-ai-offline` to KaryaHub's tokens (brass-tinted surface, ink text, hairline border) in light and dark. It's calm, never red: AI being off is a normal state, not an error.
 - **States:** AI online (tags only), AI offline (banner, note, "Read without AI" tag), AI answer unusable (note, "Read without AI" tag), photo unreadable while offline (the existing red error with Try again; the photo stays in the chat).
+
+## Additions in CR-0005 (accounts and businesses)
+- **Sign in:** the card says "Sign in to KaryaHub" with no business name; "Forgot your PIN?" and, only before a platform admin exists, "First-time setup" are quiet text buttons below the form. The demo accounts collapse under "Explore a demo business" so the page looks like a product, not a prototype. Forgot PIN, reset, setup and "Choose your own PIN" reuse the same card.
+- **PINs shown once:** new and reset PINs appear in a brand-tinted panel ("Share these PINs now") with large letter-spaced numbers and a CSV download; it stays until dismissed and is never shown again.
+- **Admin:** each team row has an "Access for <name>" disclosure with a Role default / Allow / Block select per permission; the role table uses 44px tick boxes (owner column locked on); CSV import shows problem rows by row number.
+- **Businesses:** the platform admin's list uses the Team row pattern with the business icon, a Demo tag for the sample firm, and one action row (Reset owner PIN, Turn off).
+- **Real businesses:** no Demo pill, watermark, "dummy" tags or sample chips; Home shows a "Get started" panel with three steps instead of the sales cards.
+- **States:** loading ("Opening KaryaHub…"), server unreachable (one calm card with Try again), no-access, no permissions at all (My account explains), demo-locked Admin (controls disabled with a note).

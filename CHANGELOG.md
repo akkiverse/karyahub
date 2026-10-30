@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- Accounts and businesses on the server (Neon Postgres): sign in with mobile number and PIN on any phone, a platform admin who creates businesses and their first owners, and owners who add people one by one or from a CSV, set roles, switch single permissions on or off per role or per person, reset PINs and read an activity log. See [CR-0005](docs/changes/CR-0005-accounts-and-businesses.md).
+- Forgot your PIN: a 6-digit code to choose a new PIN (sent over WhatsApp once it is live; the demo shows its code on screen). People on a temporary PIN must choose their own first.
+- My account (who you are, what you can do, change your PIN), Settings business details, and a first-time setup screen for the platform admin.
+- `/api/health` reports the database status (and the kind of fault, never the address); the server version string now says 0.4.0. Unexpected server faults are now logged.
+- If the app can't open, the opening screen says why (server not set up, server fault, or no connection) and the first requests wait up to 30 seconds for a sleeping server.
+
+### Changed
+- Sign-in no longer shows a business name; the demo accounts sit under "Explore a demo business".
+- Real businesses look finished: no Demo pill, sample chips, watermark or dummy tags, and Home shows "Get started". The public demo is one business with a read-only team.
+- Job, AI, paperwork and renewal routes need sign-in and the right permission; the server works out who you are and ignores the role or business sent in a request.
+- The team, PINs and access log moved from the browser to the server (saved data version 4). On-device jobs and documents are kept per business.
+
+### Removed
+- The on-device demo sign-in and Admin (US-13 and US-15), replaced by server accounts.
+
 ## [0.3.0] - 2026-10-30
 
 ### Added

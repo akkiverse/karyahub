@@ -73,7 +73,7 @@ function visitPlan(j, ui) {
 
 export function job({ state, params, ui, allow = () => true }) {
   const j = state.jobs.find((x) => x.id === params.id);
-  if (!j) return `<section class="page"><h1 id="page-title" tabindex="-1">Job not found</h1><p>This job isn't in the demo data any more. It may have been cleared by Reset demo.</p><a class="btn btn-ghost" href="#/jobs">Back to Jobs</a></section>`;
+  if (!j) return `<section class="page"><h1 id="page-title" tabindex="-1">Job not found</h1><p>This job isn't on this device any more.</p><a class="btn btn-ghost" href="#/jobs">Back to Jobs</a></section>`;
   const docs = state.documents.filter((d) => d.job_id === j.id);
   const sub = j.lines.reduce((s, l) => s + l.qty * l.rate, 0);
   return `<section class="page">

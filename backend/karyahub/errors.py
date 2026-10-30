@@ -1,5 +1,7 @@
 """One error shape for every failure: {"error": {"code", "message"}} with plain-English messages."""
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -46,5 +48,9 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(_body(code, message), status_code=exc.status_code)
 
     @app.exception_handler(Exception)
-    async def _unhandled(_: Request, __: Exception) -> JSONResponse:
+    async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        # Without this line a server fault is invisible in the Vercel logs (the answer is just a plain 500).
+        logging.getLogger("karyahub").error(
+            "Unhandled %s on %s %s", type(exc).__name__, request.method, request.url.path, exc_info=exc
+        )
         return JSONResponse(_body("internal_error", "Something went wrong on our side. Try again."), 500)

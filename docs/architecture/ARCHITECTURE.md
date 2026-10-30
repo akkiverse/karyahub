@@ -1,6 +1,6 @@
 # KaryaHub: Architecture
 
-Last updated by CR-0002. Detail: [HLD.md](HLD.md) (high level), [LLD.md](LLD.md) (low level), [RISKS.md](RISKS.md), [REFERENCE-REVIEW.md](REFERENCE-REVIEW.md).
+Last updated by CR-0005. Detail: [HLD.md](HLD.md) (high level), [LLD.md](LLD.md) (low level), [RISKS.md](RISKS.md), [REFERENCE-REVIEW.md](REFERENCE-REVIEW.md).
 
 ## Context
 
@@ -87,6 +87,23 @@ Server (stateless): Tenant configuration (`tenancy.py`); everything else is comp
 | Speech-to-text | `adapters/speech.py` (`transcribe`) | Mock: sample transcript | `KARYAHUB_SPEECH_API_KEY`, build the live adapter (media download from Meta, then the speech API) |
 | LLM | `adapters/llm.py` (`extract_job`, `read_image`): `StudioAiLlm` (CR-0004), `MockLlm`, `LiveLlm` | Studio AI (`qwen3.5:9b` on the founder's Ollama server, through `studio_ai.py`) when `AI_ENDPOINTS` is set; otherwise mock. Offline or unusable answers fall back to the quick reader, labelled "Read without AI" | Link the shared `AI_ENDPOINTS` and `AI_GATEWAY_KEY` variables to the karyahub Vercel project |
 | Customer codes | `domain/otp.py` | Demo secret, code shown on screen | `KARYAHUB_OTP_SECRET`, live WhatsApp sending |
+
+## Accounts, businesses and the database (CR-0005)
+
+```mermaid
+flowchart LR
+  B[Browser] -->|"/api/v1, HttpOnly session cookie"| F[FastAPI on Vercel]
+  F -->|"SQLAlchemy async, asyncpg"| N[(Neon Postgres: karyahub_master_db)]
+  F --> A[Accounts service: sign-in, sessions, team, permissions, businesses]
+  A --> N
+  F -. forgot-PIN code .-> W[WhatsApp adapter: simulated until live]
+```
+
+- **Tables:** `businesses`, `users` (one business each; none for the platform admin), `role_permissions` and `user_permissions` (the owner's switches), `sessions` (hashed tokens), `sign_in_throttle`, `otp_challenges`, `audit_log`. Migrations are Alembic scripts in `backend/karyahub/db/migrations/`, run once per server start under an advisory lock.
+- **Request path:** the cookie is looked up in `sessions`; the person, their business and their permissions (role table, then role switches, then personal switches) are loaded; each route names the permission it needs (`accounts/deps.py`); business data is always queried with the person's `business_id`.
+- **Roles:** `platform_admin` (businesses only, no business data), `owner`, `coordinator`, `technician`.
+- **Settings:** `DATABASE_URL` (or `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`), `KARYAHUB_PIN_PEPPER`, `KARYAHUB_BOOTSTRAP_TOKEN`. Without a database address the server uses a throwaway in-memory database for local runs and tests. `/api/health` shows `database`.
+- **Web app:** boots by asking `/auth/me`; keeps who is signed in in memory only; keeps each business's on-device data under its own key until jobs move to the server (CR-0007).
 
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.

@@ -12,12 +12,13 @@ import { settings } from './views/settings.js';
 import { prettyDate, escapeHtml } from './format.js';
 import { today } from './clock.js';
 import { SAMPLES } from './data/demo.js';
-import { api as defaultApi } from './api/client.js';
+import { createApiClient, ApiUnreachable } from './api/client.js';
 import { createSession } from './session.js';
-import { createTeamActions, ACCESS_OFF } from './domain/team.js';
-import { can, canOpen, landingFor, roleName, initials, DEMO_PINS } from './domain/access.js';
-import { signIn, logo } from './views/signin.js';
+import { can, canOpen, landingFor, roleName, initials, PERMISSIONS, normalisePhone } from './domain/access.js';
+import { signIn, forgotPin, resetPin, setupScreen, mustChangePin, loadingScreen, unreachableScreen, logo } from './views/signin.js';
 import { admin, denied } from './views/admin.js';
+import { businesses } from './views/businesses.js';
+import { account } from './views/account.js';
 import { jobsheetImage } from './data/jobsheet.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
@@ -27,6 +28,7 @@ const NAV = [
   ['chat', 'Chat', '#/chat', 'chat', 'Workspace', true],
   ['jobs', 'Jobs', '#/jobs', 'jobs', 'Workspace', true],
   ['renewals', 'Renewals', '#/renewals', 'renewals', 'Workspace', true],
+  ['businesses', 'Businesses', '#/businesses', 'building', 'Platform', true],
   ['admin', 'Admin', '#/admin', 'users', 'Manage', true],
   ['settings', 'Settings', '#/settings', 'settings', 'Manage', false],
 ];
@@ -41,30 +43,104 @@ export function parseRoute(hash) {
   if (a === 'renewals') return { name: 'renewals', tab: 'renewals' };
   if (a === 'settings') return { name: 'settings', tab: 'settings' };
   if (a === 'admin') return { name: 'admin', tab: 'admin' };
+  if (a === 'businesses') return { name: 'businesses', tab: 'businesses' };
+  if (a === 'account') return { name: 'account', tab: 'account' };
   return { name: 'home', tab: 'home' };
 }
-const VIEWS = { home, chat, jobs, job, doc: documentView, renewals, settings, admin };
-const TITLES = { home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', signin: 'Sign in' };
+const VIEWS = { home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account };
+const TITLES = { home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in' };
+
+const PERMISSION_LABELS = PERMISSIONS;
+const OFFLINE = "Couldn't reach the KaryaHub server. Check your connection and try again.";
+const msg = (e) => (e instanceof ApiUnreachable ? OFFLINE : e.message);
 
 export function mountApp(root, options = {}) {
   const win = root.ownerDocument.defaultView;
   const store = options.store || createStore();
   const stepDelay = () => (options.stepDelay ?? STEP_DELAY_MS);
-  const api = options.api || defaultApi;
   const session = options.session || createSession();
-  const team = createTeamActions({ store, session, random: options.random });
-  const actions = createActions({ store, getAdapters, stepDelay, api, currentUser: () => team.me(), photoImage: options.photoImage || jobsheetImage });
-  const ui = { signin: {}, admin: {}, renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null };
+  const api = options.api || createApiClient({ onSessionEnded: () => endSession('Your session ended. Please sign in again.') });
+  // The signed-in person as the screens use it: who they are plus what the server says they may do.
+  const meOf = () => {
+    const s = session.get();
+    return s ? { ...s.user, permissions: s.permissions, business: s.business } : null;
+  };
+  const actions = createActions({ store, getAdapters, stepDelay, api, currentUser: meOf, photoImage: options.photoImage || jobsheetImage });
+  const ui = {
+    boot: 'loading', auth: {}, authState: null, admin: {}, businesses: {}, account: {}, profile: {},
+    renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
+  };
   let alive = true;
 
-  // Data the server works out for a screen, fetched when the screen opens (CR-0002).
+  // ---------- who is signed in ----------
+  function applySession(me) {
+    session.set(me);
+    if (me && me.signed_in && me.business) store.switchTo(me.business);
+    ui.auth = {};
+    ui.admin = {};
+    ui.businesses = {};
+    ui.account = {};
+    ui.profile = {};
+    ui.meta = null;
+  }
+  async function loadAuthState() {
+    try { ui.authState = await api.authState(); } catch { ui.authState = { needs_setup: false, demo_accounts: [] }; }
+  }
+  async function endSession(notice) {
+    session.end();
+    store.close();
+    ui.admin = {}; ui.businesses = {}; ui.profile = {}; ui.account = {}; ui.meta = null;
+    ui.auth = { notice };
+    await loadAuthState();
+    if (alive) render();
+  }
+  async function boot() {
+    ui.boot = 'loading';
+    ui.bootError = null;
+    render();
+    try {
+      const me = await api.me();
+      if (me.signed_in) applySession(me);
+      else await loadAuthState();
+      ui.boot = 'ready';
+    } catch (e) {
+      ui.boot = 'error';
+      ui.bootError = e instanceof ApiUnreachable ? null : { message: e.message, code: e.code };
+    }
+    if (!alive) return;
+    render();
+    loadForRoute();
+  }
+
+  // Data the server works out for a screen, fetched when the screen opens (CR-0002, CR-0005).
   async function loadForRoute() {
+    const me = meOf();
+    if (!me) return;
     if (route.name === 'settings' && store.get().settings.mode === 'server' && !(ui.meta && ui.meta.data)) {
       ui.meta = null;
       try { ui.meta = { data: await api.meta() }; } catch (e) { ui.meta = { error: e.message }; }
       if (alive && route.name === 'settings') render();
     }
     if (route.name === 'job') loadPlan(route.params.id);
+    if (route.name === 'admin' && can(me, 'manage_team') && !ui.admin.data) loadAdmin();
+    if (route.name === 'businesses' && can(me, 'manage_businesses') && !ui.businesses.list) loadBusinesses();
+  }
+  async function loadAdmin(extra = {}) {
+    try {
+      const [data, log] = await Promise.all([api.team(), api.audit()]);
+      ui.admin = { ...ui.admin, ...extra, data, audit: log.entries, error: '' };
+    } catch (e) {
+      ui.admin = { ...ui.admin, ...extra, error: msg(e) };
+    }
+    if (alive && route.name === 'admin') render();
+  }
+  async function loadBusinesses(extra = {}) {
+    try {
+      ui.businesses = { ...ui.businesses, ...extra, list: (await api.businesses()).businesses, error: '' };
+    } catch (e) {
+      ui.businesses = { ...ui.businesses, ...extra, error: msg(e) };
+    }
+    if (alive && route.name === 'businesses') render();
   }
   async function loadPlan(jobId, force = false) {
     const j = store.get().jobs.find((x) => x.id === jobId);
@@ -86,69 +162,75 @@ export function mountApp(root, options = {}) {
     else el.dataset.theme = t;
   }
 
-  // The signed-in person, or null. A session for someone whose access was turned off ends here.
-  function currentUser() {
-    const u = team.me();
-    if (!u && session.get()) { session.end(); ui.signin = { notice: ACCESS_OFF }; }
-    return u;
-  }
-
   function shell(me, html) {
-    const allowed = NAV.filter(([k]) => canOpen(me.role, k));
+    const allowed = NAV.filter(([k]) => canOpen(me, k));
     const sections = [...new Set(allowed.map((n) => n[4]))];
     const link = ([k, label, href, ic]) => `<a href="${href}" class="tab ${route.tab === k ? 'is-active' : ''}" ${route.tab === k ? 'aria-current="page"' : ''}>${icon(ic, { size: 20 })}<span>${label}</span></a>`;
-    const biz = store.get().settings.business_name;
+    const demo = Boolean(me.business && me.business.is_demo);
+    const biz = me.business ? me.business.name : 'KaryaHub platform';
     return `
     <a class="skip" href="#main">Skip to content</a>
     <div class="shell route-${route.name}">
       <header class="topbar">
-        <a class="brand" href="${landingFor(me.role)}" aria-label="KaryaHub, start page"><span class="logo" aria-hidden="true">${logo()}</span><span class="brand-name">KaryaHub</span></a>
-        <span class="topbar-biz"><strong>${escapeHtml(biz)}</strong><span class="muted">Pune</span></span>
+        <a class="brand" href="${landingFor(me)}" aria-label="KaryaHub, start page"><span class="logo" aria-hidden="true">${logo()}</span><span class="brand-name">KaryaHub</span></a>
+        <span class="topbar-biz"><strong>${escapeHtml(biz)}</strong></span>
         <span class="topbar-right">
-          <span class="demo-pill" title="All data is dummy demo data">Demo · ${prettyDate(today())}</span>
+          ${demo ? `<span class="demo-pill" title="All data is dummy demo data">Demo · ${prettyDate(today())}</span>` : ''}
           <details class="account" data-testid="account-menu">
             <summary aria-label="Account: ${escapeHtml(me.name)}, ${escapeHtml(roleName(me.role))}"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><span class="account-name">${escapeHtml(me.name.split(' ')[0])}</span></summary>
             <div class="account-menu">
               <p><strong>${escapeHtml(me.name)}</strong><span class="muted small" data-testid="current-role">${escapeHtml(roleName(me.role))}</span></p>
-              ${can(me.role, 'manage_settings') ? `<a href="#/settings" class="menu-item">${icon('settings', { size: 18 })} Settings</a>` : ''}
-              ${can(me.role, 'manage_team') ? `<a href="#/admin" class="menu-item">${icon('users', { size: 18 })} Admin</a>` : ''}
+              <a href="#/account" class="menu-item">${icon('user', { size: 18 })} My account</a>
+              ${can(me, 'manage_settings') ? `<a href="#/settings" class="menu-item">${icon('settings', { size: 18 })} Settings</a>` : ''}
+              ${can(me, 'manage_team') ? `<a href="#/admin" class="menu-item">${icon('users', { size: 18 })} Admin</a>` : ''}
               <button type="button" class="menu-item" data-action="sign-out">${icon('logout', { size: 18 })} Sign out</button>
             </div>
           </details>
         </span>
       </header>
       <nav class="tabs" aria-label="Main">
-        <a class="brand nav-brand" href="${landingFor(me.role)}" aria-label="KaryaHub, start page"><span class="logo" aria-hidden="true">${logo()}</span><span class="brand-name">KaryaHub</span></a>
-        <div class="nav-biz"><span class="nav-biz-mark" aria-hidden="true">${escapeHtml(initials(biz))}</span><span><strong>${escapeHtml(biz)}</strong><span class="small">Demo workspace</span></span></div>
+        <a class="brand nav-brand" href="${landingFor(me)}" aria-label="KaryaHub, start page"><span class="logo" aria-hidden="true">${logo()}</span><span class="brand-name">KaryaHub</span></a>
+        <div class="nav-biz"><span class="nav-biz-mark" aria-hidden="true">${escapeHtml(initials(biz))}</span><span><strong>${escapeHtml(biz)}</strong><span class="small">${demo ? 'Demo workspace' : me.business ? 'Business workspace' : 'Platform admin'}</span></span></div>
         ${sections.map((sec) => `<div class="nav-group"><span class="nav-label">${sec}</span>${allowed.filter((n) => n[4] === sec).map(link).join('')}</div>`).join('')}
         <div class="nav-user"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><span class="nav-user-main"><strong>${escapeHtml(me.name)}</strong><span class="muted small">${escapeHtml(roleName(me.role))}</span></span><button type="button" class="icon-btn" data-action="sign-out" aria-label="Sign out" title="Sign out">${icon('logout', { size: 18 })}</button></div>
       </nav>
       <nav class="bottom-tabs" aria-label="Main (phone)">${allowed.filter((n) => n[5]).map(link).join('')}</nav>
       <main id="main" class="main">${html}
-        <footer class="site-foot no-print"><a href="${HUB_URL}">Part of Idea Studio by AkkiVerse</a><span>Sample data only. No real messages are sent.</span></footer>
+        <footer class="site-foot no-print"><a href="${HUB_URL}">Part of Idea Studio by AkkiVerse</a>${demo ? '<span>Sample data only. No real messages are sent.</span>' : ''}</footer>
       </main>
     </div>`;
   }
 
+  function authScreen() {
+    const props = { ui, hubUrl: HUB_URL };
+    const screens = { forgot: forgotPin, reset: resetPin, setup: setupScreen };
+    return `<main id="main" class="auth-main">${(screens[ui.auth.screen] || signIn)(props)}</main>`;
+  }
+
   function render() {
+    if (!alive) return;
     const state = store.get();
-    const me = currentUser();
+    if (ui.boot === 'loading') { root.innerHTML = loadingScreen(); return; }
+    if (ui.boot === 'error') { root.innerHTML = unreachableScreen(ui.bootError); return; }
+    const me = meOf();
     const name = me ? route.name : 'signin';
     const thread = root.querySelector('.thread');
     const nearBottom = thread ? thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120 : true;
     const oldTop = thread ? thread.scrollTop : 0;
     if (!me) {
-      root.innerHTML = `<main id="main" class="auth-main">${signIn({ state, ui, hubUrl: HUB_URL })}</main>`;
+      root.innerHTML = authScreen();
+    } else if (me.must_change_pin) {
+      root.innerHTML = `<main id="main" class="auth-main">${mustChangePin({ ui, me, hubUrl: HUB_URL })}</main>`;
     } else {
-      const allow = (perm) => can(me.role, perm);
-      const props = { state, ui, params: route.params || {}, busy: actions.isBusy(), me, allow };
-      const html = canOpen(me.role, route.name) ? VIEWS[route.name](props) : denied({ me, routeName: TITLES[route.name] || route.name });
+      const allow = (perm) => can(me, perm);
+      const props = { state, ui, params: route.params || {}, busy: actions.isBusy(), me, allow, permissionLabels: PERMISSION_LABELS };
+      const html = canOpen(me, route.name) ? VIEWS[route.name](props) : denied({ me, routeName: TITLES[route.name] || route.name });
       root.innerHTML = shell(me, html);
     }
     const t2 = root.querySelector('.thread');
     if (t2) t2.scrollTop = nearBottom || name !== lastRouteName ? t2.scrollHeight : oldTop;
     if (name !== lastRouteName) {
-      root.ownerDocument.title = `${TITLES[name]} · KaryaHub demo`;
+      root.ownerDocument.title = `${TITLES[name]} · KaryaHub${me && me.business && me.business.is_demo ? ' demo' : ''}`;
       const h = root.querySelector('#page-title');
       if (lastRouteName !== null) { root.ownerDocument.documentElement.scrollTop = 0; if (h) h.focus({ preventScroll: true }); }
       lastRouteName = name;
@@ -170,34 +252,65 @@ export function mountApp(root, options = {}) {
   win.addEventListener('hashchange', onHash);
   const unsub = store.subscribe(() => { applyTheme(); render(); });
 
+  const focus = (sel) => root.querySelector(sel)?.focus();
+  const setNotice = (target, text, error = false) => { target.notice = { text, error }; };
+
   async function onClick(e) {
     const el = e.target.closest('[data-action]');
     if (!el || !root.contains(el)) return;
     const a = el.dataset.action;
-    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role'].includes(a)) return; // handled on change
-    e.preventDefault();
+    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role', 'member-permission', 'role-permission', 'pick-csv'].includes(a)) return; // handled on change
+    if (a !== 'download') e.preventDefault();
     if (a === 'use-demo') {
-      const st = store.get().staff.find((x) => x.id === el.dataset.staff);
-      if (st) { ui.signin = { phone: st.phone, pin: DEMO_PINS[st.id] || '' }; render(); root.querySelector('form[data-form="signin"] button[type="submit"]')?.focus(); }
+      ui.auth = { phone: el.dataset.phone, pin: el.dataset.pin };
+      render();
+      focus('form[data-form="signin"] button[type="submit"]');
       return;
     }
+    if (a === 'auth-screen') {
+      const typed = root.querySelector('input[name="phone"]');
+      ui.auth = { screen: el.dataset.screen === 'signin' ? undefined : el.dataset.screen, phone: typed ? typed.value : (ui.auth.phone || '') };
+      render();
+      focus('#main input, #main button[type="submit"]');
+      return;
+    }
+    if (a === 'retry-boot') { boot(); return; }
     if (a === 'sign-out') {
-      team.signOut();
-      ui.signin = { notice: 'You have signed out.' };
-      ui.admin = {};
-      render();
+      try { await api.signOut(); } catch { /* the cookie ends on its own after 12 hours */ }
+      await endSession('You have signed out.');
       return;
     }
+    if (a === 'reload-admin') { ui.admin = {}; loadAdmin(); return; }
+    if (a === 'dismiss-credentials') { ui.admin.credentials = null; render(); return; }
+    if (a === 'dismiss-issued') { ui.businesses.issued = null; render(); return; }
     if (a === 'reset-pin') {
-      const res = await team.resetPin(el.dataset.staff);
-      ui.admin = { notice: res.error ? { error: true, text: res.error } : { text: `New PIN for ${res.name}: ${res.pin}. Share it with them in person; the old PIN no longer works.` } };
-      render();
+      const m = (ui.admin.data?.members || []).find((x) => x.id === el.dataset.staff);
+      try {
+        const res = await api.resetMemberPin(el.dataset.staff);
+        await loadAdmin({ credentials: [{ name: res.name, phone: m ? m.phone : '', role: m ? m.role : '', pin: res.pin }], notice: { text: `New PIN made for ${res.name}. They choose their own at next sign-in.` } });
+      } catch (err) { setNotice(ui.admin, msg(err), true); render(); }
       return;
     }
     if (a === 'toggle-access') {
-      const res = team.updateStaff(el.dataset.staff, { active: el.dataset.active === 'true' });
-      ui.admin = { notice: res.error ? { error: true, text: res.error } : { text: `${res.text}.` } };
-      render();
+      try {
+        const res = await api.updateMember(el.dataset.staff, { active: el.dataset.active === 'true' });
+        await loadAdmin({ notice: { text: `${res.name}: access ${res.active ? 'turned on' : 'turned off'}.` } });
+      } catch (err) { setNotice(ui.admin, msg(err), true); render(); }
+      return;
+    }
+    if (a === 'toggle-business') {
+      try {
+        const res = await api.setBusinessActive(el.dataset.business, el.dataset.active === 'true');
+        await loadBusinesses({ notice: { text: `${res.name} is now ${res.active ? 'on' : 'turned off'}.` } });
+      } catch (err) { ui.businesses.notice = { text: msg(err), error: true }; render(); }
+      return;
+    }
+    if (a === 'reset-owner-pin') {
+      try {
+        const res = await api.resetOwnerPin(el.dataset.owner);
+        const owner = (ui.businesses.list || []).flatMap((b) => b.owners).find((o) => o.id === el.dataset.owner);
+        await loadBusinesses({ issued: { name: res.name, phone: owner ? owner.phone : '', pin: res.pin }, notice: null });
+      } catch (err) { ui.businesses.notice = { text: msg(err), error: true }; render(); }
       return;
     }
     if (a === 'send-sample') {
@@ -249,62 +362,187 @@ export function mountApp(root, options = {}) {
     ui.editingCard = null; ui.cardErrors = {}; render();
   }
 
+  async function submitAuth(form) {
+    const kind = form.dataset.form;
+    const v = (n) => (form.elements[n] ? form.elements[n].value.trim() : '');
+    if (kind === 'signin') {
+      const phone = v('phone');
+      ui.auth = { phone, busy: true };
+      render();
+      try {
+        const me = await api.signIn(phone, v('pin'));
+        applySession(me);
+        const u = meOf();
+        const target = !u.must_change_pin && canOpen(u, route.name) && !(route.name === 'home' && !can(u, 'view_dashboard')) ? (win.location.hash || '#/') : landingFor(u);
+        navigate(target);
+      } catch (err) {
+        ui.auth = { phone, error: msg(err) };
+        render();
+        focus('form[data-form="signin"] input[name="pin"]');
+      }
+    } else if (kind === 'forgot') {
+      const phone = v('phone');
+      ui.auth = { screen: 'forgot', phone, busy: true };
+      render();
+      try {
+        const res = await api.forgotPin(phone);
+        ui.auth = { screen: 'reset', phone: normalisePhone(phone), demoCode: res.demo_code || '', notice: res.message };
+      } catch (err) {
+        ui.auth = { screen: 'forgot', phone, error: msg(err) };
+      }
+      render();
+      focus('#main input');
+    } else if (kind === 'reset') {
+      const phone = ui.auth.phone;
+      if (v('pin') !== v('pin2')) { ui.auth = { ...ui.auth, error: "The two PINs don't match." }; render(); focus('input[name="pin"]'); return; }
+      ui.auth = { ...ui.auth, busy: true, error: '' };
+      render();
+      try {
+        await api.resetPin(phone, v('code'), v('pin'));
+        ui.auth = { phone, notice: 'Your PIN is changed. Sign in with the new one.' };
+      } catch (err) {
+        ui.auth = { screen: 'reset', phone, demoCode: ui.auth.demoCode, error: msg(err) };
+      }
+      render();
+      focus('#main input');
+    } else if (kind === 'setup') {
+      const body = { token: v('token'), name: v('name'), phone: v('phone'), pin: v('pin') };
+      ui.auth = { screen: 'setup', name: body.name, phone: body.phone, busy: true };
+      render();
+      try {
+        await api.bootstrap(body);
+        await loadAuthState();
+        ui.auth = { phone: normalisePhone(body.phone), notice: 'The platform admin is ready. Sign in with your mobile number and PIN.' };
+      } catch (err) {
+        ui.auth = { screen: 'setup', name: body.name, phone: body.phone, error: msg(err) };
+      }
+      render();
+      focus('#main input');
+    } else if (kind === 'change-pin') {
+      if (v('pin') !== v('pin2')) { ui.auth = { error: "The two PINs don't match." }; render(); focus('input[name="pin"]'); return; }
+      ui.auth = { busy: true };
+      render();
+      try {
+        await api.changePin(v('current'), v('pin'));
+        applySession(await api.me());
+        navigate(landingFor(meOf()));
+      } catch (err) {
+        ui.auth = { error: msg(err) };
+        render();
+        focus('input[name="current"]');
+      }
+    }
+  }
+
+  async function submitTeam(form) {
+    const kind = form.dataset.form;
+    const v = (n) => (form.elements[n] ? form.elements[n].value.trim() : '');
+    if (kind === 'add-staff') {
+      const data = { name: v('name'), phone: v('phone'), role: v('role'), pin: v('pin') };
+      try {
+        const res = await api.addMember({ name: data.name, phone: data.phone, role: data.role, ...(data.pin ? { pin: data.pin } : {}), must_change_pin: true });
+        await loadAdmin({ form: {}, errors: {}, notice: { text: `${res.member.name} was added as ${roleName(res.member.role)}.` }, credentials: [{ name: res.member.name, phone: res.member.phone, role: res.member.role, pin: res.pin }] });
+      } catch (err) {
+        ui.admin = { ...ui.admin, form: { ...data, pin: '' }, errors: { message: msg(err) } };
+        render();
+        focus('[data-testid="add-error"]');
+      }
+    } else if (kind === 'import-staff') {
+      const csv = v('csv') || ui.admin.csv || '';
+      try {
+        const res = await api.importMembers(csv);
+        const added = res.created.length;
+        await loadAdmin({ csv: '', importResult: res, credentials: res.created, notice: { text: `${added} ${added === 1 ? 'person' : 'people'} added${res.errors.length ? `, ${res.errors.length} row${res.errors.length === 1 ? ' needs' : 's need'} fixing` : ''}.`, error: !added && res.errors.length > 0 } });
+      } catch (err) {
+        ui.admin = { ...ui.admin, csv, notice: { text: msg(err), error: true } };
+        render();
+      }
+    } else if (kind === 'add-business') {
+      const data = { name: v('name'), address: v('address'), gstin: v('gstin').toUpperCase(), state_code: v('state_code') || '27', owner_name: v('owner_name'), owner_phone: v('owner_phone'), ...(v('owner_pin') ? { owner_pin: v('owner_pin') } : {}) };
+      try {
+        const res = await api.createBusiness(data);
+        await loadBusinesses({ form: {}, formError: '', issued: { name: res.owner.name, phone: res.owner.phone, pin: res.pin }, notice: { text: `${res.business.name} was created.` } });
+      } catch (err) {
+        ui.businesses = { ...ui.businesses, form: { ...data, owner_pin: '' }, formError: msg(err) };
+        render();
+        focus('[data-testid="biz-error"]');
+      }
+    } else if (kind === 'business-profile') {
+      const fields = { name: v('name'), address: v('address'), gstin: v('gstin').toUpperCase() };
+      try {
+        const saved = await api.saveBusinessProfile(fields);
+        const cur = session.get();
+        session.set({ ...cur, business: saved });
+        store.update((s) => { s.settings.business_name = saved.name; s.settings.address = saved.address; s.settings.gstin = saved.gstin; });
+        ui.profile = { notice: { text: 'Saved. Your quotes and reminders now use these details.' } };
+      } catch (err) {
+        ui.profile = { ...fields, notice: { text: msg(err), error: true } };
+      }
+      render();
+    } else if (kind === 'account-pin') {
+      if (v('pin') !== v('pin2')) { ui.account = { notice: { text: "The two new PINs don't match.", error: true } }; render(); return; }
+      try {
+        await api.changePin(v('current'), v('pin'));
+        ui.account = { notice: { text: 'Your PIN is changed.' } };
+      } catch (err) {
+        ui.account = { notice: { text: msg(err), error: true } };
+      }
+      render();
+    }
+  }
+
   function onSubmit(e) {
     const form = e.target.closest('form[data-form]');
     if (!form) return;
     e.preventDefault();
-    if (form.dataset.form === 'signin') {
-      const phone = form.elements.phone.value;
-      const pin = form.elements.pin.value.trim();
-      ui.signin = { phone, pin: '', busy: true };
-      render();
-      team.signIn(phone, pin).then((res) => {
-        if (res.error) { ui.signin = { phone, error: res.error }; render(); root.querySelector('form[data-form="signin"] input[name="pin"]')?.focus(); return; }
-        ui.signin = {};
-        const u = res.user;
-        const target = canOpen(u.role, route.name) && !(route.name === 'home' && !can(u.role, 'view_dashboard')) ? (win.location.hash || '#/') : landingFor(u.role);
-        navigate(target);
-      });
-      return;
-    }
-    if (form.dataset.form === 'add-staff') {
-      const data = { name: form.elements.name.value, phone: form.elements.phone.value, role: form.elements.role.value, pin: form.elements.pin.value.trim() };
-      team.addStaff(data).then((res) => {
-        if (res.errors) { ui.admin = { form: { ...data, pin: '' }, errors: res.errors }; render(); root.querySelector('[data-form="add-staff"] [aria-invalid="true"]')?.focus(); return; }
-        if (res.error) { ui.admin = { form: data, notice: { error: true, text: res.error } }; render(); return; }
-        ui.admin = { notice: { text: `${data.name.trim()} was added as ${roleName(data.role)}. They can sign in with their mobile number and the PIN you chose.` } };
-        render();
-      });
-      return;
-    }
-    if (form.dataset.form === 'send-text') {
+    const kind = form.dataset.form;
+    if (['signin', 'forgot', 'reset', 'setup', 'change-pin'].includes(kind)) { submitAuth(form); return; }
+    if (['add-staff', 'import-staff', 'add-business', 'business-profile', 'account-pin'].includes(kind)) { submitTeam(form); return; }
+    if (kind === 'send-text') {
       const text = form.elements.text.value.trim();
       if (!text) return;
       ui.draft = '';
       actions.send({ type: 'text', text });
-    } else if (form.dataset.form === 'verify-otp') {
+    } else if (kind === 'verify-otp') {
       const code = form.elements.code.value.replace(/\D/g, '');
       if (code.length !== 6) { ui.wfNote = { job: form.dataset.job, error: true, text: 'Enter the 6-digit code the customer received.' }; render(); root.querySelector('[data-form="verify-otp"] input')?.focus(); return; }
       const j = store.get().jobs.find((x) => x.id === form.dataset.job);
       runTransition(form.dataset.job, 'verify_otp', { code, challenge: (j && j.otp && j.otp.challenge) || '' });
-    } else if (form.dataset.form === 'approve') {
+    } else if (kind === 'approve') {
       const edits = {};
       form.querySelectorAll('input[data-field]').forEach((i) => { edits[i.dataset.field] = i.dataset.field === 'amc_value' ? (i.value === '' ? '' : Number(i.value)) : i.value.trim(); });
       approve(form.dataset.id, edits);
     }
   }
 
-  function onChange(e) {
+  async function onChange(e) {
     const el = e.target;
     const a = el.dataset.action;
     if (a === 'edit-line') actions.updateDocumentLine(el.dataset.doc, Number(el.dataset.index), { [el.dataset.key]: el.value === '' ? NaN : Number(el.value) });
     else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
     else if (a === 'set-theme') actions.setSetting('theme', el.value);
     else if (a === 'toggle-failure') actions.setSetting('simulate_failure', el.checked);
-    else if (a === 'set-role') {
-      const res = team.updateStaff(el.dataset.staff, { role: el.value });
-      ui.admin = { notice: res.error ? { error: true, text: res.error } : { text: `${res.text}.` } };
+    else if (a === 'pick-csv') {
+      const file = el.files && el.files[0];
+      if (!file) return;
+      const text = await file.text();
+      ui.admin = { ...ui.admin, csv: text };
       render();
+    } else if (a === 'set-role') {
+      try {
+        const res = await api.updateMember(el.dataset.staff, { role: el.value });
+        await loadAdmin({ notice: { text: `${res.name} is now ${roleName(res.role)}.` } });
+      } catch (err) { ui.admin = { ...ui.admin, notice: { text: msg(err), error: true } }; await loadAdmin(); }
+    } else if (a === 'member-permission') {
+      try {
+        const res = await api.memberPermissions(el.dataset.staff, { [el.dataset.permission]: el.value });
+        await loadAdmin({ notice: { text: `Access updated for ${res.name}.` } });
+      } catch (err) { ui.admin = { ...ui.admin, notice: { text: msg(err), error: true } }; await loadAdmin(); }
+    } else if (a === 'role-permission') {
+      try {
+        await api.rolePermissions(el.dataset.role, { [el.dataset.permission]: el.checked });
+        await loadAdmin({ notice: { text: `Access updated for everyone with the ${roleName(el.dataset.role)} role.` } });
+      } catch (err) { ui.admin = { ...ui.admin, notice: { text: msg(err), error: true } }; await loadAdmin(); }
     }
   }
   function onInput(e) { if (e.target.id === 'composer-input') ui.draft = e.target.value; }
@@ -316,11 +554,22 @@ export function mountApp(root, options = {}) {
   root.addEventListener('input', onInput);
   root.ownerDocument.addEventListener('keydown', onKey);
   applyTheme();
-  render();
-  loadForRoute();
+
+  // Tests hand in who is signed in; the real app asks the server.
+  let ready;
+  if (options.me !== undefined) {
+    if (options.me && options.me.signed_in) applySession(options.me);
+    ui.authState = options.authState || { needs_setup: false, demo_accounts: [] };
+    ui.boot = 'ready';
+    render();
+    loadForRoute();
+    ready = Promise.resolve();
+  } else {
+    ready = boot();
+  }
 
   return {
-    store, actions, team, session, ui, navigate, render,
+    store, actions, session, ui, navigate, render, ready,
     unmount() { alive = false; win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
   };
 }

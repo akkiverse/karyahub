@@ -1,9 +1,9 @@
-"""Staff roles and what each may do (CR-0003). The web app keeps the same table in
-src/domain/access.js; a test keeps them identical.
+"""Staff roles and what each may do (CR-0003, extended by CR-0005).
 
-The demo has no user database, so the role arrives with each request (``actor_role``) and is
-checked here; it is not yet proof of identity. Real sign-in (server sessions backed by a
-database) is the next step before real staff use KaryaHub (ADR-0010, RISKS.md R-15).
+The role table here is the starting point. Since CR-0005 a business owner can switch single
+permissions on or off for a role, or for one person, and the server works out each person's
+effective permissions from the database (``effective_permissions``). The web app keeps the same
+starting table in src/domain/access.js; a test keeps them identical.
 """
 
 from pydantic import BaseModel
@@ -58,9 +58,37 @@ PERMISSIONS: list[Permission] = [
     Permission(id="close_jobs", label="Close jobs", roles=_OFFICE),
     Permission(id="create_documents", label="Create quotes and invoices", roles=_OFFICE),
     Permission(id="manage_renewals", label="See renewals and send reminders", roles=_OFFICE),
-    Permission(id="manage_settings", label="Change settings and reset the demo", roles=["owner"]),
+    Permission(id="manage_settings", label="Change settings and business details", roles=["owner"]),
     Permission(id="manage_team", label="Add staff, change roles and PINs (Admin)", roles=["owner"]),
 ]
+
+PLATFORM_ROLE = "platform_admin"
+PLATFORM_PERMISSION = "manage_businesses"
+BUSINESS_PERMISSION_IDS = [p.id for p in PERMISSIONS]
+# The owner always keeps these two, so a business can never lock its own owner out.
+OWNER_LOCKED = ["manage_team", "manage_settings"]
+EDITABLE_ROLES = ["coordinator", "technician"]
+
+
+def effective_permissions(
+    role: str, role_overrides: dict[str, bool] | None = None, user_overrides: dict[str, bool] | None = None
+) -> frozenset[str]:
+    """Role default, then the business's switches for that role, then the person's own override."""
+    if role == PLATFORM_ROLE:
+        return frozenset({PLATFORM_PERMISSION})
+    if role == "owner":
+        granted = set(BUSINESS_PERMISSION_IDS)
+        for perm, allowed in (user_overrides or {}).items():
+            if perm in BUSINESS_PERMISSION_IDS and perm not in OWNER_LOCKED:
+                granted.add(perm) if allowed else granted.discard(perm)
+        return frozenset(granted)
+    granted = {p.id for p in PERMISSIONS if role in p.roles}
+    for source in (role_overrides, user_overrides):
+        for perm, allowed in (source or {}).items():
+            if perm in BUSINESS_PERMISSION_IDS:
+                granted.add(perm) if allowed else granted.discard(perm)
+    return frozenset(granted)
+
 
 # Job workflow action -> permission needed.
 ACTION_PERMISSION: dict[str, str] = {
@@ -81,7 +109,6 @@ _ACTION_WORDS = {
 }
 
 _BY_ID = {p.id: p for p in PERMISSIONS}
-_ROLE_NAMES = {r.id: r.name for r in ROLES}
 
 
 def can(role: str, permission: str) -> bool:
@@ -89,17 +116,15 @@ def can(role: str, permission: str) -> bool:
     return bool(p and role in p.roles)
 
 
-def check_action(role: str | None, action: str) -> None:
-    """Refuse a job action the given role may not take. No role means a system call (WhatsApp)."""
-    if role is None:
+def check_action(permissions: frozenset[str] | None, action: str) -> None:
+    """Refuse a job action the signed-in person's permissions don't cover. None means a system call."""
+    if permissions is None:
         return
-    if role not in _ROLE_NAMES:
-        raise AppError("unknown_role", "That staff role isn't known. Sign out and sign in again.", 403)
     needed = ACTION_PERMISSION.get(action)
-    if needed and not can(role, needed):
+    if needed and needed not in permissions:
         raise AppError(
             "forbidden",
-            f"Your role ({_ROLE_NAMES[role]}) can't {_ACTION_WORDS.get(needed, 'do this')}. "
-            "Ask the owner or the office coordinator.",
+            f"Your access doesn't include permission to {_ACTION_WORDS.get(needed, 'do this')}. "
+            "Ask your business owner.",
             403,
         )

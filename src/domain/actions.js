@@ -7,7 +7,7 @@ import { reminderText } from './renewals.js';
 import { isValidISO } from '../format.js';
 import { ApiUnreachable } from '../api/client.js';
 import { FALLBACK_NOTE } from '../adapters/server.js';
-import { can, ACTION_PERMISSION, roleName, roleShort } from './access.js';
+import { can, ACTION_PERMISSION, roleShort } from './access.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const NO_NAME_REPLY = "I couldn't find a customer name, can you add it?";
@@ -203,7 +203,7 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
   async function createDocument(jobId, type) {
     const s0 = store.get();
     const job = s0.jobs.find((j) => j.id === jobId);
-    if (!job) return { error: 'That job no longer exists. Reset the demo or pick another job.' };
+    if (!job) return { error: 'That job no longer exists. Pick another job.' };
     let docId;
     store.update((s) => {
       s.seq[type] = (s.seq[type] || 0) + 1;
@@ -250,10 +250,10 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
   /** Move a job through its workflow. The KaryaHub server checks every rule (CR-0002, US-8). */
   async function transition(jobId, action, payload = {}) {
     const job = store.get().jobs.find((j) => j.id === jobId);
-    if (!job) return { error: 'That job no longer exists. Reset the demo or pick another job.' };
+    if (!job) return { error: 'That job no longer exists. Pick another job.' };
     const user = currentUser();
-    if (user && !can(user.role, ACTION_PERMISSION[action])) {
-      return { error: `Your role (${roleName(user.role)}) can't do this. Ask the owner or the office coordinator.` };
+    if (user && ACTION_PERMISSION[action] && !can(user, ACTION_PERMISSION[action])) {
+      return { error: "Your access doesn't include this. Ask your business owner." };
     }
     const body = {
       state: job.state || 'WORK_DONE',
@@ -262,7 +262,6 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
       applied_op_ids: (job.events || []).map((e) => e.client_op_id),
       payload: action === 'request_otp' ? { ...payload, phone: job.phone } : payload,
       actor: user ? `${user.name} (${roleShort(user.role)})` : 'Owner',
-      actor_role: user ? user.role : null,
       channel: 'web',
       captured_at: nowStamp(),
       work_done: job.work_done,

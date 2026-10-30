@@ -8,10 +8,8 @@ Vercel Functions come and go, so connections aren't pooled in the app (Neon's ow
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
-from alembic import command
-from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool, StaticPool
@@ -19,6 +17,9 @@ from sqlalchemy.pool import NullPool, StaticPool
 from karyahub.settings import Settings
 
 MEMORY_URL = "sqlite+aiosqlite://"
+# The newest migration. A test keeps this equal to the migrations folder. When the database is already there,
+# starting up costs one cheap query instead of loading Alembic.
+SCHEMA_HEAD = "0001"
 _ADVISORY_LOCK = 727_001
 _engines: dict[str, AsyncEngine] = {}
 _ready: dict[str, asyncio.Lock | bool] = {}
@@ -32,11 +33,12 @@ def async_url(url: str) -> tuple[str, dict]:
         return url, {}
     parts = urlsplit(url)
     scheme = "postgresql+asyncpg"
-    query = [(k, v) for k, v in parse_qsl(parts.query) if k not in {"sslmode", "channel_binding", "options"}]
+    # Neon and Vercel add options (sslmode, channel_binding, pgbouncer, connect_timeout...). asyncpg rejects
+    # the ones it doesn't know, so none are passed on; SSL is set through connect_args below.
     connect_args: dict = {"statement_cache_size": 0}  # Neon's pooler runs in transaction mode
     if "sslmode=disable" not in parts.query and parts.hostname not in {"localhost", "127.0.0.1"}:
         connect_args["ssl"] = True
-    return urlunsplit((scheme, parts.netloc, parts.path, urlencode(query), "")), connect_args
+    return urlunsplit((scheme, parts.netloc, parts.path, "", "")), connect_args
 
 
 def get_engine(settings: Settings) -> AsyncEngine:
@@ -53,10 +55,23 @@ def get_engine(settings: Settings) -> AsyncEngine:
 
 
 def _upgrade(sync_conn) -> None:
+    from alembic import command
+    from alembic.config import Config
+
     cfg = Config()
     cfg.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
     cfg.attributes["connection"] = sync_conn
     command.upgrade(cfg, "head")
+
+
+async def _schema_current(engine: AsyncEngine) -> bool:
+    try:
+        async with engine.connect() as conn:
+            return (
+                await conn.execute(text("select version_num from alembic_version"))
+            ).scalar() == SCHEMA_HEAD
+    except Exception:
+        return False
 
 
 async def ensure_ready(engine: AsyncEngine, key: str) -> None:
@@ -68,10 +83,11 @@ async def ensure_ready(engine: AsyncEngine, key: str) -> None:
     async with lock:
         if _ready.get(key) is True:
             return
-        async with engine.begin() as conn:
-            if conn.dialect.name == "postgresql":
-                await conn.execute(text(f"select pg_advisory_xact_lock({_ADVISORY_LOCK})"))
-            await conn.run_sync(_upgrade)
+        if not await _schema_current(engine):
+            async with engine.begin() as conn:
+                if conn.dialect.name == "postgresql":
+                    await conn.execute(text(f"select pg_advisory_xact_lock({_ADVISORY_LOCK})"))
+                await conn.run_sync(_upgrade)
         from karyahub.accounts import demo  # imported here: demo needs the models, models need no demo
 
         async with async_sessionmaker(engine, expire_on_commit=False)() as db:

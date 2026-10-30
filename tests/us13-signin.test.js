@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setup, until } from './helpers.js';
 import { fakeApi } from './fake-api.js';
 import { PEOPLE, meFor } from './fake-accounts.js';
-import { createApiClient } from '../src/api/client.js';
+import { createApiClient, ApiError, ApiUnreachable } from '../src/api/client.js';
 
 let t;
 afterEach(() => t?.app.unmount());
@@ -145,20 +145,42 @@ describe('US-22 Sign-in screens (CR-0005)', () => {
     expect(t.app.session.get()).toBeNull();
   });
 
-  it('AC-22.9: the real app asks the server who is signed in; an unreachable server shows a calm retry screen', async () => {
+  async function openReal(me) {
     document.body.innerHTML = '<div id="app"></div>';
     localStorage.clear();
     const { mountApp } = await import('../src/app.js');
-    const api = { ...fakeApi(), me: async () => { throw new Error('down'); } };
+    const api = { ...fakeApi(), me };
     const root = document.getElementById('app');
     const app = mountApp(root, { api });
+    return { app, root, api };
+  }
+  const screen = (root) => root.querySelector('[data-testid="server-unreachable"]');
+
+  it('AC-22.9: the real app asks the server who is signed in; a network failure shows a calm retry screen', async () => {
+    const { app, root, api } = await openReal(async () => { await new Promise((r) => setTimeout(r, 5)); throw new ApiUnreachable(); });
     expect(root.textContent).toContain('Opening KaryaHub');
     await app.ready;
-    expect(root.querySelector('[data-testid="server-unreachable"]').textContent).toContain("Can't reach KaryaHub");
+    expect(screen(root).textContent).toContain("Can't reach KaryaHub");
+    expect(screen(root).textContent).toContain('Check your internet connection');
     api.me = async () => ({ signed_in: false });
     root.querySelector('[data-action="retry-boot"]').click();
     await vi.waitFor(() => { if (!root.querySelector('form[data-form="signin"]')) throw new Error('no'); });
     app.unmount();
+    t = null;
+  });
+
+  it('AC-22.9: when the server answers with a problem the screen says so instead of blaming the internet', async () => {
+    const { app, root } = await openReal(async () => { throw new ApiError('Not configured: add KARYAHUB_PIN_PEPPER', { code: 'not_configured', status: 503 }); });
+    await app.ready;
+    expect(screen(root).textContent).toContain("KaryaHub isn't ready");
+    expect(screen(root).textContent).toContain('Not configured: add KARYAHUB_PIN_PEPPER');
+    expect(screen(root).textContent).not.toContain('internet');
+    expect(screen(root).textContent).toContain('Reference: not_configured');
+    app.unmount();
+    const again = await openReal(async () => { throw new ApiError('Something went wrong on our side. Try again.', { code: 'internal_error', status: 500 }); });
+    await again.app.ready;
+    expect(screen(again.root).textContent).toContain('Something went wrong on our side. Wait a minute');
+    again.app.unmount();
     t = null;
   });
 

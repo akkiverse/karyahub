@@ -282,3 +282,53 @@ def test_the_database_address_is_read_from_any_of_the_usual_names(monkeypatch, n
     monkeypatch.setenv(name, "postgresql://u:p@host/db")
     get_settings.cache_clear()
     assert get_settings().database_url == "postgresql://u:p@host/db"
+
+
+def test_every_extra_option_on_the_database_address_is_dropped():
+    """Vercel and Neon add options the async driver rejects (pgbouncer, connect_timeout...); none are passed on."""
+    url, args = async_url(
+        "postgres://u:p@h.neon.tech/db?sslmode=require&pgbouncer=true&connect_timeout=15&application_name=x"
+    )
+    assert url == "postgresql+asyncpg://u:p@h.neon.tech/db"
+    assert args["ssl"] is True
+
+
+def test_the_schema_head_matches_the_migrations_folder():
+    """db.engine.SCHEMA_HEAD (used to skip Alembic when the database is current) is the newest migration."""
+    from pathlib import Path
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from karyahub.db import engine as eng
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(Path(eng.__file__).parent / "migrations"))
+    assert ScriptDirectory.from_config(cfg).get_current_head() == eng.SCHEMA_HEAD
+
+
+def test_unexpected_server_faults_are_logged_with_their_kind(monkeypatch, caplog):
+    """A fault we didn't plan for answers a calm 500 and leaves a line in the logs (it used to vanish)."""
+    from fastapi.testclient import TestClient
+    from karyahub.accounts import service
+    from karyahub.app import create_app
+
+    async def boom(*_a, **_k):
+        raise RuntimeError("the database is down")
+
+    monkeypatch.setattr(service, "principal_for_token", boom)
+    with TestClient(create_app(), raise_server_exceptions=False) as c:
+        r = c.get("/api/v1/auth/me")
+    assert r.status_code == 500 and r.json()["error"]["code"] == "internal_error"
+    assert any("Unhandled RuntimeError on GET /api/v1/auth/me" in rec.getMessage() for rec in caplog.records)
+
+
+def test_health_names_the_kind_of_database_fault_but_nothing_else(monkeypatch, client):
+    """/api/health says what kind of fault it was (never the address), so a failing deploy can be read from a browser."""
+
+    async def broken(*_a, **_k):
+        raise ConnectionRefusedError("postgres://user:secret@host/db refused")
+
+    monkeypatch.setattr("karyahub.app.ensure_ready", broken)
+    body = client.get("/api/health").json()
+    assert body["database"] == "error: ConnectionRefusedError"
+    assert "secret" not in str(body) and "postgres" not in str(body)

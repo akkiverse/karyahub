@@ -4,6 +4,7 @@ import { isAiOffline } from '../ui/ai-status.js';
 
 // Reading with Studio AI (CR-0004) can take a while on the founder's own AI server.
 export const AI_TIMEOUT_MS = 60000;
+export const BOOT_TIMEOUT_MS = 30000;
 
 export class ApiError extends Error {
   constructor(message, { code = 'api_error', status = 0 } = {}) {
@@ -67,8 +68,9 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     amcPlan: (contract, today, existingKeys = []) => call('POST', '/amc/plan', { contract, today, existing_keys: existingKeys }),
 
     // Sign-in and accounts (CR-0005)
-    authState: () => call('GET', '/auth/state'),
-    me: () => call('GET', '/auth/me', undefined, { quiet: true }),
+    // The first requests may wake a sleeping function and database, so they get longer than the usual 8 seconds.
+    authState: () => call('GET', '/auth/state', undefined, { timeout: BOOT_TIMEOUT_MS }),
+    me: () => call('GET', '/auth/me', undefined, { quiet: true, timeout: BOOT_TIMEOUT_MS }),
     signIn: (phone, pin) => call('POST', '/auth/sign-in', { phone, pin }, { quiet: true }),
     signOut: () => call('POST', '/auth/sign-out', undefined, { quiet: true }),
     bootstrap: (form) => call('POST', '/auth/bootstrap', form),

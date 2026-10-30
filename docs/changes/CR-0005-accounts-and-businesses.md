@@ -26,7 +26,7 @@ Underneath:
 - **PINs:** scrypt with a per-person salt and a server secret (`KARYAHUB_PIN_PEPPER`, required with a real database).
 - **Permissions:** the starting role table plus the owner's switches, worked out on the server for every request. Job, AI, paperwork and renewal routes now require sign-in and the right permission; `actor_role` in a request and the `X-Tenant-Id` header are ignored.
 - **Web app:** the app asks the server who is signed in; the on-device team and access log are gone (data version 4); on-device data is kept per business.
-- `/api/health` reports `database: ok | memory | error | not_configured` and never the address.
+- `/api/health` reports `database: ok | memory | not_configured | error: <kind of fault>` and never the address or a secret. Unexpected server faults are now written to the logs (they used to vanish). The first requests of the app wait up to 30 seconds (a sleeping function and database), and the opening screen says what the server said instead of blaming the internet.
 
 ## References
 None attached. The founder's description of the multi-business model is in the chat; the earlier review of the Kritvo reference platform is in [REFERENCE-REVIEW.md](../architecture/REFERENCE-REVIEW.md) (shared schema with a business id, OTP login, inventory as its own module).
@@ -48,8 +48,8 @@ None attached. The founder's description of the multi-business model is in the c
 New [ADR-0012](../adr/0012-accounts-businesses-and-a-shared-database.md), which supersedes [ADR-0010](../adr/0010-demo-sign-in-and-roles.md) and completes [ADR-0009](../adr/0009-multi-tenant-ready.md). [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) gains the database and sign-in flow; [RISKS.md](../architecture/RISKS.md) updates R-08 and R-10 and adds R-19 to R-21.
 
 ## Verification
-- Server: 74 pytest tests (26 earlier, 48 new) against an in-memory database: sign-in, lock-out, hashing, CSRF, temporary PINs, team add and CSV import, role and person switches, business isolation, the read-only demo, the platform admin, forgot-PIN codes, and the Neon address conversion. No test reaches a real database or the real AI server.
-- Web: 82 Vitest tests (61 earlier, 21 new or rewritten) with the accounts API stood in by a fake; the on-device team tests were replaced.
+- Server: 78 pytest tests (26 earlier, 52 new) against an in-memory database: sign-in, lock-out, hashing, CSRF, temporary PINs, team add and CSV import, role and person switches, business isolation, the read-only demo, the platform admin, forgot-PIN codes, and the Neon address conversion. No test reaches a real database or the real AI server.
+- Web: 83 Vitest tests (61 earlier, 22 new or rewritten) with the accounts API stood in by a fake; the on-device team tests were replaced.
 - Compatibility: data saved by v0.1.0, v0.2.0 and v0.3.0 (with its on-device team) loads; each business's on-device data stays separate.
 - Real run: the production build with the real server and an in-memory database, driven by curl (create the platform admin, create a business, temporary-PIN gate, CSV import, isolation, demo read-only) and by a headless browser at 375px and 1280px in light and dark (48 screenshots, no console errors, no horizontal overflow).
 - Not run here: the app against the real Neon database (the founder's connection string isn't, and shouldn't be, on this machine). It is checked on the Vercel preview through `/api/health`.

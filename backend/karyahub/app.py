@@ -1,6 +1,7 @@
 """KaryaHub API (FastAPI). All routes live under /api; the web app calls /api/v1/*."""
 
 import json
+import logging
 from datetime import date
 from typing import Annotated, Any, Literal
 
@@ -33,8 +34,10 @@ async def database_status(settings: Settings) -> str:
         await ensure_ready(engine, settings.database_url or MEMORY_URL)
         async with engine.connect() as conn:
             await conn.execute(text("select 1"))
-    except Exception:
-        return "error"
+    except Exception as exc:
+        # The kind of fault only (for example "InvalidPasswordError"), never the address or any secret.
+        logging.getLogger("karyahub").error("Database check failed: %s", type(exc).__name__, exc_info=exc)
+        return f"error: {type(exc).__name__}"
     return "ok" if settings.uses_real_database else "memory"
 
 

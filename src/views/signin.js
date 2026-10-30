@@ -46,10 +46,20 @@ export function loadingScreen() {
   return '<main id="main" class="auth-main"><div class="auth-card"><p class="muted" role="status"><span class="spinner" aria-hidden="true"></span> Opening KaryaHub…</p></div></main>';
 }
 
-export function unreachableScreen() {
+/** The opening request failed. `error` is what the server said, or empty when it couldn't be reached at all. */
+export function unreachableScreen(error) {
+  const server = Boolean(error && error.message);
+  const text = !server
+    ? 'Check your internet connection, then try again. Nothing you did has been lost.'
+    : error.code === 'not_configured'
+      ? `${error.message}. This is a setup step for whoever runs KaryaHub; once it is done, try again.`
+      : error.code === 'internal_error' || !error.code
+        ? 'Something went wrong on our side. Wait a minute and try again. If it keeps happening, tell whoever runs KaryaHub.'
+        : error.message;
   return `<main id="main" class="auth-main"><div class="auth-card" data-testid="server-unreachable">
-    <h1 id="page-title" tabindex="-1">Can't reach KaryaHub</h1>
-    <p class="muted">Check your internet connection, then try again. Nothing you did has been lost.</p>
+    <h1 id="page-title" tabindex="-1">${server ? "KaryaHub isn't ready" : "Can't reach KaryaHub"}</h1>
+    <p class="muted">${escapeHtml(text)}</p>
+    ${server && error.code ? `<p class="muted small">Reference: ${escapeHtml(error.code)}</p>` : ''}
     <button type="button" class="btn btn-primary" data-action="retry-boot">Try again</button></div></main>`;
 }
 

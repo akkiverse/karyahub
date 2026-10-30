@@ -96,14 +96,16 @@ export function mountApp(root, options = {}) {
   }
   async function boot() {
     ui.boot = 'loading';
+    ui.bootError = null;
     render();
     try {
       const me = await api.me();
       if (me.signed_in) applySession(me);
       else await loadAuthState();
       ui.boot = 'ready';
-    } catch {
+    } catch (e) {
       ui.boot = 'error';
+      ui.bootError = e instanceof ApiUnreachable ? null : { message: e.message, code: e.code };
     }
     if (!alive) return;
     render();
@@ -209,7 +211,7 @@ export function mountApp(root, options = {}) {
     if (!alive) return;
     const state = store.get();
     if (ui.boot === 'loading') { root.innerHTML = loadingScreen(); return; }
-    if (ui.boot === 'error') { root.innerHTML = unreachableScreen(); return; }
+    if (ui.boot === 'error') { root.innerHTML = unreachableScreen(ui.bootError); return; }
     const me = meOf();
     const name = me ? route.name : 'signin';
     const thread = root.querySelector('.thread');

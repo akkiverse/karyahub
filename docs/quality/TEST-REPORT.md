@@ -1,12 +1,12 @@
 # KaryaHub: Test report
 
-**Run:** 2026-10-30 · **Branch:** `cr/0005-accounts-and-businesses` (CR-0005) · **Result:** 156 of 156 tests passing (74 server, 82 web), covering all 95 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 36 kB JS and 10 kB CSS gzipped)
+**Run:** 2026-10-30 · **Branch:** `cr/0005-accounts-and-businesses` (CR-0005) · **Result:** 161 of 161 tests passing (78 server, 83 web), covering all 95 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 36 kB JS and 10 kB CSS gzipped)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in or another role; `me` can hand in any server answer. Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
 Two suites:
-- **Web app:** 82 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js` and `tests/fake-accounts.js` standing in for the server (they record calls and can act unreachable). AC-2.2 runs with the real step timing under fake timers.
-- **Server:** 74 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
+- **Web app:** 83 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js` and `tests/fake-accounts.js` standing in for the server (they record calls and can act unreachable). AC-2.2 runs with the real step timing under fake timers.
+- **Server:** 78 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
 
 Some criteria have a test on each side (for example AC-7.2: the web app calls the API, and the server returns the AC-3.2 fields). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
@@ -185,7 +185,8 @@ Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see 
 | AC-22.7 | `tests/us13-signin.test.js` › AC-20.1 and AC-22.7 (screen): First-time setup shows only while no platform admin exists, and needs the setup token | Pass |
 | AC-22.8 | `tests/us11-compat.test.js` › AC-22.8: data saved by v0.3.0 (version 3, with the on-device team) loads for the demo business without the team and keeps jobs and documents | Pass |
 | AC-22.8 | `tests/us11-compat.test.js` › AC-22.8: each business keeps its own data on this device, a new business starts empty, and switching back restores each | Pass |
-| AC-22.9 | `tests/us13-signin.test.js` › AC-22.9: the real app asks the server who is signed in; an unreachable server shows a calm retry screen | Pass |
+| AC-22.9 | `tests/us13-signin.test.js` › AC-22.9: the real app asks the server who is signed in; a network failure shows a calm retry screen | Pass |
+| AC-22.9 | `tests/us13-signin.test.js` › AC-22.9: when the server answers with a problem the screen says so instead of blaming the internet | Pass |
 | AC-22.9 | `tests/us14-roles.test.js` › AC-22.9: a platform admin sees only the Businesses screen and no business screens | Pass |
 
 ## Design checklist
@@ -222,4 +223,4 @@ Fixes made after looking at the screenshots:
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.
 - v0.3.0 (2026-10-30): CR-0004 released; 87 of 87 acceptance tests passing.
-- CR-0005 in review: 156 of 156 tests passing; not yet released.
+- CR-0005 in review: 161 of 161 tests passing; not yet released.

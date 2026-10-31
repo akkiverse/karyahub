@@ -13,8 +13,11 @@ from sqlalchemy import text
 
 from karyahub import __version__, access, studio_ai
 from karyahub.accounts import routes as account_routes
-from karyahub.accounts.deps import BusinessPrincipalDep, TenantDep, require
+from karyahub.accounts.deps import BusinessPrincipalDep, DbDep, TenantDep, require
 from karyahub.adapters import Adapters, get_adapters
+from karyahub.data import rls
+from karyahub.data import routes as data_routes
+from karyahub.data import service as data_service
 from karyahub.db.engine import MEMORY_URL, ensure_ready, get_engine
 from karyahub.domain import amc, otp, renewals, workflow
 from karyahub.domain.documents import DocLine, Totals, compute_totals
@@ -148,6 +151,8 @@ def create_app() -> FastAPI:
             "mode": settings.mode,
             "database": status,
         }
+        if settings.uses_real_database:
+            body["row_level_security"] = rls.STATE["status"]  # the second wall between businesses (CR-0009)
         if timings:
             # How long the database takes to answer from this server: tells apart "far away" from "slow".
             body["database_ms"] = timings
@@ -238,8 +243,28 @@ def create_app() -> FastAPI:
         tenant: TenantDep,
         a: AdaptersDep,
         who: BusinessPrincipalDep,
+        db: DbDep,
     ) -> workflow.TransitionResult:
         access.check_action(who.permissions, req.action)  # the server's own record of who this is
+        stored = None
+        if not tenant.is_demo:
+            # A real business's job lives on the server: its state comes from there, not the phone (CR-0009).
+            await rls.scope(db, tenant.id)
+            stored = await data_service.load_job(db, tenant.id, job_id)
+            if stored is None:
+                raise AppError(
+                    "job_not_synced",
+                    "This job hasn't reached the server yet. Wait for changes to send, then try again.",
+                    404,
+                )
+            req = req.model_copy(
+                update={
+                    "state": stored.body.get("state") or "WORK_DONE",
+                    "applied_op_ids": [
+                        e.get("client_op_id") for e in stored.body.get("events", []) if e.get("client_op_id")
+                    ],
+                }
+            )
         secret = settings.secret("otp_secret")
         ctx: dict[str, Any] = {}
         if req.action == "verify_otp":
@@ -262,6 +287,23 @@ def create_app() -> FastAPI:
             result.otp = {"challenge": challenge, "expires_at": expires, "sent": sent["status"]}
             if settings.mode == "mock":
                 result.otp["demo_code"] = code  # mock mode only: nothing is really sent
+        if stored is not None and not result.duplicate:
+            saved_otp = (
+                {k: result.otp[k] for k in ("challenge", "expires_at", "demo_code") if k in result.otp}
+                if result.otp
+                else stored.body.get("otp")
+            )
+            await data_service.save_job_step(
+                db,
+                tenant.id,
+                stored,
+                result.state,
+                result.event.model_dump() if result.event else None,
+                saved_otp,
+            )
+            await db.commit()
+        elif stored is not None:
+            await db.rollback()
         return result
 
     # ---------- staff roles (CR-0003) ----------
@@ -332,6 +374,7 @@ def create_app() -> FastAPI:
 
     app.include_router(api)
     app.include_router(account_routes.router)
+    app.include_router(data_routes.router)
     app.include_router(v1)
     return app
 

@@ -136,6 +136,19 @@ def test_ac_19_4_owner_switches_permissions_for_a_role(make_business, make_clien
     owner = make_business()["owner"]
     _add(owner)
     tech = make_client("9822200002", "6402")
+    # Since CR-0009 a real business's job lives on the server, so the job has to be there first (and verified).
+    job = {"customer_id": "c", "customer_name": "Ramesh", "date": "2027-01-01", "lines": [], "events": []}
+    owner.post(
+        "/api/v1/sync",
+        json={"since": 0, "ops": [{"op_id": "op-seed-1", "kind": "job", "id": "J-1", "body": job}]},
+    )
+    verify = {"state": "WORK_DONE", "action": "supervisor_verify", "client_op_id": "op-seed-0002"}
+    assert (
+        owner.post(
+            "/api/v1/jobs/J-1/transitions", json=verify | {"payload": {"reason": "Seen on site"}}
+        ).status_code
+        == 200
+    )
     close = {
         "state": "VERIFIED",
         "action": "close",

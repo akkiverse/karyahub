@@ -4,7 +4,7 @@
 - **Requested by:** Founder (TASKS.md K3, 2026-10-31; the Add a person fix was reported in chat the same day)
 - **Date:** 2026-10-31
 - **Release:** v0.5.0 (planned)
-- **Pull request:** to be linked when opened
+- **Pull request:** [#9](https://github.com/akkiverse/karyahub/pull/9)
 
 ## Why
 Since CR-0005 KaryaHub knows who people are and which business they belong to, but a real firm's customers, jobs, quotes, invoices and chat still live in each person's own browser. Two phones of the same firm see different work, clearing the browser loses everything, and the owner cannot see what the technicians did. The founder's goal is that a real AC-service firm can run its whole day on KaryaHub; this is step 1 of that plan (`docs/plan/ROADMAP.md`).

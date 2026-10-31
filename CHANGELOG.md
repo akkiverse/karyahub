@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-31
+
 ### Added
 - Business data on the server: a real firm's customers, jobs, quotes, invoices and chat are now kept in the database for that business only (with a second wall of Postgres row-level security), so every phone of the firm sees the same work. See [CR-0009](docs/changes/CR-0009-business-data-on-server.md) and [ADR-0013](docs/adr/0013-business-data-sync-and-row-level-security.md).
 - Works on a weak signal: changes are saved on the phone first, queued, shown as "waiting to send" and sent once when the signal returns, with no duplicates, even if the app is closed in between.
@@ -88,6 +90,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.5.0]: https://github.com/akkiverse/karyahub/pull/9
 [0.4.3]: https://github.com/akkiverse/karyahub/pull/8
 [0.4.2]: https://github.com/akkiverse/karyahub/pull/7
 [0.4.1]: https://github.com/akkiverse/karyahub/pull/6

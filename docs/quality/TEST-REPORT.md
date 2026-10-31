@@ -269,6 +269,7 @@ Fixes made after looking at the screenshots:
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.
 - v0.3.0 (2026-10-30): CR-0004 released; 87 of 87 acceptance tests passing.
+- v0.5.0 (2026-10-31): CR-0009 released; 209 of 209 tests passing (110 server, 99 web), plus the Postgres-only test on PostgreSQL 16.2.
 - v0.4.3 (2026-10-30): CR-0008 released; 170 of 170 tests passing (the kit's own new tests are in the hub repository).
 - v0.4.2 (2026-10-30): CR-0007 released; 170 of 170 tests passing (82 server, 88 web).
 - v0.4.1 (2026-10-30): CR-0006 released; 165 of 165 tests passing (78 server, 87 web).

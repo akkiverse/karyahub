@@ -8,7 +8,7 @@ bundles only backend/, so the value below is the fallback there; a test keeps th
 import json
 from pathlib import Path
 
-_VERSION = "0.5.0"
+_VERSION = "0.6.0"
 
 
 def _read_version() -> str:

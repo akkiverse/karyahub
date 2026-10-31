@@ -1,9 +1,9 @@
 # CR-0009: Business data on the server
 
-- **Status:** In progress
+- **Status:** Released
 - **Requested by:** Founder (TASKS.md K3, 2026-10-31; the Add a person fix was reported in chat the same day)
 - **Date:** 2026-10-31
-- **Release:** v0.5.0 (planned)
+- **Release:** v0.5.0 (2026-10-31, [PR #9](https://github.com/akkiverse/karyahub/pull/9))
 - **Pull request:** [#9](https://github.com/akkiverse/karyahub/pull/9)
 
 ## Why

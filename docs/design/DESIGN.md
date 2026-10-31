@@ -65,3 +65,10 @@ The founder asked for a more professional look that appeals to businesses. Direc
 - **Businesses:** the platform admin's list uses the Team row pattern with the business icon, a Demo tag for the sample firm, and one action row (Reset owner PIN, Turn off).
 - **Real businesses:** no Demo pill, watermark, "dummy" tags or sample chips; Home shows a "Get started" panel with three steps instead of the sales cards.
 - **States:** loading ("Opening KaryaHub…"), server unreachable (one calm card with Try again), no-access, no permissions at all (My account explains), demo-locked Admin (controls disabled with a note).
+
+## Additions in CR-0009 (business data on the server)
+- **Sync mark** in the top bar of a real business (not the demo): "All saved" (quiet grey), "Sending 3…" (teal, the icon turns), "3 changes waiting" or "No signal" (amber outline). It names no technology and never blocks work; the full sentence is in its tooltip. It is updated in place, so a background update never redraws a form someone is typing in.
+- **Banner** above the page, only when something needs a look: "We moved N items from this phone to your KaryaHub account" (once, dismissible) and "N changes were not saved" with the server's reason in plain words (dismissible).
+- **New** replaces a job or document number until the server has given one (`J-0007`, `QT-2026-0003`); a quotation without a number is just "Quotation".
+- **Logo**: in Settings under Business details (preview, Add or Replace, Remove; picture up to 200 KB, resized to 256 px in the browser) and at the top left of quotes and invoices (up to 120 × 64 px, never stretched).
+- **Add a person** at the top of Admin is a button that moves to the form and puts the cursor in the first box.

@@ -4,7 +4,7 @@
 - **Requested by:** Founder (TASKS.md B2, 30 Oct 2026; and 31 Oct: "AI works in the hub, but KaryaHub Chat doesn't")
 - **Date:** 2026-11-01
 - **Release:** v0.6.0 (planned)
-- **Pull request:** see the PR for branch `cr/0010-smooth-ai-and-chat`
+- **Pull request:** [#11](https://github.com/akkiverse/karyahub/pull/11)
 
 ## Why
 On 31 Oct the founder found that Chat didn't work in the live app, although AI answered in the hub. We checked three things first.

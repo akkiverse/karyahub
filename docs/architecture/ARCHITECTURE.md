@@ -85,7 +85,7 @@ Server (stateless): Tenant configuration (`tenancy.py`); everything else is comp
 | WhatsApp Cloud API: incoming | `POST /api/v1/whatsapp/webhook` | Works with demo secrets in mock mode | Meta business verification, a number, `KARYAHUB_WHATSAPP_APP_SECRET`, `KARYAHUB_WHATSAPP_VERIFY_TOKEN`; register the webhook URL |
 | WhatsApp Cloud API: outgoing | `adapters/whatsapp.py` (`send`) | Mock: records a simulated send | `KARYAHUB_WHATSAPP_ACCESS_TOKEN`, approved utility templates, build the live adapter |
 | Speech-to-text | `adapters/speech.py` (`transcribe`) | Mock: sample transcript | `KARYAHUB_SPEECH_API_KEY`, build the live adapter (media download from Meta, then the speech API) |
-| LLM | `adapters/llm.py` (`extract_job`, `read_image`): `StudioAiLlm` (CR-0004), `MockLlm`, `LiveLlm` | Studio AI (`qwen3.5:9b` on the founder's Ollama server, through `studio_ai.py`) when `AI_ENDPOINTS` is set; otherwise mock. Offline or unusable answers fall back to the quick reader, labelled "Read without AI" | Link the shared `AI_ENDPOINTS` and `AI_GATEWAY_KEY` variables to the karyahub Vercel project |
+| LLM | `adapters/llm.py` (`extract_job`, `read_image`): `StudioAiLlm` (CR-0004), `MockLlm`, `LiveLlm` | Studio AI (`AI_MODEL`, default `gemma4:e4b`, and `AI_MODEL_VISION` for photos, on the founder's Ollama server, through `studio_ai.py`; CR-0010) when `AI_ENDPOINTS` is set; otherwise mock. Offline or unusable answers fall back to the quick reader, labelled "Read without AI" | Link the shared `AI_ENDPOINTS` and `AI_GATEWAY_KEY` variables to the karyahub Vercel project |
 | Customer codes | `domain/otp.py` | Demo secret, code shown on screen | `KARYAHUB_OTP_SECRET`, live WhatsApp sending |
 
 ## Accounts, businesses and the database (CR-0005)
@@ -129,7 +129,7 @@ flowchart LR
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.
 
-**Reading with Studio AI (CR-0004):** Chat → API `read-image` (photo as JPEG) and/or `extract` → `StudioAiLlm` → `studio_ai.chat` (first AI server that answers; 40 seconds) → Pydantic-checked job → draft card tagged "Read by AI". If no AI server answers: quick reader → draft tagged "Read without AI" with a note, and the banner (polling `/api/ai/status` every minute) says AI is offline.
+**Reading with Studio AI (CR-0004):** Chat → API `read-image` (photo as JPEG) and/or `extract` → `StudioAiLlm` → `studio_ai.chat` (first AI server that answers; 90 seconds since CR-0010, with a thinking line, Stop, and photo text streamed from `read-image/stream`; Chat warms the models through `/api/v1/ai/warm` when it opens) → Pydantic-checked job → draft card tagged "Read by AI". If no AI server answers: quick reader → draft tagged "Read without AI" with a note, and the banner (polling `/api/ai/status` every minute) says AI is offline.
 
 **Proof of work:** Job → Send code → API `request_otp` (code bound to job and tenant, 10 minutes) → enter code → API `verify_otp` → Verified → Close → Closed; each step appended to the job's history with an idempotent operation id.
 

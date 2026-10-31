@@ -5,6 +5,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+- Chat: after a message was read, the message box and Send stayed greyed out, so a second message couldn't be sent until you left Chat and came back. They now switch back on after every reply. See [CR-0010](docs/changes/CR-0010-smooth-ai-and-chat.md).
+- A model missing on the AI computer no longer makes KaryaHub say "AI is offline": the AI kit (v2) uses another model the computer has.
+- `/api/health` shows the released version (it said 0.4.3 while 0.5.0 was live).
+
+### Added
+- While the AI reads, Chat says what it is doing, counts the seconds and offers **Stop**; the message stays, with **Try again**.
+- A job-sheet photo's text appears as the AI reads it.
+- Opening Chat gets the AI ready, so the first message is answered quickly.
+
+### Changed
+- Each AI step may take up to 90 seconds (was 40) inside a 120-second server function (was 60); photos use `AI_MODEL_VISION`; the everyday model is `gemma4:e4b` unless `AI_MODEL` says otherwise. See [ADR-0014](docs/adr/0014-smooth-ai-streaming-warm-up-and-time-budget.md).
+
 ## [0.5.0] - 2026-10-31
 
 ### Added

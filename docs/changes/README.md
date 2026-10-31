@@ -4,6 +4,7 @@ Every change to KaryaHub is recorded here: what changed, why, and how it affecte
 
 | CR | Change | Why (short) | Status | Release |
 |---|---|---|---|---|
+| [CR-0010](CR-0010-smooth-ai-and-chat.md) | Chat works and AI is smooth: Send works after each reply, thinking line with timer and Stop, photo text as it is read, warm-up, AI kit v2 (model fallback), 90 s steps in a 120 s function, version from studio.json | Founder: KaryaHub Chat didn't work although AI worked in the hub; TASKS B2 | In review | v0.6.0 (planned) |
 | [CR-0009](CR-0009-business-data-on-server.md) | Business data on the server: customers, jobs, documents and chat of a real business move from the browser to the database, scoped by business with row-level security; offline changes queue and sync without duplicates; one-time import from the device; logo; the Add a person button fix | Founder: a real firm runs its whole day on KaryaHub; every phone sees the same work | Released | v0.5.0 |
 | [CR-0008](CR-0008-ai-over-a-slow-link.md) | AI over a slow link: the shared AI kit waits longer to connect and for the online check, and reuses one connection | The AI PC is up but KaryaHub said the AI server was down | Released | v0.4.3 |
 | [CR-0007](CR-0007-faster-sign-in.md) | Faster sign-in: fewer database round trips, reused connections, more patience in the app, health timings | Founder could not sign in: sign-in took 8.4 s and the app gave up after 8 | In review | v0.4.2 (planned) |

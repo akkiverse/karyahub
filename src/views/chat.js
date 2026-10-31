@@ -35,15 +35,23 @@ function voiceBubble(m, ui) {
   <p class="voice-transcript"><span class="sr-label">Voice note transcript:</span> ${escapeHtml(m.body)}</p>`;
 }
 
-function processCard(m) {
+// While an AI step runs (CR-0010): what it is doing, seconds so far (updated by the app each second), and Stop.
+function thinkingLine(s, busy) {
+  if (s.status !== 'running' || !busy || !s.thinking) return '';
+  return `<span class="step-thinking" data-testid="ai-thinking">${escapeHtml(s.thinking)} <span class="ai-timer" data-started="${Number(s.started_at) || 0}" data-testid="ai-timer">0 s</span><button type="button" class="btn btn-small btn-stop" data-action="stop-ai" data-testid="ai-stop">${icon('x', { size: 14 })} Stop</button></span>`;
+}
+
+function processCard(m, ui = {}, busy = false) {
   const stepIcon = (s) => (s.status === 'done' ? icon('check', { size: 16 }) : s.status === 'failed' ? icon('x', { size: 16 }) : s.status === 'running' ? '<span class="spinner" aria-hidden="true"></span>' : s.status === 'skipped' ? icon('arrowRight', { size: 16 }) : '<span class="dot-pending" aria-hidden="true"></span>');
   const statusText = { pending: 'waiting', running: 'working', done: 'done', failed: 'failed', skipped: 'skipped' };
+  const streamed = (ui.streaming && ui.streaming[m.id]) || '';
   return `<div class="process" data-testid="processing-panel" aria-live="polite">
     <p class="process-title">${icon('sparkle', { size: 16 })} Processing</p>
     <ol class="steps">${m.steps
-      .map((s) => `<li class="step is-${s.status}" data-step="${s.id}" data-status="${s.status}"><span class="step-icon">${stepIcon(s)}</span><span class="step-body"><strong>${s.label}</strong> <span class="step-state">${statusText[s.status]}</span>${s.detail ? `<span class="step-detail">${escapeHtml(s.detail)}</span>` : ''}</span></li>`)
+      .map((s) => `<li class="step is-${s.status}" data-step="${s.id}" data-status="${s.status}"><span class="step-icon">${stepIcon(s)}</span><span class="step-body"><strong>${s.label}</strong> <span class="step-state">${statusText[s.status]}</span>${thinkingLine(s, busy)}${s.detail ? `<span class="step-detail">${escapeHtml(s.detail)}</span>` : ''}</span></li>`)
       .join('')}</ol>
     ${m.notice ? `<p class="process-note" role="status" data-testid="process-note">${icon('alert', { size: 16 })}<span>${escapeHtml(m.notice)}</span></p>` : ''}
+    ${!m.transcript && streamed ? `<div class="transcript is-streaming" data-testid="transcript-streaming"><span class="label">Reading…</span><p>${escapeHtml(streamed)}</p></div>` : ''}
     ${m.transcript ? `<div class="transcript" data-testid="transcript"><span class="label">Transcript</span><p>${escapeHtml(m.transcript)}</p></div>` : ''}
     ${m.error ? `<div class="step-error" role="alert" data-testid="process-error">${icon('alert', { size: 16 })}<span>${escapeHtml(m.error)}</span><button type="button" class="btn btn-small" data-action="retry" data-id="${m.id}">${icon('rotate', { size: 16 })} Try again</button></div>` : ''}
   </div>`;
@@ -83,12 +91,12 @@ function documentBubble(m, state) {
     <p class="sim-note">Simulated: nothing was sent.</p>`;
 }
 
-function message(m, state, ui) {
+function message(m, state, ui, busy) {
   const out = m.from === 'technician';
   let body = '';
   if (m.kind === 'voice') body = voiceBubble(m, ui);
   else if (m.kind === 'image') body = `<figure class="photo" data-testid="image-bubble">${JOBSHEET_SVG}<figcaption>${escapeHtml(m.body)}</figcaption></figure>`;
-  else if (m.kind === 'process') body = processCard(m);
+  else if (m.kind === 'process') body = processCard(m, ui, busy);
   else if (m.kind === 'card') body = summaryCard(m, ui, state);
   else if (m.kind === 'document') body = documentBubble(m, state);
   else body = `<p class="bubble-text">${escapeHtml(m.body)}</p>${m.job_id ? `<a class="inline-link" href="#/jobs/${m.job_id}">Open ${jobRef(state, m.job_id) === 'New' ? 'the job' : jobRef(state, m.job_id)}</a>` : ''}`;
@@ -110,7 +118,7 @@ export function chat({ state, ui, busy }) {
         <span class="who"><strong data-testid="chat-title">KaryaHub</strong><small>Business account · ${state.settings.is_demo ? 'demo, nothing is really sent' : 'WhatsApp is simulated until it is connected'}</small></span>
       </header>
       <ol class="thread" data-testid="thread">
-        ${state.messages.map((m) => message(m, state, ui)).join('')}
+        ${state.messages.map((m) => message(m, state, ui, busy)).join('')}
         ${!started ? `<li class="hint" data-testid="chat-hint">${state.settings.is_demo ? 'Pick a sample to start' : 'Type a technician\'s message below to start'}</li>` : ''}
       </ol>
       ${state.settings.is_demo ? `<div class="picker" role="group" aria-label="Send a sample technician message" data-testid="sample-picker">

@@ -28,10 +28,15 @@ export function serverAdapters(api) {
     },
     llm: {
       name: 'server',
-      readImage: (media, { fail = false, image = null } = {}) =>
-        viaServer('LLM', () => api.readImage(media?.id || '', fail, image), () => mockLlm.readImage(media, { fail })),
-      extractJob: (text, { fail = false } = {}) =>
-        viaServer('LLM', () => api.extract(text, fail), () => mockLlm.extractJob(text, { fail })),
+      // CR-0010: the photo's text streams in (onText) when the server can, and Stop (signal) ends the wait.
+      readImage: (media, { fail = false, image = null, onText = null, signal = null } = {}) =>
+        viaServer(
+          'LLM',
+          () => (onText && api.readImageStream ? api.readImageStream(media?.id || '', image, { onText, signal, simulateFailure: fail }) : api.readImage(media?.id || '', fail, image, { signal })),
+          () => mockLlm.readImage(media, { fail }),
+        ),
+      extractJob: (text, { fail = false, signal = null } = {}) =>
+        viaServer('LLM', () => api.extract(text, fail, { signal }), () => mockLlm.extractJob(text, { fail })),
     },
     whatsapp: {
       name: 'server',

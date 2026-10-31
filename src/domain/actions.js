@@ -35,18 +35,24 @@ const stepDetail = (base, r, a) => (readerLabel(r) ? `${readerLabel(r)} (${via(r
 let opCounter = 0;
 const newOpId = (jobId) => `op-${jobId}-${Date.now().toString(36)}-${(opCounter += 1)}-${Math.random().toString(36).slice(2, 6)}`;
 
-export function createActions({ store, getAdapters, stepDelay, api, currentUser = () => null, photoImage = async () => null, ensureSynced = async () => true }) {
+// What a running AI step says while the person waits (CR-0010). The timer and Stop button are drawn next to it.
+export const THINKING = { photo: 'Reading the job sheet…', voice: 'Turning the voice note into text…', extract: 'Reading the message…' };
+
+export function createActions({ store, getAdapters, stepDelay, api, currentUser = () => null, photoImage = async () => null, ensureSynced = async () => true, onStream = () => {}, onIdle = () => {}, now = () => Date.now() }) {
   const adapters = () => getAdapters(store.get().settings.mode, api);
   const updateMsg = (id, fn) => store.update((s) => { const m = s.messages.find((x) => x.id === id); if (m) fn(m, s); });
   const setStep = (id, stepId, patch) => updateMsg(id, (m) => Object.assign(m.steps.find((st) => st.id === stepId), patch));
   let busy = false;
+  let stopper = null; // the running AI step's Stop (CR-0010)
 
   async function process(source, processId) {
     const fail = store.get().settings.simulate_failure;
     const a = adapters();
     const sample = source.sample_id ? SAMPLES.find((s) => s.id === source.sample_id) : null;
+    stopper = typeof AbortController === 'function' ? new AbortController() : null;
+    const signal = stopper ? stopper.signal : null;
     // Step 1: Transcribe
-    setStep(processId, 'transcribe', { status: 'running' });
+    setStep(processId, 'transcribe', { status: 'running', thinking: source.type === 'text' ? '' : THINKING[source.type] || '', started_at: now() });
     await sleep(stepDelay());
     let text;
     try {
@@ -55,29 +61,34 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
       else if (source.type === 'photo') {
         let image = null;
         if (a.mode === 'server') { try { image = await photoImage(sample); } catch { image = null; } }
-        r = await a.llm.readImage(sample, { fail, image });
+        let shown = '';
+        const onText = (piece) => { shown += piece; onStream(processId, shown); };
+        r = await a.llm.readImage(sample, { fail, image, onText, signal });
       }
       text = r ? r.text : source.text;
+      onStream(processId, null);
       setStep(processId, 'transcribe', {
+        thinking: '',
         status: 'done',
         detail: source.type === 'voice' ? `Speech adapter (${via(r, a)})` : source.type === 'photo' ? (readerLabel(r) ? stepDetail('', r, a) : `Photo read by LLM adapter (${via(r, a)})`) : 'Text message, nothing to transcribe',
       });
       updateMsg(processId, (m) => { m.transcript = text; if (r && r.notice) m.notice = r.notice; });
     } catch (e) {
-      setStep(processId, 'transcribe', { status: 'failed', detail: e.message });
+      onStream(processId, null);
+      setStep(processId, 'transcribe', { status: 'failed', thinking: '', detail: e.code === 'stopped' ? 'Stopped' : e.message });
       updateMsg(processId, (m) => { m.error = e.message; });
       return;
     }
     // Step 2: Extract
-    setStep(processId, 'extract', { status: 'running' });
+    setStep(processId, 'extract', { status: 'running', thinking: THINKING.extract, started_at: now() });
     await sleep(stepDelay());
     let result;
     try {
-      result = await a.llm.extractJob(text, { fail: false });
-      setStep(processId, 'extract', { status: 'done', detail: stepDetail('LLM adapter', result, a) });
+      result = await a.llm.extractJob(text, { fail: false, signal });
+      setStep(processId, 'extract', { status: 'done', thinking: '', detail: stepDetail('LLM adapter', result, a) });
       if (result && result.notice) updateMsg(processId, (m) => { m.notice = result.notice; });
     } catch (e) {
-      setStep(processId, 'extract', { status: 'failed', detail: e.message });
+      setStep(processId, 'extract', { status: 'failed', thinking: '', detail: e.code === 'stopped' ? 'Stopped' : e.message });
       updateMsg(processId, (m) => { m.error = e.message; });
       return;
     }
@@ -121,7 +132,14 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
       await process(source, processId);
     } finally {
       busy = false;
+      stopper = null;
+      onIdle(); // CR-0010: redraw so Send and the samples work again (the last redraw happened while busy)
     }
+  }
+
+  /** Stop waiting for the AI (CR-0010). The technician's message stays, with Try again. */
+  function stop() {
+    if (stopper) stopper.abort();
   }
 
   async function retry(processId) {
@@ -130,10 +148,12 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
     if (!msg) return;
     busy = true;
     try {
-      updateMsg(processId, (m) => { m.error = ''; m.transcript = ''; m.notice = ''; m.steps.forEach((st) => { st.status = 'pending'; st.detail = ''; }); });
+      updateMsg(processId, (m) => { m.error = ''; m.transcript = ''; m.notice = ''; m.steps.forEach((st) => { st.status = 'pending'; st.detail = ''; st.thinking = ''; }); });
       await process(msg.source, processId);
     } finally {
       busy = false;
+      stopper = null;
+      onIdle(); // CR-0010: redraw so Send and the samples work again (the last redraw happened while busy)
     }
   }
 
@@ -305,5 +325,5 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
 
   const setSetting = (key, value) => store.update((s) => { s.settings[key] = value; });
 
-  return { send, retry, approve, createDocument, updateDocumentLine, sendReminder, transition, amcPlan, setSetting, reset: () => store.reset(), isBusy: () => busy };
+  return { send, retry, stop, approve, createDocument, updateDocumentLine, sendReminder, transition, amcPlan, setSetting, reset: () => store.reset(), isBusy: () => busy };
 }

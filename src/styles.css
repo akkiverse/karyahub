@@ -178,6 +178,13 @@ button, input { font: inherit; color: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .transcript { background: var(--c-paper); border-radius: 8px; padding: 8px 10px; font-size: 0.85rem; }
 .transcript .label { font-size: 0.72rem; font-weight: 700; color: var(--c-muted); }
+/* CR-0010: an AI step in progress: what it's doing, seconds so far, and Stop; photo text as it's read */
+.step-thinking { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; font-size: 0.85rem; color: var(--c-ink); }
+.ai-timer { font-variant-numeric: tabular-nums; color: var(--c-muted); min-width: 3.2em; }
+.btn-stop { gap: 4px; }
+.transcript.is-streaming p { white-space: pre-wrap; }
+.transcript.is-streaming p::after { content: "▍"; margin-left: 1px; color: var(--c-brand); animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
 .step-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--c-lapsed-soft); color: var(--c-lapsed); border-radius: 8px; padding: 8px 10px; font-weight: 600; font-size: 0.9rem; }
 .summary-fields { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
 .summary-fields div { min-width: 0; }

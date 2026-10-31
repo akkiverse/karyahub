@@ -20,6 +20,9 @@ import { admin, denied } from './views/admin.js';
 import { businesses } from './views/businesses.js';
 import { account } from './views/account.js';
 import { jobsheetImage } from './data/jobsheet.js';
+import { createSync } from './sync.js';
+import { syncChip, syncBanner } from './views/syncstatus.js';
+import { resizeLogo } from './data/logo.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
 // [route, label, href, icon, section, on the phone tab bar]
@@ -84,7 +87,17 @@ export function mountApp(root, options = {}) {
     const s = session.get();
     return s ? { ...s.user, permissions: s.permissions, business: s.business } : null;
   };
-  const actions = createActions({ store, getAdapters, stepDelay, api, currentUser: meOf, photoImage: options.photoImage || jobsheetImage });
+  // Business data on the server (CR-0009): the queue of changes and the on-device copy. Real businesses only.
+  const sync = options.sync || createSync({
+    store, api, win, storage: win.localStorage,
+    debounceMs: options.syncDelay ?? 300, pollMs: options.syncPoll ?? 30000, ...(options.syncRetry ? { retryMs: options.syncRetry } : {}),
+    onChange: () => paintSync(),
+  });
+  const actions = createActions({
+    store, getAdapters, stepDelay, api, currentUser: meOf, photoImage: options.photoImage || jobsheetImage,
+    ensureSynced: async (jobId) => (sync.status().active ? sync.flushFor('job', jobId) : true),
+  });
+  const logoImage = options.logoImage || resizeLogo;
   const ui = {
     boot: 'loading', auth: {}, authState: null, admin: {}, businesses: {}, account: {}, profile: {},
     renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
@@ -101,11 +114,23 @@ export function mountApp(root, options = {}) {
     ui.account = {};
     ui.profile = {};
     ui.meta = null;
+    if (me && me.signed_in && me.business && !me.business.is_demo && !me.user.must_change_pin) sync.start(me.business);
+    else sync.stop();
+  }
+  /** Update the sync mark and banner in place, so a background update never wipes what someone is typing. */
+  function paintSync() {
+    if (!alive) return;
+    const st = sync.status();
+    const chip = root.querySelector('[data-slot="sync-chip"]');
+    const banner = root.querySelector('[data-slot="sync-banner"]');
+    if (chip) chip.innerHTML = syncChip(st);
+    if (banner) banner.innerHTML = syncBanner(st);
   }
   async function loadAuthState() {
     try { ui.authState = await api.authState(); } catch { ui.authState = { needs_setup: false, demo_accounts: [] }; }
   }
   async function endSession(notice) {
+    sync.stop();
     session.end();
     store.close();
     ui.admin = {}; ui.businesses = {}; ui.profile = {}; ui.account = {}; ui.meta = null;
@@ -199,6 +224,7 @@ export function mountApp(root, options = {}) {
         <span class="topbar-biz"><strong>${escapeHtml(biz)}</strong></span>
         <span class="topbar-right">
           ${demo ? `<span class="demo-pill" title="All data is dummy demo data">Demo · ${prettyDate(today())}</span>` : ''}
+          <span data-slot="sync-chip">${syncChip(sync.status())}</span>
           <details class="account" data-testid="account-menu">
             <summary aria-label="Account: ${escapeHtml(me.name)}, ${escapeHtml(roleName(me.role))}"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><span class="account-name">${escapeHtml(me.name.split(' ')[0])}</span></summary>
             <div class="account-menu">
@@ -218,7 +244,7 @@ export function mountApp(root, options = {}) {
         <div class="nav-user"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><span class="nav-user-main"><strong>${escapeHtml(me.name)}</strong><span class="muted small">${escapeHtml(roleName(me.role))}</span></span><button type="button" class="icon-btn" data-action="sign-out" aria-label="Sign out" title="Sign out">${icon('logout', { size: 18 })}</button></div>
       </nav>
       <nav class="bottom-tabs" aria-label="Main (phone)">${allowed.filter((n) => n[5]).map(link).join('')}</nav>
-      <main id="main" class="main">${html}
+      <main id="main" class="main"><div data-slot="sync-banner">${syncBanner(sync.status())}</div>${html}
         <footer class="site-foot no-print"><a href="${HUB_URL}">Part of Idea Studio by AkkiVerse</a>${demo ? '<span>Sample data only. No real messages are sent.</span>' : ''}</footer>
       </main>
     </div>`;
@@ -283,7 +309,18 @@ export function mountApp(root, options = {}) {
   const routeKey = (r) => `${r.name}:${(r.params && r.params.id) || ''}`;
   const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.toast = null; ui.sheet = null; ui.wfNote = null; render(); loadForRoute(); };
   win.addEventListener('hashchange', onHash);
-  const unsub = store.subscribe(() => { applyTheme(); render(); });
+  // Something that arrived from the server must not redraw the page under a finger that is typing.
+  let renderWhenDone = false;
+  const typing = () => {
+    const a = root.ownerDocument.activeElement;
+    return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && a.closest('form'));
+  };
+  const unsub = store.subscribe((st, meta) => {
+    applyTheme();
+    if (meta && meta.remote && typing()) { renderWhenDone = true; return; }
+    render();
+  });
+  root.addEventListener('focusout', () => { if (renderWhenDone) setTimeout(() => { renderWhenDone = false; if (!typing()) render(); else renderWhenDone = true; }, 0); });
 
   const focus = (sel) => root.querySelector(sel)?.focus();
   const setNotice = (target, text, error = false) => { target.notice = { text, error }; };
@@ -292,7 +329,7 @@ export function mountApp(root, options = {}) {
     const el = e.target.closest('[data-action]');
     if (!el || !root.contains(el)) return;
     const a = el.dataset.action;
-    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role', 'member-permission', 'role-permission', 'pick-csv'].includes(a)) return; // handled on change
+    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role', 'member-permission', 'role-permission', 'pick-csv', 'pick-logo'].includes(a)) return; // handled on change
     if (a !== 'download') e.preventDefault();
     if (a === 'use-demo') {
       ui.auth = { phone: el.dataset.phone, pin: el.dataset.pin };
@@ -308,6 +345,27 @@ export function mountApp(root, options = {}) {
       return;
     }
     if (a === 'retry-boot') { boot(); return; }
+    if (a === 'dismiss-sync-notice') { sync.dismissNotice(); return; }
+    if (a === 'dismiss-sync-rejected') { sync.dismissRejected(); return; }
+    if (a === 'goto-add-person') {
+      // A link to "#admin-add" would be read as a page address and sent Home; scroll to the form instead.
+      const section = root.querySelector('#admin-add');
+      section?.scrollIntoView?.({ block: 'start', behavior: win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      root.querySelector('#admin-add input[name="name"]')?.focus({ preventScroll: true });
+      return;
+    }
+    if (a === 'remove-logo') {
+      if (el.disabled) return;
+      el.disabled = true;
+      try {
+        const saved = await api.removeLogo();
+        session.set({ ...session.get(), business: saved });
+        ui.profile = { notice: { text: 'The logo is removed.' } };
+      } catch (err) { ui.profile = { notice: { text: msg(err), error: true } }; }
+      ui.focusNext = '[data-testid="profile-notice"]';
+      render();
+      return;
+    }
     if (a === 'sign-out') {
       try { await api.signOut(); } catch { /* the cookie ends on its own after 12 hours */ }
       await endSession('You have signed out.');
@@ -575,7 +633,17 @@ export function mountApp(root, options = {}) {
     else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
     else if (a === 'set-theme') actions.setSetting('theme', el.value);
     else if (a === 'toggle-failure') actions.setSetting('simulate_failure', el.checked);
-    else if (a === 'pick-csv') {
+    else if (a === 'pick-logo') {
+      const file = el.files && el.files[0];
+      if (!file) return;
+      try {
+        const saved = await api.saveLogo(await logoImage(file));
+        session.set({ ...session.get(), business: saved });
+        ui.profile = { notice: { text: 'Saved. The logo now shows on your quotes and invoices.' } };
+      } catch (err) { ui.profile = { notice: { text: err && err.message ? msg(err) : "That picture couldn't be used. Choose a PNG, JPEG or WebP.", error: true } }; }
+      ui.focusNext = '[data-testid="profile-notice"]';
+      render();
+    } else if (a === 'pick-csv') {
       const file = el.files && el.files[0];
       if (!file) return;
       const text = await file.text();
@@ -623,6 +691,7 @@ export function mountApp(root, options = {}) {
 
   return {
     store, actions, session, ui, navigate, render, ready,
-    unmount() { alive = false; win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
+    sync,
+    unmount() { alive = false; sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
   };
 }

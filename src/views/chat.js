@@ -2,7 +2,8 @@ import { icon } from '../ui/icons.js';
 import { escapeHtml, rupees, prettyDate, prettyPhone, duration } from '../format.js';
 import { SAMPLES } from '../data/demo.js';
 import { JOBSHEET_SVG } from '../data/jobsheet.js';
-import { docTitle } from '../domain/documents.js';
+import { docLabel } from '../domain/documents.js';
+import { jobRef } from '../ids.js';
 
 const FIELDS = [
   ['customer_name', 'Customer', 'text'],
@@ -48,7 +49,7 @@ function processCard(m) {
   </div>`;
 }
 
-function summaryCard(m, ui) {
+function summaryCard(m, ui, state) {
   const editing = ui.editingCard === m.id && m.status === 'draft';
   const errs = (ui.cardErrors && ui.cardErrors[m.id]) || {};
   const lines = (m.job.lines || []).filter((l) => Number(l.rate) > 0);
@@ -68,7 +69,7 @@ function summaryCard(m, ui) {
     ${linesHtml}
     ${m.status === 'draft'
       ? `<div class="card-actions"><button type="button" class="btn btn-ghost" data-action="edit-card" data-id="${m.id}">${icon('pencil', { size: 16 })} Edit</button><button type="button" class="btn btn-primary" data-action="approve" data-id="${m.id}" data-testid="approve">${icon('check', { size: 18 })} Approve</button></div>`
-      : `<div class="card-actions"><a class="btn btn-ghost" href="#/jobs/${m.job_id}">Open job ${m.job_id} ${icon('arrowRight', { size: 16 })}</a></div>`}
+      : `<div class="card-actions"><a class="btn btn-ghost" href="#/jobs/${m.job_id}">Open job${jobRef(state, m.job_id) === 'New' ? '' : ` ${jobRef(state, m.job_id)}`} ${icon('arrowRight', { size: 16 })}</a></div>`}
   </div>`;
 }
 
@@ -76,7 +77,7 @@ function documentBubble(m, state) {
   const d = state.documents.find((x) => x.id === m.doc_id);
   return `<a class="doc-attach" href="#/doc/${escapeHtml(m.doc_id)}" data-testid="doc-attachment">
       <span class="doc-icon">${icon('file', { size: 22 })}</span>
-      <span><strong>${d ? `${docTitle(d.type)} ${d.id}` : escapeHtml(m.doc_id)}</strong><small>${d ? `${rupees(d.total)} · PDF · simulated` : 'PDF · simulated'}</small></span>
+      <span><strong>${d ? docLabel(d) : escapeHtml(m.doc_id)}</strong><small>${d ? `${rupees(d.total)} · PDF · simulated` : 'PDF · simulated'}</small></span>
     </a>
     <p class="bubble-text" data-testid="doc-sent">${escapeHtml(m.body)}</p>
     <p class="sim-note">Simulated: nothing was sent.</p>`;
@@ -88,9 +89,9 @@ function message(m, state, ui) {
   if (m.kind === 'voice') body = voiceBubble(m, ui);
   else if (m.kind === 'image') body = `<figure class="photo" data-testid="image-bubble">${JOBSHEET_SVG}<figcaption>${escapeHtml(m.body)}</figcaption></figure>`;
   else if (m.kind === 'process') body = processCard(m);
-  else if (m.kind === 'card') body = summaryCard(m, ui);
+  else if (m.kind === 'card') body = summaryCard(m, ui, state);
   else if (m.kind === 'document') body = documentBubble(m, state);
-  else body = `<p class="bubble-text">${escapeHtml(m.body)}</p>${m.job_id ? `<a class="inline-link" href="#/jobs/${m.job_id}">Open ${m.job_id}</a>` : ''}`;
+  else body = `<p class="bubble-text">${escapeHtml(m.body)}</p>${m.job_id ? `<a class="inline-link" href="#/jobs/${m.job_id}">Open ${jobRef(state, m.job_id) === 'New' ? 'the job' : jobRef(state, m.job_id)}</a>` : ''}`;
   const wide = m.kind === 'process' || m.kind === 'card';
   return `<li class="msg ${out ? 'out' : 'in'} kind-${m.kind} ${wide ? 'wide' : ''}" data-from="${m.from}" data-kind="${m.kind}">
     <div class="bubble">${out && m.author ? `<span class="author">${escapeHtml(m.author)}</span>` : ''}${body}<span class="meta">${time(m.at)}${out ? ` ${icon('checks', { size: 14 })}` : ''}</span></div>

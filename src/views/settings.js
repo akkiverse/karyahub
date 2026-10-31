@@ -23,7 +23,16 @@ function serviceRows(mode, meta) {
   }).join('');
 }
 
-function profileForm(s, ui, locked) {
+function logoBlock(me) {
+  const version = me && me.business && me.business.logo_version;
+  return `<div class="logo-field" data-testid="logo-field">
+    <span class="logo-label">Logo</span>
+    ${version ? `<img class="logo-preview" data-testid="logo-preview" alt="Your logo" src="/api/v1/business/logo?v=${escapeHtml(version)}">` : '<span class="muted small">No logo yet. It shows on your quotes and invoices.</span>'}
+    <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${version ? 'Replace logo' : 'Add a logo'}<input class="sr-only" type="file" name="logo" accept="image/png,image/jpeg,image/webp" data-action="pick-logo"></label>${version ? `<button type="button" class="btn btn-ghost btn-small" data-action="remove-logo">Remove logo</button>` : ''}</div>
+  </div>`;
+}
+
+function profileForm(s, ui, locked, me) {
   const f = ui.profile || {};
   return `<section class="panel" aria-labelledby="profile-title">
     <div class="panel-head"><h2 class="panel-title" id="profile-title">Business details</h2></div>
@@ -35,10 +44,11 @@ function profileForm(s, ui, locked) {
       <label class="field"><span>GSTIN</span><input name="gstin" maxlength="15" value="${escapeHtml(f.gstin ?? s.gstin)}" ${locked ? 'disabled' : ''}></label>
       ${locked ? '<p class="muted small">The demo business\'s details can\'t be changed.</p>' : `<button type="submit" class="btn btn-primary">${icon('check', { size: 18 })} Save details</button>`}
     </form>
+    ${locked ? '' : logoBlock(me)}
   </section>`;
 }
 
-export function settings({ state, ui }) {
+export function settings({ state, ui, me }) {
   const s = state.settings;
   const demo = Boolean(s.is_demo);
   const mode = ['server', 'mock', 'live'].includes(s.mode) ? s.mode : 'server';
@@ -53,7 +63,7 @@ export function settings({ state, ui }) {
     </fieldset>`;
   return `<section class="page">
     <header class="page-head"><h1 id="page-title" tabindex="-1">Settings</h1></header>
-    ${profileForm(s, ui, demo)}
+    ${profileForm(s, ui, demo, me)}
     ${demo ? `<div class="mode-banner ${mode === 'live' ? 'is-live' : ''}" data-testid="mode-banner">${icon(mode === 'server' ? 'server' : 'plug')}<div><strong>${title}</strong><p>${text}</p></div></div>` : ''}
     ${serverLine}
     <h2 class="section-title">Services</h2>

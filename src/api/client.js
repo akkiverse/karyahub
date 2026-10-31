@@ -4,6 +4,7 @@ import { isAiOffline } from '../ui/ai-status.js';
 
 // Reading with Studio AI (CR-0004) can take a while on the founder's own AI server.
 export const AI_TIMEOUT_MS = 60000;
+export const SYNC_TIMEOUT_MS = 30000; // a batch of queued changes over a weak signal
 export const BOOT_TIMEOUT_MS = 30000; // opening the app and signing in: a sleeping server and database may need a while
 
 export class ApiError extends Error {
@@ -88,6 +89,12 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     rolePermissions: (role, permissions) => put(`/team/roles/${encodeURIComponent(role)}/permissions`, { permissions }),
     audit: () => call('GET', '/team/audit'),
     saveBusinessProfile: (fields) => put('/business/profile', fields),
+    saveLogo: (dataUrl) => put('/business/logo', { data_url: dataUrl }),
+    removeLogo: () => call('DELETE', '/business/logo'),
+
+    // Business data (CR-0009): one call sends the queued changes and brings back what changed on the server.
+    sync: (since, ops) => call('POST', '/sync', { since, ops }, { timeout: SYNC_TIMEOUT_MS }),
+    importDevice: (payload) => call('POST', '/import', payload, { timeout: SYNC_TIMEOUT_MS }),
 
     // Businesses (platform admin)
     businesses: () => call('GET', '/platform/businesses'),

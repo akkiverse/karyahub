@@ -87,7 +87,7 @@ def test_ac_17_2_ai_reads_the_job_with_a_json_schema(client, ai):
     assert job["amc_value"] == 4800
     assert job["lines"] == [{"description": "Gas refill, Daikin 1T split AC", "qty": 1, "rate": 2200}]
     sent = fake.requests[0]
-    assert sent["body"]["model"] == "qwen3.5:9b"
+    assert sent["body"]["model"] == "gemma4:e4b"  # kit v2 default (CR-0010)
     assert sent["body"]["options"]["temperature"] == 0
     assert sent["body"]["format"]["required"][0] == "customer_name"
     assert "Anil Kumar ji Baner" in sent["body"]["messages"][-1]["content"]

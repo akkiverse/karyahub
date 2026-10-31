@@ -13,6 +13,9 @@ AI_ENV = [
     "AI_API",
     "AI_TIMEOUT",
     "AI_CONTEXT",
+    "AI_MODEL_VISION",
+    "AI_MODEL_FALLBACK",
+    "KARYAHUB_AI_STEP_SECONDS",
 ]
 
 
@@ -23,8 +26,12 @@ def no_real_ai(monkeypatch):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(studio_ai, "TRANSPORT", None)
     studio_ai._down_until.clear()
+    studio_ai._model_on.clear()
+    studio_ai._warmed.clear()
     yield
     studio_ai._down_until.clear()
+    studio_ai._model_on.clear()
+    studio_ai._warmed.clear()
 
 
 DB_ENV = [

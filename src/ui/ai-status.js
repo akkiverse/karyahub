@@ -84,3 +84,41 @@ export async function isAiOffline(response, opts = {}) {
   }
   return false;
 }
+
+/**
+ * A "Thinking… 12 s" note with a Stop button, for while a person waits for an AI answer (kit v2).
+ *
+ *   const ctrl = new AbortController();
+ *   const t = showThinking(document.querySelector("#answer"), { label: "Reading the job sheet…", onStop: () => ctrl.abort() });
+ *   try { await fetch(url, { signal: ctrl.signal, ... }) } finally { t.done(); }
+ *
+ * Words streamed in can go to t.text(piece). Returns { text(piece), setLabel(label), seconds(), done() }.
+ */
+export function showThinking(mount, opts = {}) {
+  const box = document.createElement("div");
+  box.className = "studio-ai-thinking";
+  box.setAttribute("role", "status");
+  box.setAttribute("aria-live", "polite");
+  box.innerHTML =
+    '<span class="studio-ai-thinking-label"></span> <span class="studio-ai-thinking-time" aria-hidden="true"></span> ' +
+    '<button type="button" class="studio-ai-thinking-stop">Stop</button><div class="studio-ai-thinking-text"></div>';
+  const label = box.querySelector(".studio-ai-thinking-label");
+  const time = box.querySelector(".studio-ai-thinking-time");
+  const out = box.querySelector(".studio-ai-thinking-text");
+  const stop = box.querySelector("button");
+  const started = Date.now();
+  const seconds = () => Math.floor((Date.now() - started) / 1000);
+  label.textContent = opts.label || "Thinking…";
+  const tick = () => { time.textContent = `${seconds()} s`; };
+  tick();
+  const timer = setInterval(tick, 1000);
+  if (opts.onStop) stop.addEventListener("click", () => opts.onStop());
+  else stop.hidden = true;
+  mount.append(box);
+  return {
+    text(piece) { out.textContent += piece; },
+    setLabel(text) { label.textContent = text; },
+    seconds,
+    done() { clearInterval(timer); box.remove(); },
+  };
+}

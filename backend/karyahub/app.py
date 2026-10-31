@@ -1,5 +1,6 @@
 """KaryaHub API (FastAPI). All routes live under /api; the web app calls /api/v1/*."""
 
+import asyncio
 import json
 import logging
 import time
@@ -7,7 +8,7 @@ from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -27,6 +28,22 @@ from karyahub.settings import Settings, get_settings
 from karyahub.whatsapp import webhook
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+
+def _log_ai_calls() -> None:
+    """Send the AI kit's line per call (model, server, outcome, seconds) to the runtime logs (CR-0010)."""
+    kit_log = logging.getLogger("studio_ai")
+    kit_log.setLevel(logging.INFO)
+    if not any(getattr(h, "_karyahub", False) for h in kit_log.handlers):
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        handler._karyahub = True  # type: ignore[attr-defined]
+        kit_log.addHandler(handler)
+
+
+async def _one_line(result: dict[str, Any]):
+    """The non-streaming answer as the single final line of the stream format (mock and live adapters)."""
+    yield json.dumps({"done": True, **result}, ensure_ascii=False) + "\n"
 
 
 async def database_status(settings: Settings) -> tuple[str, dict[str, int]]:
@@ -137,6 +154,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
     install_error_handlers(app)
+    _log_ai_calls()
     studio_ai.install(app)  # /api/ai/status and friendly "AI is offline" errors (CR-0004)
     api = APIRouter(prefix="/api")
     v1 = APIRouter(prefix="/api/v1")
@@ -204,6 +222,29 @@ def create_app() -> FastAPI:
         return TextResult(
             text=r["text"], adapter=a.mode, reader=r.get("reader", ""), notice=r.get("notice", "")
         )
+
+    @v1.post("/pipeline/read-image/stream", dependencies=[Depends(require("use_chat"))])
+    async def read_image_stream(req: ImageRequest, a: AdaptersDep) -> StreamingResponse:
+        """The photo's text as it's read, as lines of JSON (CR-0010). See StudioAiLlm.stream_image."""
+        if req.simulate_failure or not hasattr(a.llm, "stream_image"):
+            r = await a.llm.read_image(req.media_id, image_b64=req.image_base64, fail=req.simulate_failure)
+            body = {"text": r["text"], "reader": r.get("reader", ""), "notice": r.get("notice", "")}
+            lines = _one_line(body)
+        else:
+            lines = await a.llm.stream_image(req.media_id, image_b64=req.image_base64)
+        return StreamingResponse(
+            lines,
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        )
+
+    @v1.post("/ai/warm", dependencies=[Depends(require("use_chat"))])
+    async def warm_ai() -> dict[str, Any]:
+        """Load the AI models without answering, when Chat opens (CR-0010). Never fails; once a minute."""
+        if not studio_ai.configured():
+            return {"configured": False, "everyday": None, "photos": None}
+        everyday, photos = await asyncio.gather(studio_ai.warm_up(), studio_ai.warm_up(vision=True))
+        return {"configured": True, "everyday": everyday, "photos": photos}
 
     @v1.post("/pipeline/extract", dependencies=[Depends(require("use_chat"))])
     async def extract(req: TextRequest, a: AdaptersDep) -> ExtractResult:

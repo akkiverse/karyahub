@@ -1,6 +1,6 @@
 # KaryaHub: Architecture
 
-Last updated by CR-0005. Detail: [HLD.md](HLD.md) (high level), [LLD.md](LLD.md) (low level), [RISKS.md](RISKS.md), [REFERENCE-REVIEW.md](REFERENCE-REVIEW.md).
+Last updated by CR-0009. Detail: [HLD.md](HLD.md) (high level), [LLD.md](LLD.md) (low level), [RISKS.md](RISKS.md), [REFERENCE-REVIEW.md](REFERENCE-REVIEW.md).
 
 ## Context
 
@@ -103,7 +103,28 @@ flowchart LR
 - **Request path:** the cookie is looked up in `sessions`; the person, their business and their permissions (role table, then role switches, then personal switches) are loaded; each route names the permission it needs (`accounts/deps.py`); business data is always queried with the person's `business_id`.
 - **Roles:** `platform_admin` (businesses only, no business data), `owner`, `coordinator`, `technician`.
 - **Settings:** `DATABASE_URL` (or `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`), `KARYAHUB_PIN_PEPPER`, `KARYAHUB_BOOTSTRAP_TOKEN`. Without a database address the server uses a throwaway in-memory database for local runs and tests. `/api/health` shows `database`.
-- **Web app:** boots by asking `/auth/me`; keeps who is signed in in memory only; keeps each business's on-device data under its own key until jobs move to the server (CR-0007).
+- **Web app:** boots by asking `/auth/me`; keeps who is signed in in memory only; keeps each business's on-device copy under its own key (the demo business's copy is its only copy; a real business's copy is a cache of the server, see below).
+
+## Business data, sync and the wall between businesses (CR-0009)
+
+```mermaid
+flowchart LR
+  subgraph Phone
+    UI[Screens] --> ST[Store: on-device copy]
+    ST --> Q[Queue of changes with operation ids]
+  end
+  Q -->|"POST /api/v1/sync (up to 100 changes, cursor)"| SY[Sync service]
+  SY -->|"set_config app.business_id, SET LOCAL ROLE karyahub_app"| DB[(records, sync_ops, counters, device_imports: business_id + row-level security)]
+  SY -->|"what changed since the cursor"| ST
+  UI -->|"proof-of-work step"| TR[Transition route: loads and saves the job on the server]
+  TR --> DB
+```
+
+- **Tables (migration 0002):** `records` (one row per customer, job, document or chat message; JSON body), `sync_ops` (every applied operation id), `counters` (per-business change cursor and number counters), `device_imports` (one row per phone that moved its old data). `businesses` gains a deferred `logo_data` and `logo_version`.
+- **Request path:** the signed-in person's business id (never a value from the request) is set on the transaction before any record is touched; on Postgres the transaction also switches to the restricted role so the row-level security policy binds.
+- **Sync:** the phone sends `{device_id, since, ops}`; the server applies each op once (checked against `sync_ops`), gives new jobs and documents numbers, and returns the changes after `since` for the kinds the person may read. Job `state`, `events` and `otp` are changed only by the transition route.
+- **Phone:** `src/sync.js` watches the store, queues a change per edited item (coalescing edits to the same item that has not been sent), persists the queue, sends it when online with growing waits, applies what comes back without re-queuing it, and shows how many changes wait.
+- **Demo business:** no sync; its data stays on the device and the server refuses.
 
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.

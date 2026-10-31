@@ -6,11 +6,12 @@ import { mockWhatsApp } from '../src/adapters/whatsapp.js';
 import { ApiError, ApiUnreachable } from '../src/api/client.js';
 import { SAMPLES } from '../src/data/demo.js';
 import { fakeAccounts } from './fake-accounts.js';
+import { fakeSync } from './fake-sync.js';
 
 const NEXT = { request_otp: 'WORK_DONE', verify_otp: 'VERIFIED', close: 'CLOSED' };
 const FROM = { request_otp: ['WORK_DONE'], verify_otp: ['WORK_DONE'], close: ['VERIFIED'] };
 
-export function fakeApi({ unreachable = false, code = '123456', accounts: accountOptions } = {}) {
+export function fakeApi({ unreachable = false, code = '123456', accounts: accountOptions, sync: syncOptions } = {}) {
   const calls = [];
   const rec = (name, args, fn) => {
     calls.push({ name, args });
@@ -21,6 +22,7 @@ export function fakeApi({ unreachable = false, code = '123456', accounts: accoun
   const accounts = fakeAccounts(accountOptions);
   return {
     ...accounts,
+    ...fakeSync(syncOptions),
     calls,
     accountCalls: accounts.calls,
     meta: () => rec('meta', [], async () => ({

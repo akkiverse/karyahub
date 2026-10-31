@@ -16,6 +16,7 @@ KaryaHub is a portal for AMC (annual maintenance contract) service firms such as
 | Stage | Live: v0.4.3 at https://karyahub-akkiverse.vercel.app |
 | Acceptance tests | 170 of 170 passing in v0.4.3 ([report](docs/quality/TEST-REPORT.md)) |
 | Latest release | [CR-0008](docs/changes/CR-0008-ai-over-a-slow-link.md): AI over a slow link (v0.4.3). Before that, [CR-0007](docs/changes/CR-0007-faster-sign-in.md): faster sign-in (v0.4.2). Before that, [CR-0006](docs/changes/CR-0006-clear-feedback-while-saving.md): clear feedback while saving (v0.4.1). Before that, [CR-0005](docs/changes/CR-0005-accounts-and-businesses.md): accounts and businesses on the server (mobile-and-PIN sign-in, platform admin, owners' team and access, forgot-PIN codes, real-business look) (v0.4.0). Before that, [CR-0004](docs/changes/CR-0004-real-ai-studio-ai.md): real AI for job notes and photos through Studio AI, with a labelled "Read without AI" fallback (v0.3.0). Before that, [CR-0003](docs/changes/CR-0003-business-look-admin-and-staff-logins.md): business look, Admin panel and staff logins (released in v0.2.0 with [CR-0002](docs/changes/CR-0002-advance-tech.md): KaryaHub server, WhatsApp webhook, proof of work, AMC visit plans) |
+| In review | [CR-0009](docs/changes/CR-0009-business-data-on-server.md): business data on the server (planned v0.5.0). Plan and rules: [docs/plan/ROADMAP.md](docs/plan/ROADMAP.md) |
 | Demo sign-in | Owner 99000 00201 / PIN 2468 · Coordinator 99000 00202 / 1357 · Technicians 99000 00203 / 8642 and 99000 00204 / 9753 (sample accounts) |
 
 ## Stack

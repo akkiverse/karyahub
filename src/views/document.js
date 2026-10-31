@@ -1,16 +1,17 @@
 import { icon } from '../ui/icons.js';
 import { escapeHtml, rupees, rupeesExact, prettyDate, prettyPhone } from '../format.js';
 import { docTitle, lineIsValid } from '../domain/documents.js';
+import { refOf, jobRef } from '../ids.js';
 
 export const WATERMARK = 'DEMO, not a valid tax invoice';
 
-export function documentView({ state, params, ui }) {
+export function documentView({ state, params, ui, me }) {
   const d = state.documents.find((x) => x.id === params.id);
   if (!d) return `<section class="page"><h1 id="page-title" tabindex="-1">Document not found</h1><p>It may no longer be on this device.</p><a class="btn btn-ghost" href="#/jobs">Back to Jobs</a></section>`;
   const s = state.settings;
   return `<section class="page doc-page">
     <div class="doc-toolbar no-print">
-      <a class="back" href="#/jobs/${d.job_id}">${icon('arrowLeft', { size: 18 })} Job ${d.job_id}</a>
+      <a class="back" href="#/jobs/${d.job_id}">${icon('arrowLeft', { size: 18 })} Job ${jobRef(state, d.job_id)}</a>
       <button type="button" class="btn btn-primary" data-action="download" data-testid="download">${icon('download', { size: 18 })} Download</button>
     </div>
     ${ui.toast && ui.toast.where === 'doc' ? `<p class="notice no-print ${ui.toast.error ? 'notice-error' : ''}" role="status">${escapeHtml(ui.toast.text)}</p>` : ''}
@@ -18,13 +19,14 @@ export function documentView({ state, params, ui }) {
       ${s.is_demo ? `<div class="watermark" data-testid="watermark" aria-label="${WATERMARK}">${WATERMARK}</div>` : ''}
       <header class="doc-head">
         <div>
+          ${me && me.business && me.business.logo_version ? `<img class="doc-logo" data-testid="doc-logo" alt="" src="/api/v1/business/logo?v=${escapeHtml(me.business.logo_version)}">` : ''}
           <p class="doc-biz" data-testid="doc-business">${escapeHtml(s.business_name)}${s.is_demo ? ' <span class="demo-tag">demo</span>' : ''}</p>
           <p class="muted">${escapeHtml(s.address)}</p>
           <p class="muted">GSTIN <span data-testid="doc-gstin">${escapeHtml(s.gstin)}</span>${s.is_demo ? ' (dummy)' : ''}</p>
         </div>
         <div class="doc-meta">
           <h1 id="page-title" tabindex="-1">${docTitle(d.type)}</h1>
-          <p><strong>${d.id}</strong></p>
+          <p><strong data-testid="doc-number">${refOf(d)}</strong></p>
           <p class="muted">${prettyDate(d.date)}</p>
         </div>
       </header>

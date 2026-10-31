@@ -567,3 +567,22 @@ summary.demo-accounts-title { cursor: pointer; min-height: 44px; display: flex; 
 .start-step p { margin: 0 0 4px; }
 /* Results brought into view must land below the sticky header (CR-0006). */
 .panel-credentials, .notice, .field-error { scroll-margin-top: 88px; }
+
+/* ---- Business data on the server (CR-0009): sync mark, banner, logo ---- */
+.sync-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
+.sync-chip.is-saved { color: var(--c-muted); }
+.sync-chip.is-sending { color: var(--c-brand); background: var(--c-brand-soft); }
+.sync-chip.is-waiting, .sync-chip.is-offline { color: var(--c-soon); background: var(--c-surface); border-color: var(--c-soon); }
+.sync-chip.is-sending svg { animation: sync-spin 1.2s linear infinite; }
+@keyframes sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sync-chip.is-sending svg { animation: none; } }
+[data-slot="sync-banner"]:not(:empty) { display: grid; gap: 8px; margin-bottom: 12px; }
+[data-slot="sync-banner"] .notice { flex-wrap: wrap; }
+[data-slot="sync-banner"] ul { margin: 6px 0 6px 18px; font-weight: 400; }
+@media (max-width: 480px) { .sync-chip { padding: 4px 8px; gap: 4px; min-width: 0; } .sync-chip span { max-width: 6.6rem; overflow: hidden; text-overflow: ellipsis; } .topbar-right { min-width: 0; gap: 6px; } }
+.logo-field { display: grid; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--c-line); }
+.logo-label { font-weight: 600; }
+.logo-preview { max-width: 160px; max-height: 80px; object-fit: contain; border: 1px solid var(--c-line); border-radius: 8px; padding: 6px; background: #fff; }
+.logo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.logo-actions label:focus-within { outline: 3px solid var(--c-focus); outline-offset: 2px; }
+.doc-logo { max-width: 120px; max-height: 64px; object-fit: contain; display: block; margin-bottom: 6px; }

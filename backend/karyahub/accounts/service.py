@@ -739,6 +739,7 @@ def business_dict(b: Business) -> dict:
         "amc_lead_days": b.amc_lead_days,
         "is_demo": b.is_demo,
         "active": b.active,
+        "logo_version": b.logo_version or "",
     }
 
 

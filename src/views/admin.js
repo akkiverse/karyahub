@@ -59,7 +59,7 @@ export function admin({ ui, me }) {
   return `<section class="page page-wide">
     <header class="page-head page-head-row">
       <div><h1 id="page-title" tabindex="-1">Admin</h1><p class="muted">People, roles and access for ${escapeHtml(business)}.</p></div>
-      <a class="btn btn-secondary" href="#admin-add">${icon('user', { size: 18 })} Add a person</a>
+      <button type="button" class="btn btn-secondary" data-action="goto-add-person" data-testid="add-person-top">${icon('user', { size: 18 })} Add a person</button>
     </header>
     ${locked ? `<p class="notice" role="status" data-testid="demo-locked">This is the demo business, so its team can't be changed. A business of your own has full control of its team.</p>` : ''}
 

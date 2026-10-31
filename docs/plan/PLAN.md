@@ -26,4 +26,4 @@ Unchanged (ADR-0002, ADR-0005): plain JavaScript UI with Vite and Vitest; Python
 
 ## Risks
 - The AI server is one PC (RISKS R-18): covered by the labelled fallback and banner.
-- Slow answers: each AI call is limited to 40 seconds inside a 60-second function, so the fallback always has time to reply.
+- Slow answers: each AI call is limited to 90 seconds inside a 120-second function (CR-0010; was 40 in 60), so the fallback always has time to reply.

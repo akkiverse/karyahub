@@ -32,6 +32,7 @@ export function fakeApi({ unreachable = false, code = '123456', accounts: accoun
     transcribe: (id, fail) => rec('transcribe', [id, fail], () => wrapErr(mockSpeech.transcribe(SAMPLES.find((s) => s.id === id), { fail }))),
     readImage: (id, fail) => rec('readImage', [id, fail], () => wrapErr(mockLlm.readImage(SAMPLES.find((s) => s.id === id), { fail }))),
     extract: (text, fail) => rec('extract', [text, fail], () => wrapErr(mockLlm.extractJob(text, { fail }))),
+    warmAi: () => rec('warmAi', [], async () => ({ configured: false, everyday: null, photos: null })),
     send: (to, kind, body) => rec('send', [to, kind, body], () => wrapErr(mockWhatsApp.sendMessage({ to, kind, body }))),
     transition: (jobId, req) => rec('transition', [jobId, req], async () => {
       if (!(FROM[req.action] || []).includes(req.state)) throw new ApiError("You can't do that now.", { code: 'invalid_transition', status: 409 });

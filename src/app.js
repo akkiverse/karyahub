@@ -96,10 +96,18 @@ export function mountApp(root, options = {}) {
   const actions = createActions({
     store, getAdapters, stepDelay, api, currentUser: meOf, photoImage: options.photoImage || jobsheetImage,
     ensureSynced: async (jobId) => (sync.status().active ? sync.flushFor('job', jobId) : true),
+    // The photo's text as the AI reads it (CR-0010). Kept on screen only; the chat saves the finished text.
+    onStream: (id, text) => {
+      if (text == null) delete ui.streaming[id];
+      else ui.streaming[id] = text;
+      if (route.name === 'chat') render();
+    },
+    onIdle: () => { if (route.name === 'chat') render(); },
   });
   const logoImage = options.logoImage || resizeLogo;
   const ui = {
     boot: 'loading', auth: {}, authState: null, admin: {}, businesses: {}, account: {}, profile: {},
+    streaming: {}, warmedAt: 0,
     renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
   };
   let alive = true;
@@ -165,9 +173,19 @@ export function mountApp(root, options = {}) {
       try { ui.meta = { data: await api.meta() }; } catch (e) { ui.meta = { error: e.message }; }
       if (alive && route.name === 'settings') render();
     }
+    if (route.name === 'chat') warmAi(me);
     if (route.name === 'job') loadPlan(route.params.id);
     if (route.name === 'admin' && can(me, 'manage_team') && !ui.admin.data) loadAdmin();
     if (route.name === 'businesses' && can(me, 'manage_businesses') && !ui.businesses.list) loadBusinesses();
+  }
+  // Opening Chat asks the server to load the AI models now, so the first message doesn't wait for them (CR-0010).
+  // Quietly, at most every 5 minutes; nothing is shown if it fails.
+  const WARM_EVERY_MS = 5 * 60 * 1000;
+  function warmAi(me) {
+    if (store.get().settings.mode !== 'server' || !can(me, 'use_chat') || typeof api.warmAi !== 'function') return;
+    if (ui.warmedAt && Date.now() - ui.warmedAt < WARM_EVERY_MS) return;
+    ui.warmedAt = Date.now();
+    api.warmAi().catch(() => { ui.warmedAt = 0; });
   }
   async function loadAdmin(extra = {}) {
     if (extra.credentials && extra.credentials.length) ui.focusNext = '[data-testid="admin-credentials"]';
@@ -256,6 +274,15 @@ export function mountApp(root, options = {}) {
     return `<main id="main" class="auth-main">${(screens[ui.auth.screen] || signIn)(props)}</main>`;
   }
 
+  // "Reading the message… 12 s" (CR-0010): the seconds change without redrawing the page, so typing isn't disturbed.
+  function paintTimers() {
+    root.querySelectorAll('.ai-timer[data-started]').forEach((el) => {
+      const started = Number(el.dataset.started) || Date.now();
+      el.textContent = `${Math.max(0, Math.floor((Date.now() - started) / 1000))} s`;
+    });
+  }
+  const timerTick = win.setInterval ? win.setInterval(() => { if (alive && actions.isBusy()) paintTimers(); }, 1000) : null;
+
   function render() {
     if (!alive) return;
     const state = store.get();
@@ -276,6 +303,7 @@ export function mountApp(root, options = {}) {
       const html = canOpen(me, route.name) ? VIEWS[route.name](props) : denied({ me, routeName: TITLES[route.name] || route.name });
       root.innerHTML = shell(me, html);
     }
+    paintTimers();
     const t2 = root.querySelector('.thread');
     if (t2) t2.scrollTop = nearBottom || name !== lastRouteName ? t2.scrollHeight : oldTop;
     if (ui.focusNext) {
@@ -420,6 +448,7 @@ export function mountApp(root, options = {}) {
       const sample = SAMPLES.find((s) => s.id === el.dataset.sample);
       if (sample) await actions.send({ type: sample.kind, sample_id: sample.id });
     } else if (a === 'retry') await actions.retry(el.dataset.id);
+    else if (a === 'stop-ai') actions.stop();
     else if (a === 'edit-card') { ui.editingCard = el.dataset.id; render(); root.querySelector('[data-form="approve"] input')?.focus(); }
     else if (a === 'cancel-edit') { ui.editingCard = null; ui.cardErrors = {}; render(); }
     else if (a === 'approve') approve(el.dataset.id, {});
@@ -692,6 +721,6 @@ export function mountApp(root, options = {}) {
   return {
     store, actions, session, ui, navigate, render, ready,
     sync,
-    unmount() { alive = false; sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
+    unmount() { alive = false; if (timerTick) win.clearInterval(timerTick); sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
   };
 }

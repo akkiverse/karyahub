@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-10-31 · **Branch:** `cr/0009-business-data-on-server` (CR-0009) · **Result:** 209 of 209 tests passing, plus 1 that runs only against a real Postgres and also passed (110 server + 1 Postgres-only, 99 web), covering all 109 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 41 kB JS and 10 kB CSS gzipped)
+**Run:** 2026-11-01 · **Branch:** `cr/0010-smooth-ai-and-chat` (CR-0010) · **Result:** 231 of 231 tests passing (122 server + 1 Postgres-only test skipped without its database, 109 web), covering all 123 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
@@ -83,7 +83,7 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-16.1 | `tests/us16-look.test.js` › AC-16.1: Home shows a "Today at" row with jobs, waiting checks, renewals in 30 days with money, and paperwork, from the data | Pass |
 | AC-16.2 | `tests/us16-look.test.js` › AC-16.2: every signed-in screen shows the business and who is signed in, with Sign out | Pass |
 | AC-17.1 | `tests/api/test_us17_studio_ai.py::test_ac_17_1_without_ai_settings_the_demo_reader_is_used` (with no AI settings, messages are read by the bundled demo reader and nothing calls an AI server.) | Pass |
-| AC-17.2 | `tests/api/test_us17_studio_ai.py::test_ac_17_2_ai_reads_the_job_with_a_json_schema` (with AI set up, the report goes to qwen3.5:9b with the job schema at temperature 0, and the validated answer is the job.) | Pass |
+| AC-17.2 | `tests/api/test_us17_studio_ai.py::test_ac_17_2_ai_reads_the_job_with_a_json_schema` (with AI set up, the report goes to the everyday model, gemma4:e4b by default since CR-0010, with the job schema at temperature 0, and the validated answer is the job.) | Pass |
 | AC-17.3 | `tests/api/test_us17_studio_ai.py::test_ac_17_3_no_customer_name_keeps_the_ask_for_a_name_behaviour` (when the AI finds no customer name, the answer is found=false with customer_name missing.) | Pass |
 | AC-17.4 | `tests/api/test_us17_studio_ai.py::test_ac_17_4_ai_answers_are_validated_and_bad_ones_fall_back` (AI answers are untrusted: bad phone and date values are dropped, and an unusable answer falls back to the quick reader.) | Pass |
 | AC-17.5 | `tests/api/test_us17_studio_ai.py::test_ac_17_5_ai_reads_the_job_sheet_photo` (a photo sent with the request is read by the AI (image attached) and the text comes back labelled as AI.) | Pass |
@@ -231,6 +231,28 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-23.11 | `tests/api/test_us23_business_data.py::test_ac_23_11_a_logo_must_be_a_small_real_picture` (wrong type, broken text, a different file type inside, too big, or a link are all refused.) | Pass |
 | AC-23.11 | `tests/api/test_us23_business_data.py::test_ac_23_11_only_the_owner_changes_the_logo_and_the_demo_is_fixed` (a coordinator can't change the logo; the demo business's can't change either.) | Pass |
 | AC-23.12 | `tests/api/test_us23_business_data.py::test_ac_23_12_the_demo_business_never_syncs` (the demo owner gets a plain refusal; the demo's data stays on the device.) | Pass |
+| AC-24.1 | `tests/api/test_us24_smooth_ai.py::test_ac_24_1_health_shows_the_released_version` (health and meta show studio.json's version; the server's bundled copy matches.) | Pass |
+| AC-24.2 | `tests/api/test_us24_smooth_ai.py::test_ac_24_2_a_model_the_mac_lacks_is_not_offline` (AI_MODEL=qwen3.5:9b on a Mac without it: read by gemma4:e4b, not offline; the 404 is paid once.) | Pass |
+| AC-24.3 | `tests/api/test_us24_smooth_ai.py::test_ac_24_3_photos_use_the_vision_model` (notes and photos use gemma4:e4b; with AI_MODEL_VISION=qwen3-vl:8b photos use it.) | Pass |
+| AC-24.4 | `tests/api/test_us24_smooth_ai.py::test_ac_24_4_time_limits_fit_inside_the_server_function` (maxDuration 120; step 90 by default, settable, capped at 110.) | Pass |
+| AC-24.5 | `tests/api/test_us24_smooth_ai.py::test_ac_24_5_a_slow_answer_is_waited_for` (a slower answer within the limit is used.) | Pass |
+| AC-24.6 | `tests/api/test_us24_smooth_ai.py::test_ac_24_6_too_slow_falls_back_and_nothing_is_lost` (past the limit: quick reader with the offline note, details kept.) | Pass |
+| AC-24.7 | `tests/api/test_us24_smooth_ai.py::test_ac_24_7_opening_chat_warms_the_models` (both models loaded with an empty chat and keep_alive 30m; a second call within a minute is skipped.) | Pass |
+| AC-24.7 | `tests/api/test_us24_smooth_ai.py::test_ac_24_7_warming_never_fails_and_needs_sign_in` (not set up and offline answer calmly; signed out is refused.) | Pass |
+| AC-24.8 | `tests/api/test_us24_smooth_ai.py::test_ac_24_8_photo_text_streams_as_it_is_read` (pieces then a final line with reader ai; the AI got stream=true and the photo.) | Pass |
+| AC-24.8 | `tests/api/test_us24_smooth_ai.py::test_ac_24_8_streaming_falls_back_like_before` (offline: the sample's stored text labelled; an unknown photo ends with ai_unavailable.) | Pass |
+| AC-24.8 | `tests/api/test_us24_smooth_ai.py::test_ac_24_8_bad_photos_are_refused_before_streaming` (not a photo: 422 at once; simulated failure 422; no AI set up: demo text in one line.) | Pass |
+| AC-24.9 | `tests/api/test_us24_smooth_ai.py::test_ac_24_9_every_ai_call_is_logged_without_secrets` (log lines name the models, server and seconds; never the key, address or note.) | Pass |
+| AC-24.10 | `tests/us24-smooth-ai.test.js` › AC-24.10: opening Chat asks the server to load the AI models, once every few minutes, without showing anything | Pass |
+| AC-24.10 | `tests/us24-smooth-ai.test.js` › AC-24.10: people without Chat, and a failing warm-up, show nothing | Pass |
+| AC-24.11 | `tests/us24-smooth-ai.test.js` › AC-24.11: while the AI reads a message, Chat says what it is doing, counts the seconds and offers Stop | Pass |
+| AC-24.11 | `tests/us24-smooth-ai.test.js` › AC-24.11: Stop ends the wait, keeps the message with Try again, and Try again reads it | Pass |
+| AC-24.12 | `tests/us24-smooth-ai.test.js` › AC-24.12: a job-sheet photo shows its text as the AI reads it, then the finished transcript | Pass |
+| AC-24.12 | `tests/us24-smooth-ai.test.js` › AC-24.12: the sample photo still works with a server that has no stream (older server or in-browser mode) | Pass |
+| AC-24.13 | `tests/us24-smooth-ai.test.js` › AC-24.13: the API client reads the photo stream piece by piece and returns the final answer | Pass |
+| AC-24.13 | `tests/us24-smooth-ai.test.js` › AC-24.13: a stream that ends with an error, an unreachable server and Stop are told apart | Pass |
+| AC-24.13 | `tests/us24-smooth-ai.test.js` › AC-24.13: the app waits longer than the server's 90-second AI step before giving up | Pass |
+| AC-24.14 | `tests/us24-smooth-ai.test.js` › AC-24.14: after a message is read, Send works again for the next one (it stayed greyed out before) | Pass |
 
 ## Design checklist
 | Check | Result |
@@ -247,6 +269,15 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | Motion: one entrance moment plus action feedback | Yes: processing steps ticking to green; sheet rises; voice-note waveform while playing |
 
 ## Visual check
+**CR-0010:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database). `AI_ENDPOINTS` pointed at a local stand-in for the Mac's Ollama that has only `gemma4:e4b`, takes 4 s per JSON read and streams the photo text word by word. `AI_MODEL` was set to `qwen3.5:9b`, a model the stand-in lacks, to exercise the fallback. Playwright in Chromium at 375px light and dark and 1280px light:
+- Opening Chat sent one warm-up.
+- A typed note showed "Reading the message… 2 s" with Stop, then the draft card, and the message box and Send were on again.
+- A second note went straight through.
+- The job-sheet photo's text appeared word by word under "Reading…" with a cursor, then became the transcript.
+- Stop showed "Stopped. Your message is kept: press Try again to read it again." with Try again.
+
+The server log showed one line per AI call (`AI gemma4:e4b on Main server: answered in 4.0 s`, `AI stream gemma4:e4b … first word 0.3 s`). There were no console errors, and page width equals the viewport. No fixes were needed.
+
 **CR-0009:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database), driven by Playwright in Chromium at 375px and 1280px in light and dark (4 runs, 52 screenshots): sign in as a real business's owner on a fresh browser (the mark says "All saved"), a job typed in Chat and approved (shown as "New", then `J-0001` after the sync), the Jobs list on a second fresh browser showing the same jobs, the browser set offline and a second job approved (the mark says how many changes are waiting and the page stays within the screen), Settings with a logo added (preview, Replace and Remove), Admin with the Add a person button (pressing it stays on Admin and puts the cursor in the name box). Fixes made after looking: the Open link in a chat bubble showed the raw id of a not-yet-numbered job and widened the page on a phone (it now says "Open the job" until the server gives a number), and the sync mark was too wide on a phone and widened the top bar by 2 px (it is now narrower with an ellipsis). Nothing overflows sideways on any screen.
 
 **CR-0005:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database), driven by Playwright in Chromium at 375px and 1280px in light and dark (48 screenshots: sign-in with and without the demo accounts; a real business owner on Home, Chat, Jobs, Renewals, Admin, Settings and My account; the platform admin on Businesses; the demo owner on Home and Admin). No page errors, no console errors, no horizontal overflow. Before that, the same server was walked through with curl: create the platform admin, create a business, the temporary-PIN gate, CSV import with a bad row, isolation between businesses, and the read-only demo. Fixes made after looking: the platform admin's footer said "Sample data only" (it now shows only in the demo business); a real business's Home showed the sales story and a "Sample data" tag (now a "Get started" panel); the activity log showed a raw code for PIN changes and the role table still said "reset the demo" (both reworded); "1 people" and "1 row need fixing" grammar. Not run here: the real Neon database, which is checked on the Vercel preview through `/api/health`.
@@ -265,6 +296,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
+- v0.6.0 (planned): CR-0010 in review; 231 of 231 tests passing (122 server, 109 web), plus the Postgres-only test (skipped here).
 - v0.5.0 (planned): CR-0009 in review; 209 of 209 tests passing (110 server, 99 web), plus the Postgres-only test.
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.

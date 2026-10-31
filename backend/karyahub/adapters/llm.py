@@ -10,7 +10,10 @@ Three implementations:
 
 import base64
 import binascii
+import json
+import os
 import re
+from collections.abc import AsyncIterator
 from datetime import date
 from typing import Any
 
@@ -20,8 +23,21 @@ from karyahub import prompts, studio_ai
 from karyahub.domain.extraction import Extraction, JobDraft, Line, extract_job, sample_by_id
 from karyahub.errors import READ_FAILED, AppError, not_configured
 
-# Each AI call must finish well inside the 60-second Vercel function limit (vercel.json).
-AI_STEP_SECONDS = 40.0
+# Each AI call must finish inside the Vercel function limit (vercel.json maxDuration 120), with time left to
+# answer with the quick reader when it can't (CR-0010: was 40 s, which real reads on the old AI PC overran).
+DEFAULT_AI_STEP_SECONDS = 90.0
+FUNCTION_SECONDS = 120.0
+
+
+def ai_step_seconds() -> float:
+    """KARYAHUB_AI_STEP_SECONDS (default 90), never closer than 10 s to the function limit."""
+    try:
+        value = float(os.environ.get("KARYAHUB_AI_STEP_SECONDS", "") or DEFAULT_AI_STEP_SECONDS)
+    except ValueError:
+        value = DEFAULT_AI_STEP_SECONDS
+    return max(5.0, min(value, FUNCTION_SECONDS - 10))
+
+
 MAX_IMAGE_BYTES = 3_000_000
 
 OFFLINE_NOTICE = "AI is offline right now, so this was read without AI. Check the details before approving."
@@ -156,7 +172,7 @@ def _decode_image(image_b64: str) -> bytes:
 
 
 class StudioAiLlm:
-    """The founder's own AI server (qwen3.5:9b) through the Studio AI kit."""
+    """The founder's AI server through the Studio AI kit: AI_MODEL for notes, AI_MODEL_VISION for photos."""
 
     name = "studio-ai"
 
@@ -169,7 +185,7 @@ class StudioAiLlm:
         ]
         try:
             reply = await studio_ai.chat(
-                messages, json_schema=prompts.JOB_SCHEMA, temperature=0, timeout=AI_STEP_SECONDS
+                messages, json_schema=prompts.JOB_SCHEMA, temperature=0, timeout=ai_step_seconds()
             )
         except studio_ai.AIUnavailable:
             return _quick(text, OFFLINE_NOTICE)
@@ -198,7 +214,11 @@ class StudioAiLlm:
         ]
         try:
             reply = await studio_ai.chat(
-                messages, images=[studio_ai.image_b64(image)], temperature=0, timeout=AI_STEP_SECONDS
+                messages,
+                images=[studio_ai.image_b64(image)],
+                vision=True,
+                temperature=0,
+                timeout=ai_step_seconds(),
             )
         except studio_ai.AIUnavailable:
             if sample_text:
@@ -212,3 +232,57 @@ class StudioAiLlm:
         if not text:
             raise AppError("read_failed", PHOTO_UNREADABLE, 422)
         return {"text": text, "reader": "ai", "notice": ""}
+
+    async def stream_image(self, media_id: str, *, image_b64: str | None = None) -> AsyncIterator[str]:
+        """Read a job-sheet photo and stream it as lines of JSON (CR-0010): Chat shows the text as it comes.
+
+        Lines: {"text": "<words>"} while the AI writes, then one final line:
+        {"done": true, "text": "<all of it>", "reader": "ai"|"quick"|"demo", "notice": "..."}
+        or {"done": true, "error": {"code", "message"}}. A bad photo is refused before streaming starts (4xx).
+        """
+        sample = sample_by_id(media_id)
+        sample_text = sample["mock_transcript"] if sample and sample["kind"] == "photo" else ""
+        if not image_b64:
+            if not sample_text:
+                raise AppError("read_failed", READ_FAILED, 422)
+            image = None
+        else:
+            image = _decode_image(image_b64)  # raises before the stream starts
+
+        async def lines() -> AsyncIterator[str]:
+            def line(obj: dict[str, Any]) -> str:
+                return json.dumps(obj, ensure_ascii=False) + "\n"
+
+            if image is None:
+                yield line({"done": True, "text": sample_text, "reader": "demo", "notice": NO_IMAGE_NOTICE})
+                return
+            messages = [
+                {"role": "system", "content": prompts.READ_IMAGE_SYSTEM},
+                {"role": "user", "content": prompts.READ_IMAGE_USER},
+            ]
+            got: list[str] = []
+            try:
+                async for piece in studio_ai.stream_chat(
+                    messages,
+                    images=[studio_ai.image_b64(image)],
+                    vision=True,
+                    temperature=0,
+                    timeout=ai_step_seconds(),
+                ):
+                    got.append(piece)
+                    yield line({"text": piece})
+            except (studio_ai.AIUnavailable, studio_ai.AIError) as exc:
+                offline = isinstance(exc, studio_ai.AIUnavailable)
+                if sample_text:
+                    notice = OFFLINE_NOTICE if offline else UNREADABLE_NOTICE
+                    yield line({"done": True, "text": sample_text, "reader": "quick", "notice": notice})
+                else:
+                    yield line({"done": True, "error": {"code": exc.code, "message": exc.message}})
+                return
+            text = "".join(got).strip()[:4000]
+            if not text:
+                yield line({"done": True, "error": {"code": "read_failed", "message": PHOTO_UNREADABLE}})
+                return
+            yield line({"done": True, "text": text, "reader": "ai", "notice": ""})
+
+        return lines()

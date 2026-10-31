@@ -13,7 +13,7 @@ ADR-0004 put every outside service behind an adapter; the LLM adapter has only h
 - `extract_job` asks `qwen3.5:9b` with a JSON schema at temperature 0 and validates the answer with Pydantic plus explicit clean-up (phones, ISO dates, non-negative money, at most 20 lines). An empty customer name keeps the "I couldn't find a customer name" reply.
 - `read_image` sends the photo (JPEG, PNG or WebP, up to 3 MB) and asks for its text; the text is then extracted like any message.
 - If the AI server is offline (`AIUnavailable`) or its answer can't be used (`AIError`, failed validation), extraction falls back to the quick reader (bundled answers, then the heuristic parser) and labels the result `reader: "quick"` with a notice. A photo with no stored text answers `503 ai_unavailable`; the web app keeps the photo in the chat with Try again.
-- Each AI call gets 40 seconds and the Vercel function 60 seconds, so a fallback always answers before the platform cuts the request.
+- Each AI call gets 40 seconds and the Vercel function 60 seconds, so a fallback always answers before the platform cuts the request. (Changed by [ADR-0014](0014-smooth-ai-streaming-warm-up-and-time-budget.md): 90 s in 120 s.)
 - Prompts and the schema live in `prompts.py`; tests replace `studio_ai.TRANSPORT` with `httpx.MockTransport` and never call a real AI server.
 
 ## Options considered

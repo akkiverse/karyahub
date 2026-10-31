@@ -1,5 +1,8 @@
 """US-20: businesses and the platform admin (CR-0005). US-21: forgot PIN with a code."""
 
+import json
+from pathlib import Path
+
 import pytest
 from conftest import CSRF, sign_in
 from karyahub.db.engine import async_url
@@ -272,7 +275,10 @@ def test_a_real_database_needs_the_pin_secret(monkeypatch, make_client):
 def test_health_reports_the_database_without_secrets(client):
     """/api/health says whether the database answers, and never shows its address."""
     body = client.get("/api/health").json()
-    assert body["database"] == "memory" and body["version"] == "0.4.3"
+    assert (
+        body["database"] == "memory"
+        and body["version"] == json.loads(Path("studio.json").read_text())["version"]
+    )
     assert "postgres" not in str(body)
 
 

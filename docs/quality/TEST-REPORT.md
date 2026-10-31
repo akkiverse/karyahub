@@ -296,7 +296,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
-- v0.6.0 (planned): CR-0010 in review; 231 of 231 tests passing (122 server, 109 web), plus the Postgres-only test (skipped here).
+- v0.6.0 (2026-11-01): CR-0010 released; 231 of 231 tests passing (122 server, 109 web), plus the Postgres-only test (skipped here). Founder checked the preview: two notes in a row, Stop and Try again; AI reads took 0.8 to 4.4 s (runtime logs).
 - v0.5.0 (planned): CR-0009 in review; 209 of 209 tests passing (110 server, 99 web), plus the Postgres-only test.
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.

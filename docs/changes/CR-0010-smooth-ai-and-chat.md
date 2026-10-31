@@ -1,9 +1,9 @@
 # CR-0010: Chat works and AI is smooth
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (TASKS.md B2, 30 Oct 2026; and 31 Oct: "AI works in the hub, but KaryaHub Chat doesn't")
 - **Date:** 2026-11-01
-- **Release:** v0.6.0 (planned)
+- **Release:** v0.6.0 (2026-11-01, [PR #11](https://github.com/akkiverse/karyahub/pull/11))
 - **Pull request:** [#11](https://github.com/akkiverse/karyahub/pull/11)
 
 ## Why

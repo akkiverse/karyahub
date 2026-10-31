@@ -5,6 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- Business data on the server: a real firm's customers, jobs, quotes, invoices and chat are now kept in the database for that business only (with a second wall of Postgres row-level security), so every phone of the firm sees the same work. See [CR-0009](docs/changes/CR-0009-business-data-on-server.md) and [ADR-0013](docs/adr/0013-business-data-sync-and-row-level-security.md).
+- Works on a weak signal: changes are saved on the phone first, queued, shown as "waiting to send" and sent once when the signal returns, with no duplicates, even if the app is closed in between.
+- The first time a phone signs in to a real business, the jobs, customers, documents and chat already on it are moved to the server once.
+- Job and document numbers are given by the server per business, so two phones can never choose the same number.
+- The owner can add, replace or remove a logo in Settings; it shows on quotes and invoices.
+- `/api/health` reports `row_level_security`; `docs/plan/ROADMAP.md` holds the rules and the plan.
+
+### Fixed
+- The **Add a person** button at the top of Admin took you to Home. It now moves to the form and puts the cursor in the name box.
+
+### Changed
+- A proof-of-work step on a job of a real business is now saved on the server, which no longer trusts the job's state sent by the phone.
+
 ## [0.4.3] - 2026-10-30
 
 ### Fixed

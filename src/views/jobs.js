@@ -1,6 +1,7 @@
 import { icon } from '../ui/icons.js';
 import { escapeHtml, rupees, prettyDate, prettyPhone } from '../format.js';
-import { docTitle } from '../domain/documents.js';
+import { docLabel } from '../domain/documents.js';
+import { refOf } from '../ids.js';
 
 export function jobs({ state }) {
   return `<section class="page">
@@ -9,7 +10,7 @@ export function jobs({ state }) {
       ? `<ul class="list" data-testid="jobs-list">${state.jobs
           .map((j) => `<li class="row-card" data-job="${j.id}"><a href="#/jobs/${j.id}" class="row-link">
             <span class="row-main"><strong>${escapeHtml(j.customer_name)}</strong><span class="muted">${escapeHtml(j.work_done)}${j.equipment ? ` · ${escapeHtml(j.equipment)}` : ''}</span></span>
-            <span class="row-side"><span class="state-chip state-${(j.state || 'WORK_DONE').toLowerCase()} small">${escapeHtml((STATE_LABELS[j.state || 'WORK_DONE'] || '').split(',')[0])}</span><span class="muted">${j.id} · ${prettyDate(j.date)}</span>${icon('arrowRight', { size: 18 })}</span></a></li>`)
+            <span class="row-side"><span class="state-chip state-${(j.state || 'WORK_DONE').toLowerCase()} small">${escapeHtml((STATE_LABELS[j.state || 'WORK_DONE'] || '').split(',')[0])}</span><span class="muted">${refOf(j)} · ${prettyDate(j.date)}</span>${icon('arrowRight', { size: 18 })}</span></a></li>`)
           .join('')}</ul>`
       : `<div class="empty" data-testid="jobs-empty">${icon('jobs', { size: 32 })}<p><strong>No jobs yet, send a sample in Chat</strong></p><a class="btn btn-primary" href="#/chat">Open Chat</a></div>`}
   </section>`;
@@ -78,7 +79,7 @@ export function job({ state, params, ui, allow = () => true }) {
   const sub = j.lines.reduce((s, l) => s + l.qty * l.rate, 0);
   return `<section class="page">
     <a class="back" href="#/jobs">${icon('arrowLeft', { size: 18 })} Jobs</a>
-    <header class="page-head"><h1 id="page-title" tabindex="-1">${escapeHtml(j.customer_name)}</h1><p class="muted">${j.id} · approved ${prettyDate(j.date)}</p></header>
+    <header class="page-head"><h1 id="page-title" tabindex="-1">${escapeHtml(j.customer_name)}</h1><p class="muted">${refOf(j)} · approved ${prettyDate(j.date)}</p></header>
     <dl class="detail" data-testid="job-detail">
       <div><dt>Phone</dt><dd>${escapeHtml(prettyPhone(j.phone)) || 'Not given'}</dd></div>
       <div><dt>Area</dt><dd>${escapeHtml(j.area) || 'Not given'}</dd></div>
@@ -96,6 +97,6 @@ export function job({ state, params, ui, allow = () => true }) {
     </div>` : '<p class="muted small" data-testid="docs-hidden">Quotes and invoices are made by the office.</p>'}
     ${proofOfWork(j, ui, allow)}
     ${visitPlan(j, ui)}
-    ${docs.length && allow('create_documents') ? `<h2 class="section-title">Documents</h2><ul class="list">${docs.map((d) => `<li class="row-card"><a class="row-link" href="#/doc/${d.id}"><span class="row-main"><strong>${docTitle(d.type)} ${d.id}</strong><span class="muted">${prettyDate(d.date)}</span></span><span class="row-side"><strong>${rupees(d.total)}</strong>${icon('arrowRight', { size: 18 })}</span></a></li>`).join('')}</ul>` : ''}
+    ${docs.length && allow('create_documents') ? `<h2 class="section-title">Documents</h2><ul class="list">${docs.map((d) => `<li class="row-card"><a class="row-link" href="#/doc/${d.id}"><span class="row-main"><strong>${docLabel(d)}</strong><span class="muted">${prettyDate(d.date)}</span></span><span class="row-side"><strong>${rupees(d.total)}</strong>${icon('arrowRight', { size: 18 })}</span></a></li>`).join('')}</ul>` : ''}
   </section>`;
 }

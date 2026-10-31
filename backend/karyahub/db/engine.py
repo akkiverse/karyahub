@@ -19,7 +19,7 @@ from karyahub.settings import Settings
 MEMORY_URL = "sqlite+aiosqlite://"
 # The newest migration. A test keeps this equal to the migrations folder. When the database is already there,
 # starting up costs one cheap query instead of loading Alembic.
-SCHEMA_HEAD = "0001"
+SCHEMA_HEAD = "0002"
 _ADVISORY_LOCK = 727_001
 _engines: dict[str, AsyncEngine] = {}
 _loops: dict[str, asyncio.AbstractEventLoop] = {}
@@ -113,14 +113,20 @@ async def ensure_ready(engine: AsyncEngine, key: str) -> None:
 
         async with async_sessionmaker(engine, expire_on_commit=False)() as db:
             await demo.ensure_demo(db)
+        from karyahub.data import rls  # same reason: keeps this module free of the data package
+
+        await rls.probe(engine)
         _ready[key] = True
 
 
 def forget_engines() -> None:
     """For tests: drop cached engines so each test starts with a fresh in-memory database."""
+    from karyahub.data import rls
+
     _engines.clear()
     _loops.clear()
     _ready.clear()
+    rls.reset()
 
 
 async def db_session(settings: Settings) -> AsyncIterator[AsyncSession]:

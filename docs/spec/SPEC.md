@@ -208,6 +208,23 @@ As any signed-in person I want clear screens for signing in, my account, my team
 - **AC-22.9** Given the app opens, then it asks the server who is signed in; if the server can't be reached, a calm "Can't reach KaryaHub" screen with Try again shows, and a platform admin sees only Businesses. *(added CR-0005)*
 - **AC-22.10** Given I press a button that saves (Create business, Add to team, Import people, Save details, Change PIN) or a one-off action (Reset PIN, Turn access on or off), then it shows progress and switches off until the server answers, a second press is ignored so one press makes one change, a refused attempt switches it back on and keeps what I typed, and the result (a new PIN, a confirmation or an error) is scrolled into view below the header and given focus. *(added CR-0006)*
 
+- **AC-22.11** Given I'm on Admin, then the **Add a person** button at the top takes me to the form below it and puts the cursor in the name box, without leaving Admin (it used to be a link that the app read as an unknown page and sent to Home). *(added CR-0009)*
+
+### US-23: Business data on the server
+As an owner I want my firm's customers, jobs, quotes, invoices and chat kept on the server for my business only, so that my whole team sees the same work on any phone, even from a weak signal. *(added CR-0009)*
+- **AC-23.1** Given a real business, when its people create or change customers, jobs, documents or chat messages, then they are saved on the server under that business, and another phone signed in to the same business gets them. *(added CR-0009)*
+- **AC-23.2** Given two businesses, then neither can read or change the other's records: a pull never includes them, a push that reuses another business's record id makes a separate record and leaves the other untouched, and a proof-of-work step on another business's job is refused; the database enforces the same wall with row-level security on every business-data table, and `/api/health` says whether it is on. *(added CR-0009)*
+- **AC-23.3** Given the owner's permissions, then each kind of record needs one permission to read and one to change (for example a technician cannot read documents, and a person with Chat switched off cannot save chat messages); a refused change comes back as rejected with a plain reason, and the phone puts the server's version back and says so. *(added CR-0009)*
+- **AC-23.4** Given the same change is sent more than once (an answer was lost, a retry), then it is applied once: no duplicate record, and the same answer comes back each time. *(added CR-0009)*
+- **AC-23.5** Given two phones create jobs and documents at the same time, then the server gives each a different number from the business's own counters (`J-0001`, `QT-2026-0001`, `INV-2026-0001`), and neither phone's record overwrites the other. *(added CR-0009)*
+- **AC-23.6** Given a job, then its state, history and customer code belong to the server: a phone's older copy cannot change them, a proof-of-work step is saved on the server and other phones see it, and a step on a job that has not reached the server yet is refused with a plain message. *(added CR-0009)*
+- **AC-23.7** Given a phone holds jobs, customers, documents or chat from before this version, then they can be sent to the server once per phone: customers with the same mobile number are merged, numbers already given to jobs and documents are kept, ids are made unique per phone, the business's counters move past them, a second try imports nothing, and two phones of one business can both import. *(added CR-0009)*
+- **AC-23.8** Given I sign in to a real business, then the data on screen comes from the server (the phone keeps only a copy); the first time, what the phone already held is moved with a notice saying how many items, nothing is moved twice, and the demo business never syncs and stays on the device. *(added CR-0009)*
+- **AC-23.9** Given there is no signal, then I can still approve jobs, make quotes and invoices and write in Chat; the changes are saved on the phone first and queued, the screen says how many are waiting, and when the signal returns they are sent once each, in order, even if the app was closed and reopened in between. *(added CR-0009)*
+- **AC-23.10** Given the server answers late, fails or is unreachable, then the queue is kept and tried again with growing waits, nothing typed is lost, and a change the server rejects is shown with its reason instead of being retried forever. *(added CR-0009)*
+- **AC-23.11** Given I'm the owner, then Settings lets me change the business name, address and GSTIN (saved on the server) and add, replace or remove a logo (PNG, JPEG or WebP, up to 200 KB); the logo shows in Settings and on quotes and invoices for my business's people only, is not served to other businesses or to anyone signed out, and each change is in the activity log. *(added CR-0009)*
+- **AC-23.12** Given the demo business, then the server refuses to sync or import for it (its data stays on the device), so visitors never see each other's demo work. *(added CR-0009)*
+
 ## Screens and flows
 Sign in first (CR-0003). Then a bottom tab bar on phones and a dark sidebar on desktop, showing only the screens the person's role allows: Home, Chat, Jobs, Renewals (Workspace) and Admin, Settings (Manage). An account menu in the top bar shows the person and role, with Settings, Admin and Sign out.
 
@@ -235,7 +252,7 @@ Demo flow (3 minutes): Sign in as the owner → Home → See how it works → pi
 - **Delight moment:** the processing steps tick through and the summary card lands in the chat, then the Home total updates to show the new ₹ at stake.
 
 ## Data model
-All demo data lives in the browser (localStorage in try/catch, data version 3 since CR-0003), seeded from bundled demo JSON. The KaryaHub server is stateless: it computes and checks, and the browser stores the results (ADR-0007, ADR-0009). Data saved by v0.1.0 (version 1) and the 0.2.0 preview (version 2) is upgraded on load.
+The demo business keeps its data in the browser (localStorage in try/catch, data version 4 since CR-0005), seeded from bundled demo JSON, and the server computes and checks for it (ADR-0007, ADR-0009). **Since CR-0009 a real business's customers, jobs, documents and chat messages live on the server** (table `records`, one row per item, scoped by `business_id`; ADR-0013) and the browser keeps a copy plus a queue of changes not yet sent. Data saved by v0.1.0 to v0.4.3 is upgraded on load and sent to the server once (AC-23.7).
 
 | Entity | Fields |
 |---|---|
@@ -248,6 +265,10 @@ All demo data lives in the browser (localStorage in try/catch, data version 3 si
 | Staff (added CR-0003) | id, name, phone, role (owner, coordinator, technician), active, pin_hash (salted SHA-256), created_at, last_sign_in |
 | Access log entry (added CR-0003) | id, at, who, text |
 | Session (added CR-0003, separate storage key) | staff_id, signed_in_at |
+| Record (server, added CR-0009) | business_id, kind (customer, job, document, message), id (unique per business), number (jobs and documents, given by the server), body (the item as above), seq (change counter), updated_at |
+| Sync operation (server, added CR-0009) | business_id, op_id (unique per business), result; makes a repeated change harmless |
+| Counter (server, added CR-0009) | business_id, name (seq, job, quote, invoice), value |
+| Device import (server, added CR-0009) | business_id, device_id, imported_at, counts; one row means that phone's data was moved |
 | Tenant (server) | id, business_name, address, gstin, state_code, vertical, language, amc_visit_every_days, amc_lead_days, is_demo (added CR-0002) |
 
 ## Non-functional requirements
@@ -262,14 +283,16 @@ All demo data lives in the browser (localStorage in try/catch, data version 3 si
 - Access (CR-0003, changed CR-0005): every screen and job action is checked against the signed-in person's permissions on the server; PINs are stored only as salted hashes with a server secret; sessions are HttpOnly cookies; the starting role table is identical on the web app and the server.
 - Speed (CR-0007): the server runs in Singapore (`vercel.json` `regions`), next to the Neon database, and because distance still matters a sign-in makes at most 8 database statements and a signed-in request at most 2; the app waits 20 seconds (30 for opening the app and signing in) before saying it can't reach the server.
 - Data (CR-0005): people, businesses, sessions and the activity log live in one Postgres database (Neon, `karyahub_master_db`) with `business_id` on every business-owned row and every query filtered by it. With a real database `KARYAHUB_PIN_PEPPER` must be set or accounts refuse to run. The address is never printed or returned.
-- The demo business holds only dummy names, phones and GSTINs, labelled as demo. Real businesses' people are real; jobs and customers still live on the device until CR-0007.
+- The demo business holds only dummy names, phones and GSTINs, labelled as demo. Real businesses' people, customers, jobs, documents and chat are real and live on the server (CR-0009).
+- Business wall (CR-0009): every business-data row carries `business_id`; every server statement filters by it; Postgres row-level security with a policy on `business_id` is the second wall, and `/api/health` reports `row_level_security`.
+- Weak signal (CR-0009): the app works from its on-device copy and sends queued changes when it can; one sync call sends up to 100 changes and brings back what changed; the server ignores a change it has already applied.
 
 ## Out of scope
 - Real WhatsApp phone numbers or message sending (the webhook exists and is tested, but no number is connected; changed CR-0002).
 - Real speech-to-text and paid LLM or OCR services (speech stays a demo adapter). Changed CR-0004: messages and photos are read by Studio AI, the founder's own AI server, once its settings are linked.
 - A server database, background queue, attempt limits on customer codes, and cross-delivery de-duplication (see RISKS.md R-04, R-05, R-07, R-13).
 - Valid tax invoices, e-invoicing, payments or payment links.
-- Real server-side accounts, PIN attempt limits and a database for people (done in CR-0005; ADR-0012). Still out of scope: jobs, customers and documents on the server (CR-0007), inventory (CR-0006), and delivering sign-in codes by SMS or WhatsApp to real numbers until WhatsApp is live.
+- Real server-side accounts, PIN attempt limits and a database for people (done in CR-0005; ADR-0012). Done in CR-0009: jobs, customers, documents and chat on the server. Still out of scope: inventory (CR-0011), per-financial-year gap-free document numbers (CR-0012), editing the same record on two phones at once without the later change winning, and delivering sign-in codes by SMS or WhatsApp to real numbers until WhatsApp is live.
 - Technician app, GPS or photo-based risk scoring, inventory and attendance (see REFERENCE-REVIEW.md).
 - Regional language UI (sample voice notes may be Hinglish with English transcripts).
 

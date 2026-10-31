@@ -47,7 +47,7 @@ Dotted lines are adapters that answer with mock data in v0.2, or parts that arri
 2. **Technician report (real WhatsApp, later):** Meta posts to `POST /api/v1/whatsapp/webhook`; the API checks `X-Hub-Signature-256`, de-duplicates by message id, runs the same pipeline and returns the drafts. With a database, the draft is stored and the owner sees it in the web app.
 3. **Proof of work:** owner presses Send code, then `POST /api/v1/jobs/{id}/transitions` with `request_otp`; the server issues a 6-digit code bound to the job and tenant, signed and time-limited, and sends it to the customer (simulated). The customer reads the code to the technician or owner; `verify_otp` moves the job to `VERIFIED`; `close` to `CLOSED`.
 4. **AMC visits:** job screen calls `POST /api/v1/amc/plan`; the server lists visits every 90 days, which job to create 7 days ahead, and who to tell when a visit is overdue.
-5. **Paperwork and renewals:** as in v0.1, in the browser; the server has the same rules (`/documents/totals`, `/renewals/*`) ready for when data moves server-side.
+5. **Paperwork and renewals:** the demo business works in the browser as in v0.1. A real business's customers, jobs, documents and chat live on the server since CR-0009 (see ARCHITECTURE.md, "Business data, sync and the wall between businesses"); the screens still work from the phone's own copy and queue their changes for the server.
 
 ## 6. Deployment
 
@@ -64,7 +64,7 @@ flowchart TB
 ```
 
 - One Vercel project, one repository. Previews per pull request; production only on release.
-- The function is stateless (no memory or disk between requests). Persistent data stays in the browser until the founder adds a database.
+- The function is stateless (no memory or disk between requests). Persistent data lives in the Neon database (accounts since CR-0005, business data since CR-0009); the demo business keeps its data in the browser.
 - Configuration by environment variables: `KARYAHUB_MODE` (mock or live), `KARYAHUB_WHATSAPP_APP_SECRET`, `KARYAHUB_WHATSAPP_VERIFY_TOKEN`, `KARYAHUB_WHATSAPP_ACCESS_TOKEN`, `KARYAHUB_SPEECH_API_KEY`, `KARYAHUB_LLM_API_KEY`, `KARYAHUB_OTP_SECRET`.
 
 ## 7. Cross-cutting decisions

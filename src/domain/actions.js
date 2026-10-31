@@ -8,12 +8,14 @@ import { isValidISO } from '../format.js';
 import { ApiUnreachable } from '../api/client.js';
 import { FALLBACK_NOTE } from '../adapters/server.js';
 import { can, ACTION_PERMISSION, roleShort } from './access.js';
+import { isSynced, uid } from '../ids.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const NO_NAME_REPLY = "I couldn't find a customer name, can you add it?";
 export const UNDERSTOOD_REPLY = 'Got it. Here is what I understood';
 
 function nextId(state, key, prefix) {
+  if (isSynced(state)) return `${prefix}${uid()}`; // a real business: unique on every phone, numbered by the server (CR-0009)
   state.seq[key] = (state.seq[key] || 0) + 1;
   return `${prefix}${String(state.seq[key]).padStart(4, '0')}`;
 }
@@ -23,6 +25,7 @@ function pushMessage(state, msg) {
   return id;
 }
 
+const STILL_WAITING = "This job is still waiting to be sent to the server. Try again when the signal is back.";
 const SERVER_NEEDED = "Couldn't reach the KaryaHub server. Proof-of-work steps and visit plans need it; check your connection and try again.";
 const via = (r, a) => (r && r._via === 'fallback' ? `${a.mode}: ${FALLBACK_NOTE}` : a.mode === 'server' ? 'KaryaHub server' : a.mode);
 // Who read the message on the server (CR-0004): Studio AI, or the quick reader when AI is offline.
@@ -32,7 +35,7 @@ const stepDetail = (base, r, a) => (readerLabel(r) ? `${readerLabel(r)} (${via(r
 let opCounter = 0;
 const newOpId = (jobId) => `op-${jobId}-${Date.now().toString(36)}-${(opCounter += 1)}-${Math.random().toString(36).slice(2, 6)}`;
 
-export function createActions({ store, getAdapters, stepDelay, api, currentUser = () => null, photoImage = async () => null }) {
+export function createActions({ store, getAdapters, stepDelay, api, currentUser = () => null, photoImage = async () => null, ensureSynced = async () => true }) {
   const adapters = () => getAdapters(store.get().settings.mode, api);
   const updateMsg = (id, fn) => store.update((s) => { const m = s.messages.find((x) => x.id === id); if (m) fn(m, s); });
   const setStep = (id, stepId, patch) => updateMsg(id, (m) => Object.assign(m.steps.find((st) => st.id === stepId), patch));
@@ -169,6 +172,7 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
       jobId = nextId(s, 'job', 'J-');
       s.jobs.unshift({
         id: jobId,
+        ...(isSynced(s) ? { number: '' } : {}), // the server gives the number when it receives the job
         customer_id: customer.id,
         customer_name: customer.name,
         phone: customer.phone,
@@ -195,7 +199,7 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
       m.status = 'approved';
       m.job = job;
       m.job_id = jobId;
-      pushMessage(s, { from: 'bot', kind: 'text', body: `Saved. Job ${jobId} for ${customer.name} is in Jobs.`, job_id: jobId });
+      pushMessage(s, { from: 'bot', kind: 'text', body: isSynced(s) ? `Saved. The job for ${customer.name} is in Jobs.` : `Saved. Job ${jobId} for ${customer.name} is in Jobs.`, job_id: jobId });
     });
     return { jobId };
   }
@@ -205,15 +209,17 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
     const job = s0.jobs.find((j) => j.id === jobId);
     if (!job) return { error: 'That job no longer exists. Pick another job.' };
     let docId;
+    let synced = false;
     store.update((s) => {
+      synced = isSynced(s);
       s.seq[type] = (s.seq[type] || 0) + 1;
-      docId = docNumber(type, s.seq[type]);
+      docId = synced ? `d-${uid()}` : docNumber(type, s.seq[type]);
       const lines = job.lines.map((l) => ({ ...l }));
-      s.documents.unshift({ id: docId, job_id: jobId, type, customer: { name: job.customer_name, phone: job.phone, area: job.area }, lines, ...computeTotals(lines), date: today(), sent: false });
+      s.documents.unshift({ id: docId, ...(synced ? { number: '' } : {}), job_id: jobId, type, customer: { name: job.customer_name, phone: job.phone, area: job.area }, lines, ...computeTotals(lines), date: today(), sent: false });
     });
     const label = `${docTitle(type)} sent to ${job.customer_name}`;
     try {
-      await adapters().whatsapp.sendMessage({ to: job.phone, kind: 'document', body: `${docTitle(type)} ${docId}` });
+      await adapters().whatsapp.sendMessage({ to: job.phone, kind: 'document', body: synced ? docTitle(type) : `${docTitle(type)} ${docId}` });
       store.update((s) => {
         s.documents.find((d) => d.id === docId).sent = true;
         pushMessage(s, { from: 'bot', kind: 'document', doc_id: docId, body: label });
@@ -255,6 +261,8 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
     if (user && ACTION_PERMISSION[action] && !can(user, ACTION_PERMISSION[action])) {
       return { error: "Your access doesn't include this. Ask your business owner." };
     }
+    // A real business's job is saved on the server, which does the step on its own copy, so the job must be there first (CR-0009).
+    if (!(await ensureSynced(jobId))) return { error: STILL_WAITING };
     const body = {
       state: job.state || 'WORK_DONE',
       action,

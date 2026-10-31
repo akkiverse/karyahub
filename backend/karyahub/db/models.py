@@ -5,9 +5,10 @@ One shared database ("karyahub_master_db") for every business. Each business-own
 """
 
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, deferred, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -29,6 +30,9 @@ class Business(Base):
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
+    # The logo (CR-0009) is a small image kept as a data URL, deferred so it is not read on every request.
+    logo_data: Mapped[str | None] = deferred(mapped_column(Text, nullable=True))
+    logo_version: Mapped[str] = mapped_column(String(12), default="")
 
 
 class User(Base):
@@ -110,3 +114,51 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(40))
     detail: Mapped[str] = mapped_column(Text, default="")
     at: Mapped[datetime] = mapped_column(DateTime)
+
+
+# ---------- business data (CR-0009, ADR-0013): business_id on every row, row-level security ----------
+class Record(Base):
+    """One customer, job, document or chat message of a business. The item itself is the JSON body."""
+
+    __tablename__ = "records"
+
+    business_id: Mapped[str] = mapped_column(ForeignKey("businesses.id"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(12), primary_key=True)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    number: Mapped[str] = mapped_column(String(24), default="")
+    body: Mapped[dict[str, Any]] = mapped_column(JSON)
+    seq: Mapped[int] = mapped_column(BigInteger)
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class SyncOp(Base):
+    """A change the server has applied, by the id the phone gave it. A repeat gets the same answer."""
+
+    __tablename__ = "sync_ops"
+
+    business_id: Mapped[str] = mapped_column(ForeignKey("businesses.id"), primary_key=True)
+    op_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    applied_at: Mapped[datetime] = mapped_column(DateTime)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+class Counter(Base):
+    """Per-business counters: the change cursor ('seq') and the next job and document numbers."""
+
+    __tablename__ = "counters"
+
+    business_id: Mapped[str] = mapped_column(ForeignKey("businesses.id"), primary_key=True)
+    name: Mapped[str] = mapped_column(String(20), primary_key=True)
+    value: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class DeviceImport(Base):
+    """A phone whose old on-device data has been moved to the server (once per phone)."""
+
+    __tablename__ = "device_imports"
+
+    business_id: Mapped[str] = mapped_column(ForeignKey("businesses.id"), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(40))
+    imported_at: Mapped[datetime] = mapped_column(DateTime)
+    counts: Mapped[dict[str, Any]] = mapped_column(JSON)

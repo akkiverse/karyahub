@@ -1,16 +1,19 @@
 # KaryaHub: Test report
 
-**Run:** 2026-10-30 · **Branch:** `cr/0007-faster-sign-in` (CR-0007) · **Result:** 170 of 170 tests passing (82 server, 88 web), covering all 95 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 36 kB JS and 10 kB CSS gzipped)
+**Run:** 2026-10-31 · **Branch:** `cr/0009-business-data-on-server` (CR-0009) · **Result:** 209 of 209 tests passing, plus 1 that runs only against a real Postgres and also passed (110 server + 1 Postgres-only, 99 web), covering all 109 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8; about 41 kB JS and 10 kB CSS gzipped)
 
-Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in or another role; `me` can hand in any server answer. Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
+Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
-Two suites:
-- **Web app:** 88 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js` and `tests/fake-accounts.js` standing in for the server (they record calls and can act unreachable). AC-2.2 runs with the real step timing under fake timers.
-- **Server:** 82 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
+Three suites:
+- **Web app:** 99 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js`, `tests/fake-accounts.js` and `tests/fake-sync.js` standing in for the server (they record calls and can act unreachable, lose an answer, fail, or refuse a kind of record). AC-2.2 runs with the real step timing under fake timers.
+- **Server:** 110 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
+- **Real Postgres (optional, 1 test):** `test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business` runs when `KARYAHUB_TEST_POSTGRES_URL` is set. It runs the migrations on a real Postgres 16, checks the policies and the restricted role exist, and that a scoped session with no `WHERE` sees only its own business, cannot write into another, and sees nothing with no business set. It was run on PostgreSQL 16.2 for this report, together with an end-to-end smoke run of the whole API (two businesses, sync, import, a proof-of-work step; `/api/health` said `row_level_security: on`). Without the address the test is skipped, so the normal run shows 110 passed and 1 skipped.
 
-Some criteria have a test on each side (for example AC-7.2: the web app calls the API, and the server returns the AC-3.2 fields). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
+Some criteria have a test on each side (for example AC-7.2 and AC-23.1: the web app calls the API, and the server does the work). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
 Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see the spec); their old on-device tests were replaced by the tests for AC-18 to AC-22.
+
+CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_for_a_role` now puts the job on the server first, because a real business's proof-of-work step now loads the job from the database (AC-23.6).
 
 ## Traceability: acceptance criteria to tests
 
@@ -192,6 +195,42 @@ Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see 
 | AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: pressing Create business shows progress, a second press is ignored, and the new PIN is brought into view | Pass |
 | AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: after a refused attempt the button comes back and keeps what was typed | Pass |
 | AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: Reset PIN and Turn off can only be pressed once at a time | Pass |
+| AC-22.11 | `tests/us23-business-data.test.js` › AC-22.11: the Add a person button at the top of Admin stays on Admin and puts the cursor in the form | Pass |
+| AC-23.1 | `tests/us23-business-data.test.js` › AC-23.1: a job approved in Chat is saved on the server, numbered by it, and shown as New until then | Pass |
+| AC-23.1 | `tests/api/test_us23_business_data.py::test_ac_23_1_another_phone_of_the_same_business_gets_what_was_saved` (customers, jobs, documents and chat saved by one phone reach another phone of the business.) | Pass |
+| AC-23.2 | `tests/api/test_us23_business_data.py::test_ac_23_2_one_business_cannot_read_or_change_anothers_records` (a pull never includes the other business, and reusing an id makes a separate record.) | Pass |
+| AC-23.2 | `tests/api/test_us23_business_data.py::test_ac_23_2_a_proof_of_work_step_on_another_businesss_job_is_refused` (B cannot move A's job along, even knowing its id.) | Pass |
+| AC-23.2 | `tests/api/test_us23_business_data.py::test_ac_23_2_the_platform_admin_has_no_business_data` (the platform admin runs KaryaHub but belongs to no business, so the sync call is closed to them.) | Pass |
+| AC-23.2 | `tests/api/test_us23_business_data.py::test_ac_23_2_every_business_data_table_has_a_row_level_security_policy` (each table with a business_id (except the account tables) is covered by the migration's policy.) | Pass |
+| AC-23.2 | `tests/api/test_us23_business_data.py::test_ac_23_2_health_says_whether_the_wall_is_up` (/api/health has a row_level_security field once a real database is used; none in memory.) | Pass |
+| AC-23.2 | `tests/api/test_us23_business_data.py::test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business` (policies, the restricted role and a bare select, run against a real Postgres.) | Pass |
+| AC-23.3 | `tests/us23-business-data.test.js` › AC-23.3: when the owner takes a kind of record away, this phone stops showing it | Pass |
+| AC-23.3 | `tests/api/test_us23_business_data.py::test_ac_23_3_each_kind_of_record_needs_the_owners_permission` (technicians can't read or save documents until the owner allows it; a refusal says why.) | Pass |
+| AC-23.3 | `tests/api/test_us23_business_data.py::test_ac_23_3_a_rejected_change_brings_back_the_servers_version` (when the change is refused the phone gets the record as the server has it.) | Pass |
+| AC-23.3 | `tests/api/test_us23_business_data.py::test_ac_23_3_bad_changes_are_rejected_and_the_good_ones_still_apply` (one bad change doesn't stop the rest of the batch.) | Pass |
+| AC-23.4 | `tests/us23-business-data.test.js` › AC-23.4: when the answer is lost, the same operations are sent again and nothing is duplicated | Pass |
+| AC-23.4 | `tests/api/test_us23_business_data.py::test_ac_23_4_a_change_sent_twice_is_applied_once` (a lost answer and a retry (same operation ids) leave one record and the same answer.) | Pass |
+| AC-23.5 | `tests/api/test_us23_business_data.py::test_ac_23_5_two_phones_get_different_numbers_and_never_overwrite_each_other` (numbers come from the business's counters, not from the phones.) | Pass |
+| AC-23.5 | `tests/api/test_us23_business_data.py::test_ac_23_5_the_cursor_returns_only_what_changed_since` (the answer carries a cursor; asking again with it returns only newer changes, in pages.) | Pass |
+| AC-23.6 | `tests/us23-business-data.test.js` › AC-23.6: a proof-of-work step waits for the job to reach the server, and the server's state is not sent back as a change | Pass |
+| AC-23.6 | `tests/api/test_us23_business_data.py::test_ac_23_6_state_history_and_code_belong_to_the_server` (a step is saved on the server, other phones see it, and a stale phone can't undo it.) | Pass |
+| AC-23.6 | `tests/api/test_us23_business_data.py::test_ac_23_6_the_customer_code_is_kept_on_the_server_with_the_job` (the code challenge is stored with the job; verifying uses the stored state, not the phone's.) | Pass |
+| AC-23.6 | `tests/api/test_us23_business_data.py::test_ac_23_6_a_step_on_a_job_that_has_not_reached_the_server_is_refused` (a plain message says to wait for the waiting changes to send.) | Pass |
+| AC-23.7 | `tests/us23-business-data.test.js` › AC-23.7 and AC-23.8: what was on this phone before is moved to the server once, with a notice, and not again | Pass |
+| AC-23.7 | `tests/api/test_us23_business_data.py::test_ac_23_7_old_data_on_a_phone_is_moved_once_with_numbers_and_links_kept` (ids are made unique, numbers are kept, links are re-pointed and the counters move past them.) | Pass |
+| AC-23.7 | `tests/api/test_us23_business_data.py::test_ac_23_7_a_second_try_from_the_same_phone_imports_nothing` (once per phone, however many times it is asked.) | Pass |
+| AC-23.7 | `tests/api/test_us23_business_data.py::test_ac_23_7_two_phones_of_one_business_can_both_import_without_clashes` (customers are merged by mobile number and clashing job numbers are renumbered.) | Pass |
+| AC-23.7 | `tests/api/test_us23_business_data.py::test_ac_23_7_nothing_is_imported_without_the_permission_to_save_it` (a person who can't save documents doesn't get documents imported; the rest is.) | Pass |
+| AC-23.8 | `tests/us23-business-data.test.js` › AC-23.8: a real business loads its data from the server, and the demo business never syncs | Pass |
+| AC-23.8 | `tests/us23-business-data.test.js` › AC-23.7 and AC-23.8: what was on this phone before is moved to the server once, with a notice, and not again | Pass |
+| AC-23.9 | `tests/us23-business-data.test.js` › AC-23.9: changes made with no signal are kept on the phone, counted on screen, and sent once when it returns, even after the app was closed | Pass |
+| AC-23.10 | `tests/us23-business-data.test.js` › AC-23.10: a server fault keeps the queue and tries again; a refused change is shown with its reason and the server version is put back | Pass |
+| AC-23.11 | `tests/us23-business-data.test.js` › AC-23.11: the owner adds a logo in Settings, it shows on documents, and can be removed | Pass |
+| AC-23.11 | `tests/us23-business-data.test.js` › AC-23.11: the demo business has no logo controls | Pass |
+| AC-23.11 | `tests/api/test_us23_business_data.py::test_ac_23_11_the_owner_adds_a_logo_and_only_that_business_can_see_it` (PNG, JPEG or WebP up to 200 KB; served to the business's people only; each change is logged.) | Pass |
+| AC-23.11 | `tests/api/test_us23_business_data.py::test_ac_23_11_a_logo_must_be_a_small_real_picture` (wrong type, broken text, a different file type inside, too big, or a link are all refused.) | Pass |
+| AC-23.11 | `tests/api/test_us23_business_data.py::test_ac_23_11_only_the_owner_changes_the_logo_and_the_demo_is_fixed` (a coordinator can't change the logo; the demo business's can't change either.) | Pass |
+| AC-23.12 | `tests/api/test_us23_business_data.py::test_ac_23_12_the_demo_business_never_syncs` (the demo owner gets a plain refusal; the demo's data stays on the device.) | Pass |
 
 ## Design checklist
 | Check | Result |
@@ -208,6 +247,8 @@ Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see 
 | Motion: one entrance moment plus action feedback | Yes: processing steps ticking to green; sheet rises; voice-note waveform while playing |
 
 ## Visual check
+**CR-0009:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database), driven by Playwright in Chromium at 375px and 1280px in light and dark (4 runs, 52 screenshots): sign in as a real business's owner on a fresh browser (the mark says "All saved"), a job typed in Chat and approved (shown as "New", then `J-0001` after the sync), the Jobs list on a second fresh browser showing the same jobs, the browser set offline and a second job approved (the mark says how many changes are waiting and the page stays within the screen), Settings with a logo added (preview, Replace and Remove), Admin with the Add a person button (pressing it stays on Admin and puts the cursor in the name box). Fixes made after looking: the Open link in a chat bubble showed the raw id of a not-yet-numbered job and widened the page on a phone (it now says "Open the job" until the server gives a number), and the sync mark was too wide on a phone and widened the top bar by 2 px (it is now narrower with an ellipsis). Nothing overflows sideways on any screen.
+
 **CR-0005:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database), driven by Playwright in Chromium at 375px and 1280px in light and dark (48 screenshots: sign-in with and without the demo accounts; a real business owner on Home, Chat, Jobs, Renewals, Admin, Settings and My account; the platform admin on Businesses; the demo owner on Home and Admin). No page errors, no console errors, no horizontal overflow. Before that, the same server was walked through with curl: create the platform admin, create a business, the temporary-PIN gate, CSV import with a bad row, isolation between businesses, and the read-only demo. Fixes made after looking: the platform admin's footer said "Sample data only" (it now shows only in the demo business); a real business's Home showed the sales story and a "Sample data" tag (now a "Get started" panel); the activity log showed a raw code for PIN changes and the role table still said "reset the demo" (both reworded); "1 people" and "1 row need fixing" grammar. Not run here: the real Neon database, which is checked on the Vercel preview through `/api/health`.
 
 **CR-0004:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`) and `AI_ENDPOINTS` pointing at a local stand-in for the Ollama server, driven by Playwright in Chromium. Flow: sign in as the owner, Chat, send the job-sheet photo. With AI online, the photo reached the AI as an 80 kB JPEG drawn from the sheet, both steps said "Read by Studio AI (KaryaHub server)" and the card showed "Read by AI" with Sunil Patil's job. With the AI server off (a second server whose `AI_ENDPOINTS` answers nothing), both steps said "Read without AI (KaryaHub server)", the processing note and the banner showed, and the card showed "Read without AI" with the draft ready to approve. Checked at 375px and 1280px in light and dark: no console errors, page width equals the viewport. No fixes were needed.
@@ -224,6 +265,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
+- v0.5.0 (planned): CR-0009 in review; 209 of 209 tests passing (110 server, 99 web), plus the Postgres-only test.
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.
 - v0.2.0 (2026-10-28): CR-0002 and CR-0003 released; 75 of 75 acceptance tests passing.
 - v0.3.0 (2026-10-30): CR-0004 released; 87 of 87 acceptance tests passing.

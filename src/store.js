@@ -33,19 +33,20 @@ export function createStore() {
   let state = demoState();
   state.settings.theme = savedTheme();
   const listeners = new Set();
-  const notify = () => listeners.forEach((l) => l(state));
+  const notify = (meta = {}) => listeners.forEach((l) => l(state, meta));
   const persist = () => {
     write(PREFS_KEY, { theme: state.settings.theme });
     if (key) write(key, state);
   };
   return {
     get: () => state,
-    update(fn) {
+    /** A change made on this device. `remote: true` marks what came from the server, which must not be sent back. */
+    update(fn, { remote = false } = {}) {
       const next = JSON.parse(JSON.stringify(state));
       fn(next);
       state = next;
       persist();
-      notify();
+      notify({ remote });
     },
     /** Open the on-device data of the business that just signed in. */
     switchTo(business) {

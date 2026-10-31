@@ -18,3 +18,5 @@ export function docNumber(type, n) {
   return `${type === 'invoice' ? 'INV' : 'QT'}-2027-${String(n).padStart(4, '0')}`;
 }
 export const docTitle = (type) => (type === 'invoice' ? 'Invoice' : 'Quotation');
+/** "Quotation QT-2027-0001"; a document still waiting for its number from the server is just "Quotation". */
+export const docLabel = (d) => (d.number === '' ? docTitle(d.type) : `${docTitle(d.type)} ${d.number || d.id}`);

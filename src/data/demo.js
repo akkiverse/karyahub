@@ -110,7 +110,27 @@ export const WELCOME_MESSAGE = {
   body: `Namaste! I'm KaryaHub, CoolCare AC Services' job assistant. ${WELCOME_TEXT}`,
 };
 
-export const DATA_VERSION = 4; // 4: staff and the access log moved to the server (CR-0005)
+export const DATA_VERSION = 5; // 4: staff and the access log moved to the server (CR-0005); 5: inventory (CR-0011)
+
+// Sample inventory for the demo business only. Prices are in paise. It stays on the device and never syncs.
+const item = (id, code, name, unit, qty, low, sale, cost, hsn, gst = 18) => ({ id, code, name, unit, qty, low, sale: sale * 100, cost: cost == null ? null : cost * 100, hsn: hsn || '', gst, stopped: false });
+export const DEMO_ITEMS = [
+  item('it-r32', 'GAS-R32', 'R32 refrigerant gas', 'kg', 6.5, 5, 950, 620, '2903'),
+  item('it-r22', 'GAS-R22', 'R22 refrigerant gas', 'kg', 1.5, 3, 1100, 760, '2903'),
+  item('it-cap45', 'CAP-45', 'Capacitor 45 µF', 'nos', 12, 5, 450, 210, '8532'),
+  item('it-cap25', 'CAP-2.5', 'Capacitor 2.5 µF fan', 'nos', 3, 5, 180, 70, '8532'),
+  item('it-cu14', 'CU-14', 'Copper pipe 1/4 in', 'metre', 38, 20, 260, 180, '7411'),
+  item('it-cu38', 'CU-38', 'Copper pipe 3/8 in', 'metre', 0, 15, 320, 230, '7411'),
+  item('it-motor', 'MTR-IDU15', 'Indoor fan motor, 1.5 ton split', 'nos', 2, 2, 3200, 2100, '8501'),
+  item('it-pcb', 'PCB-UNI', 'PCB, universal split AC', 'nos', 4, 2, 2800, 1650, '8537'),
+  item('it-drain', 'DRN-16', 'Drain pipe 16 mm', 'metre', 45, 10, 40, 22, '3917'),
+  item('it-tape', 'TAPE-INS', 'Insulation tape', 'roll', 24, 10, 60, 28, '3919'),
+  item('it-filter', 'FLT-SET', 'Filter mesh (pair)', 'set', 9, 4, 350, 150, ''),
+  item('it-valve', 'VLV-CHG', 'Gas charging valve', 'nos', 7, null, 220, 120, '8481'),
+];
+const demoMoves = () => DEMO_ITEMS.map((i) => ({
+  id: `mv-${i.id}`, item_id: i.id, kind: 'opening', qty: i.qty, after: i.qty, date: '2026-12-01', at: '2026-12-01T09:00:00', who: 'Akash Mehta', note: 'Sample stock',
+}));
 
 const SEQ = { job: 0, quote: 0, invoice: 0, msg: 0, customer: 0 };
 
@@ -123,6 +143,8 @@ export function demoState() {
     jobs: [],
     documents: [],
     messages: [{ ...WELCOME_MESSAGE }],
+    items: DEMO_ITEMS.map((i) => ({ ...i })),
+    stock_moves: demoMoves(),
     seq: { ...SEQ },
   };
 }
@@ -139,6 +161,8 @@ export function emptyState(business) {
     jobs: [],
     documents: [],
     messages: [welcomeMessage(business.name)],
+    items: [],
+    stock_moves: [],
     seq: { ...SEQ },
   };
 }

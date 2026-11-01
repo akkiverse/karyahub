@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 APP_ROLE = "karyahub_app"
-TABLES = ("records", "sync_ops", "counters", "device_imports")
+TABLES = ("records", "sync_ops", "counters", "device_imports", "item_codes")
 POLICY = "business_wall"
 
 # What this server process found out when it started (see probe).

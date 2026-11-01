@@ -9,6 +9,8 @@ import { ApiUnreachable } from '../api/client.js';
 import { FALLBACK_NOTE } from '../adapters/server.js';
 import { can, ACTION_PERMISSION, roleShort } from './access.js';
 import { isSynced, uid } from '../ids.js';
+import { createStockActions } from './stock.js';
+import { partLines } from './inventory.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const NO_NAME_REPLY = "I couldn't find a customer name, can you add it?";
@@ -234,7 +236,7 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
       synced = isSynced(s);
       s.seq[type] = (s.seq[type] || 0) + 1;
       docId = synced ? `d-${uid()}` : docNumber(type, s.seq[type]);
-      const lines = job.lines.map((l) => ({ ...l }));
+      const lines = [...job.lines.map((l) => ({ ...l })), ...partLines(s, job)]; // the parts taken from inventory for this job (CR-0011)
       s.documents.unshift({ id: docId, ...(synced ? { number: '' } : {}), job_id: jobId, type, customer: { name: job.customer_name, phone: job.phone, area: job.area }, lines, ...computeTotals(lines), date: today(), sent: false });
     });
     const label = `${docTitle(type)} sent to ${job.customer_name}`;
@@ -325,5 +327,8 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
 
   const setSetting = (key, value) => store.update((s) => { s.settings[key] = value; });
 
-  return { send, retry, stop, approve, createDocument, updateDocumentLine, sendReminder, transition, amcPlan, setSetting, reset: () => store.reset(), isBusy: () => busy };
+  // Inventory: items, stock moves and parts taken for a job (CR-0011).
+  const stock = createStockActions({ store, currentUser });
+
+  return { stock, send, retry, stop, approve, createDocument, updateDocumentLine, sendReminder, transition, amcPlan, setSetting, reset: () => store.reset(), isBusy: () => busy };
 }

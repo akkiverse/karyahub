@@ -27,7 +27,7 @@ describe('US-19 Admin: team and access (screens, CR-0005)', () => {
     expect(rows[1].querySelector('[data-testid="member-status"]').textContent).toBe('Active');
     expect(t.$('form[data-form="add-staff"]')).toBeTruthy();
     expect(t.$('form[data-form="import-staff"]')).toBeTruthy();
-    expect(t.$$('[data-testid="role-matrix"] tbody tr')).toHaveLength(9);
+    expect(t.$$('[data-testid="role-matrix"] tbody tr')).toHaveLength(12); // 9 before inventory (CR-0011) plus view_inventory, manage_inventory and use_parts
     expect(t.$('[data-testid="access-log"]').textContent).toContain('Akash Mehta signed in as owner');
     expect(t.$('[data-testid="demo-locked"]')).toBeNull();
   });

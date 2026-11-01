@@ -23,6 +23,8 @@ import { jobsheetImage } from './data/jobsheet.js';
 import { createSync } from './sync.js';
 import { syncChip, syncBanner } from './views/syncstatus.js';
 import { resizeLogo } from './data/logo.js';
+import { inventory, itemPage, itemForm, inventoryImport, resultsHtml, chipsHtml, pickRows, CSV_TEMPLATE } from './views/inventory.js';
+import { qtyText, signedText, stockOf, matches as itemMatches, nameOf, parseQty, r3 } from './domain/inventory.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
 // [route, label, href, icon, section, on the phone tab bar]
@@ -30,15 +32,23 @@ const NAV = [
   ['home', 'Home', '#/', 'home', 'Workspace', true],
   ['chat', 'Chat', '#/chat', 'chat', 'Workspace', true],
   ['jobs', 'Jobs', '#/jobs', 'jobs', 'Workspace', true],
+  ['inventory', 'Inventory', '#/inventory', 'box', 'Workspace', true],
   ['renewals', 'Renewals', '#/renewals', 'renewals', 'Workspace', true],
   ['businesses', 'Businesses', '#/businesses', 'building', 'Platform', true],
-  ['admin', 'Admin', '#/admin', 'users', 'Manage', true],
+  ['admin', 'Admin', '#/admin', 'users', 'Manage', false], // on the phone it is in the account menu, so the tab bar keeps five places
   ['settings', 'Settings', '#/settings', 'settings', 'Manage', false],
 ];
 
 export function parseRoute(hash) {
   const h = (hash || '').replace(/^#\/?/, '');
-  const [a, b] = h.split('/');
+  const [a, b, c, d] = h.split('/');
+  if (a === 'inventory') {
+    if (b === 'new') return { name: 'item-form', tab: 'inventory', params: {} };
+    if (b === 'import') return { name: 'inventory-import', tab: 'inventory' };
+    if (b === 'item' && c && d === 'edit') return { name: 'item-form', tab: 'inventory', params: { id: decodeURIComponent(c) } };
+    if (b === 'item' && c) return { name: 'item', tab: 'inventory', params: { id: decodeURIComponent(c) } };
+    return { name: 'inventory', tab: 'inventory' };
+  }
   if (a === 'chat') return { name: 'chat', tab: 'chat' };
   if (a === 'jobs' && b) return { name: 'job', tab: 'jobs', params: { id: decodeURIComponent(b) } };
   if (a === 'jobs') return { name: 'jobs', tab: 'jobs' };
@@ -50,8 +60,8 @@ export function parseRoute(hash) {
   if (a === 'account') return { name: 'account', tab: 'account' };
   return { name: 'home', tab: 'home' };
 }
-const VIEWS = { home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account };
-const TITLES = { home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in' };
+const VIEWS = { home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account, inventory, item: itemPage, 'item-form': itemForm, 'inventory-import': inventoryImport };
+const TITLES = { home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in', inventory: 'Inventory', item: 'Item', 'item-form': 'Item', 'inventory-import': 'Import items' };
 
 const PERMISSION_LABELS = PERMISSIONS;
 // What the submit button says while the server is working (the button is switched off meanwhile).
@@ -107,7 +117,7 @@ export function mountApp(root, options = {}) {
   const logoImage = options.logoImage || resizeLogo;
   const ui = {
     boot: 'loading', auth: {}, authState: null, admin: {}, businesses: {}, account: {}, profile: {},
-    streaming: {}, warmedAt: 0,
+    streaming: {}, warmedAt: 0, inv: { dismissed: {} },
     renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
   };
   let alive = true;
@@ -121,6 +131,7 @@ export function mountApp(root, options = {}) {
     ui.businesses = {};
     ui.account = {};
     ui.profile = {};
+    ui.inv = { dismissed: {} };
     ui.meta = null;
     if (me && me.signed_in && me.business && !me.business.is_demo && !me.user.must_change_pin) sync.start(me.business);
     else sync.stop();
@@ -141,7 +152,7 @@ export function mountApp(root, options = {}) {
     sync.stop();
     session.end();
     store.close();
-    ui.admin = {}; ui.businesses = {}; ui.profile = {}; ui.account = {}; ui.meta = null;
+    ui.admin = {}; ui.businesses = {}; ui.profile = {}; ui.account = {}; ui.inv = { dismissed: {} }; ui.meta = null;
     ui.auth = { notice };
     await loadAuthState();
     if (alive) render();
@@ -304,6 +315,11 @@ export function mountApp(root, options = {}) {
       root.innerHTML = shell(me, html);
     }
     paintTimers();
+    if (ui.inv.focusNext) {
+      const target = root.querySelector(ui.inv.focusNext);
+      ui.inv.focusNext = null;
+      target?.focus({ preventScroll: true });
+    }
     const t2 = root.querySelector('.thread');
     if (t2) t2.scrollTop = nearBottom || name !== lastRouteName ? t2.scrollHeight : oldTop;
     if (ui.focusNext) {
@@ -330,18 +346,25 @@ export function mountApp(root, options = {}) {
     ui.toast = null;
     ui.sheet = null;
     ui.wfNote = null;
+    leaveInventoryRoute();
     render();
     loadForRoute();
   }
 
   const routeKey = (r) => `${r.name}:${(r.params && r.params.id) || ''}`;
-  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.toast = null; ui.sheet = null; ui.wfNote = null; render(); loadForRoute(); };
+  // Inventory (CR-0011): a sheet closes and a notice is forgotten when the person goes to another screen.
+  const noticeKey = (r) => (r.name === 'inventory' ? 'inventory' : r.name === 'item' ? `item:${r.params.id}` : r.name === 'job' ? `job:${r.params.id}` : '');
+  function leaveInventoryRoute() {
+    ui.inv.sheet = null;
+    if (ui.inv.notice && ui.inv.notice.at !== noticeKey(route)) ui.inv.notice = null;
+  }
+  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
   win.addEventListener('hashchange', onHash);
   // Something that arrived from the server must not redraw the page under a finger that is typing.
   let renderWhenDone = false;
   const typing = () => {
     const a = root.ownerDocument.activeElement;
-    return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && a.closest('form'));
+    return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && (a.closest('form') || a.matches('[data-inv-search], [data-pick-search]')));
   };
   const unsub = store.subscribe((st, meta) => {
     applyTheme();
@@ -357,7 +380,7 @@ export function mountApp(root, options = {}) {
     const el = e.target.closest('[data-action]');
     if (!el || !root.contains(el)) return;
     const a = el.dataset.action;
-    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role', 'member-permission', 'role-permission', 'pick-csv', 'pick-logo'].includes(a)) return; // handled on change
+    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role', 'member-permission', 'role-permission', 'pick-csv', 'pick-logo', 'pick-inv-csv'].includes(a)) return; // handled on change
     if (a !== 'download') e.preventDefault();
     if (a === 'use-demo') {
       ui.auth = { phone: el.dataset.phone, pin: el.dataset.pin };
@@ -373,6 +396,7 @@ export function mountApp(root, options = {}) {
       return;
     }
     if (a === 'retry-boot') { boot(); return; }
+    if (a.startsWith('inv-')) { await onInventoryAction(a, el); return; }
     if (a === 'dismiss-sync-notice') { sync.dismissNotice(); return; }
     if (a === 'dismiss-sync-rejected') { sync.dismissRejected(); return; }
     if (a === 'goto-add-person') {
@@ -471,6 +495,143 @@ export function mountApp(root, options = {}) {
     else if (a === 'wf') await runTransition(el.dataset.job, el.dataset.wf, {});
     else if (a === 'reload-plan') loadPlan(el.dataset.job, true);
     else if (a === 'reset') { actions.reset(); ui.editingCard = null; ui.cardErrors = {}; ui.toast = { where: 'settings', text: 'Demo reset. Jobs, documents, chat and reminders are back to the bundled demo data.' }; render(); }
+  }
+
+  // ---------- inventory (CR-0011) ----------
+  const SHORT_SIGNAL = 'Importing needs a signal, because each code is checked against your whole business. Try again when the signal is back.';
+  function invNotice(at, text, error = false) { ui.inv.notice = { at, text, error }; }
+  /** Redraw only the list and its chips, so the search box keeps the cursor while someone types. */
+  function paintInv() {
+    const st = store.get();
+    const me = meOf();
+    const allow = (perm) => can(me, perm);
+    const results = root.querySelector('[data-slot="inv-results"]');
+    const chips = root.querySelector('[data-slot="inv-chips"]');
+    if (results) results.innerHTML = resultsHtml(st, ui, allow);
+    if (chips) chips.innerHTML = chipsHtml(st, ui);
+  }
+  function openSheet(sheet) { ui.inv.sheet = sheet; ui.inv.focusNext = '.sheet [data-autofocus]'; render(); }
+  function downloadTemplate() {
+    const a = root.ownerDocument.createElement('a');
+    a.href = win.URL.createObjectURL(new win.Blob([`﻿${CSV_TEMPLATE}`], { type: 'text/csv' }));
+    a.download = 'karyahub-inventory-template.csv';
+    a.click();
+    setTimeout(() => win.URL.revokeObjectURL(a.href), 1000);
+  }
+  async function checkCsv(file, text) {
+    ui.inv.csv = { file, text, checking: true };
+    ui.inv.csvResult = '';
+    render();
+    try {
+      const res = await api.inventoryImport({ text, name: file, check: true });
+      ui.inv.csv = { file, text, rows: res.rows, counts: res.counts };
+    } catch (err) {
+      ui.inv.csv = { file, text, error: err instanceof ApiUnreachable ? SHORT_SIGNAL : msg(err) };
+    }
+    if (alive && route.name === 'inventory-import') render();
+  }
+  async function importCsv() {
+    const c = ui.inv.csv;
+    if (!c || !c.rows || c.saving) return;
+    ui.inv.csv = { ...c, saving: true };
+    render();
+    try {
+      const res = await api.inventoryImport({ text: c.text, name: c.file, check: false });
+      const done = res.imported;
+      ui.inv.csvResult = `Imported from ${escapeHtml(c.file)}: <strong>${done.added} new</strong>, <strong>${done.updated} updated</strong>${res.counts.same ? `, ${res.counts.same} already up to date` : ''}.${done.skipped ? ` ${done.skipped} row${done.skipped === 1 ? ' was' : 's were'} skipped: fix ${done.skipped === 1 ? 'it' : 'them'} in the file and import it again.` : ''} <a href="#/inventory">See the inventory</a>`;
+      ui.inv.csv = null;
+      sync.flush(); // bring the new items to this phone now
+    } catch (err) {
+      ui.inv.csv = { ...c, saving: false, error: err instanceof ApiUnreachable ? SHORT_SIGNAL : msg(err) };
+    }
+    if (alive && route.name === 'inventory-import') render();
+  }
+  const tookText = (res) => `Took ${qtyText(res.qty, res.item.unit)} of ${res.item.name} for this job.${res.short ? ` Only ${qtyText(res.had, res.item.unit)} was in stock: it shows as short until someone counts.` : ''}`;
+  async function onInventoryAction(a, el) {
+    const stock = actions.stock;
+    const itemId = route.params && route.params.id;
+    if (a === 'inv-filter') { ui.inv.filter = el.dataset.filter; paintInv(); return; }
+    if (a === 'inv-add') { ui.inv.prefill = el.dataset.name || ''; ui.inv.form = null; navigate('#/inventory/new'); return; }
+    if (a === 'inv-sheet') { openSheet({ type: el.dataset.type, item: itemId, values: {}, errors: {} }); return; }
+    if (a === 'inv-close-sheet') { ui.inv.sheet = null; render(); return; }
+    if (a === 'inv-stop') {
+      const res = stock.setStopped(itemId, el.dataset.stopped === 'true');
+      const it = store.get().items.find((i) => i.id === itemId);
+      invNotice(`item:${itemId}`, res.error || (it.stopped ? `Stopped using ${it.name}. It is under the Stopped chip, with its history, and is no longer offered for jobs.` : `${it.name} is in use again.`), Boolean(res.error));
+      render();
+      return;
+    }
+    if (a === 'inv-pick') { openSheet({ type: 'pick', job: el.dataset.job, item: null, q: '', values: {}, errors: {} }); return; }
+    if (a === 'inv-pick-item') { openSheet({ ...ui.inv.sheet, item: el.dataset.item, values: {}, errors: {} }); return; }
+    if (a === 'inv-pick-again') { openSheet({ ...ui.inv.sheet, item: null, q: '', values: {}, errors: {} }); return; }
+    if (a === 'inv-take') {
+      const res = stock.takePart(el.dataset.job, el.dataset.item, el.dataset.qty, el.dataset.seg);
+      invNotice(`job:${el.dataset.job}`, res.error || tookText(res), Boolean(res.error));
+      render();
+      return;
+    }
+    if (a === 'inv-dismiss') {
+      ui.inv.dismissed[el.dataset.job] = [...(ui.inv.dismissed[el.dataset.job] || []), el.dataset.seg];
+      render();
+      return;
+    }
+    if (a === 'inv-remove') {
+      const res = stock.removePart(el.dataset.job, el.dataset.item);
+      invNotice(`job:${el.dataset.job}`, res.error || `Put ${qtyText(res.qty, res.item.unit)} of ${res.item.name} back in stock.`, Boolean(res.error));
+      render();
+      return;
+    }
+    if (a === 'inv-template') { downloadTemplate(); return; }
+    if (a === 'inv-do-import') { await importCsv(); return; }
+    if (a === 'inv-clear-csv') { ui.inv.csv = null; ui.inv.csvResult = ''; render(); return; }
+    if (a === 'inv-check-again' && ui.inv.csv) await checkCsv(ui.inv.csv.file, ui.inv.csv.text);
+  }
+  function submitInventory(form) {
+    const kind = form.dataset.form;
+    const v = Object.fromEntries(new FormData(form).entries());
+    const stock = actions.stock;
+    if (kind === 'inv-item') {
+      const id = form.dataset.item || null;
+      const res = stock.saveItem(v, id);
+      if (res.errors || res.error) {
+        ui.inv.form = { key: id || 'new', values: v, errors: res.errors || { name: res.error } };
+        ui.inv.focusNext = '[aria-invalid="true"]';
+        render();
+        return;
+      }
+      ui.inv.form = null;
+      ui.inv.prefill = '';
+      const name = String(v.name).trim();
+      if (id) { invNotice(`item:${id}`, `Saved ${name}.`); navigate(`#/inventory/item/${encodeURIComponent(id)}`); }
+      else { invNotice('inventory', `Added ${name}${res.opening ? ` with ${qtyText(res.opening, v.unit)} in stock` : ''}.`); navigate('#/inventory'); }
+      return;
+    }
+    const sh = ui.inv.sheet;
+    if (!sh) return;
+    const at = sh.job ? `job:${sh.job}` : `item:${sh.item}`;
+    const fail = (res) => { ui.inv.sheet = { ...sh, values: v, errors: res.errors }; ui.inv.focusNext = '[aria-invalid="true"]'; render(); };
+    if (sh.type === 'pick') {
+      const res = stock.takePart(sh.job, sh.item, v.qty);
+      if (res.errors) { fail(res); return; }
+      ui.inv.sheet = null;
+      invNotice(at, res.error || tookText(res), Boolean(res.error));
+      render();
+      return;
+    }
+    const res = stock.move(sh.item, sh.type, v);
+    if (res.errors) { fail(res); return; }
+    ui.inv.sheet = null;
+    const it = store.get().items.find((i) => i.id === sh.item);
+    if (res.error) invNotice(at, res.error, true);
+    else if (res.same) invNotice(at, 'Count matches. Nothing to change.');
+    else {
+      const m = res.move;
+      const st = sync.status();
+      const saved = st.active && st.state === 'offline' ? ' Saved on this phone; it will be sent when the signal returns.' : '';
+      const what = sh.type === 'in' ? `Added ${qtyText(Math.abs(m.qty), it.unit)} to ${it.name}.` : sh.type === 'out' ? `Took ${qtyText(Math.abs(m.qty), it.unit)} of ${it.name} out.` : `Count saved: ${signedText(m.qty, it.unit)} as a correction.`;
+      invNotice(at, `${what} In stock: ${qtyText(stockOf(store.get(), it), it.unit)}.${saved}`);
+    }
+    render();
   }
 
   async function runTransition(jobId, action, payload) {
@@ -638,6 +799,7 @@ export function mountApp(root, options = {}) {
       Promise.resolve(submitTeam(form)).finally(done);
       return;
     }
+    if (kind === 'inv-sheet' || kind === 'inv-item') { submitInventory(form); return; }
     if (kind === 'send-text') {
       const text = form.elements.text.value.trim();
       if (!text) return;
@@ -678,6 +840,10 @@ export function mountApp(root, options = {}) {
       const text = await file.text();
       ui.admin = { ...ui.admin, csv: text };
       render();
+    } else if (a === 'pick-inv-csv') {
+      const file = el.files && el.files[0];
+      if (!file) return;
+      await checkCsv(file.name, await file.text());
     } else if (a === 'set-role') {
       try {
         const res = await api.updateMember(el.dataset.staff, { role: el.value });
@@ -695,8 +861,30 @@ export function mountApp(root, options = {}) {
       } catch (err) { ui.admin = { ...ui.admin, notice: { text: msg(err), error: true } }; await loadAdmin(); }
     }
   }
-  function onInput(e) { if (e.target.id === 'composer-input') ui.draft = e.target.value; }
-  function onKey(e) { if (e.key === 'Escape' && ui.sheet) { ui.sheet = null; render(); } }
+  function onInput(e) {
+    const t = e.target;
+    if (t.id === 'composer-input') ui.draft = t.value;
+    else if (t.matches('[data-inv-search]')) { ui.inv.q = t.value; paintInv(); }
+    else if (t.matches('[data-pick-search]') && ui.inv.sheet) {
+      ui.inv.sheet.q = t.value;
+      const list = root.querySelector('[data-slot="pick-results"]');
+      if (list) list.innerHTML = pickRows(store.get(), t.value);
+    } else if (t.matches('[data-qty]') && ui.inv.sheet && ui.inv.sheet.item) {
+      // A hint under the quantity while it is typed: what a count would record, or that a job will use more than there is.
+      const st = store.get();
+      const it = st.items.find((i) => i.id === ui.inv.sheet.item);
+      const q = it ? parseQty(t.value, it.unit) : { ok: false };
+      const diff = root.querySelector('[data-slot="inv-diff"]');
+      const change = q.ok ? r3(q.value - stockOf(st, it)) : null;
+      if (diff) diff.textContent = change == null ? '' : change === 0 ? 'Count matches. Nothing to change.' : `This records ${signedText(change, it.unit)} as a count correction.`;
+      const short = root.querySelector('[data-slot="pick-short"]');
+      if (short) short.hidden = !(q.ok && q.value > stockOf(st, it));
+    }
+  }
+  function onKey(e) {
+    if (e.key === 'Escape' && ui.sheet) { ui.sheet = null; render(); }
+    else if (e.key === 'Escape' && ui.inv.sheet) { ui.inv.sheet = null; render(); }
+  }
 
   root.addEventListener('click', onClick);
   root.addEventListener('submit', onSubmit);

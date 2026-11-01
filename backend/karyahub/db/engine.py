@@ -19,7 +19,7 @@ from karyahub.settings import Settings
 MEMORY_URL = "sqlite+aiosqlite://"
 # The newest migration. A test keeps this equal to the migrations folder. When the database is already there,
 # starting up costs one cheap query instead of loading Alembic.
-SCHEMA_HEAD = "0002"
+SCHEMA_HEAD = "0003"
 _ADVISORY_LOCK = 727_001
 _engines: dict[str, AsyncEngine] = {}
 _loops: dict[str, asyncio.AbstractEventLoop] = {}

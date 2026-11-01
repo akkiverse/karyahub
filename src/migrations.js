@@ -4,6 +4,8 @@
 // v2 -> v3 (CR-0003) added a demo team and an access log on this device.
 // v3 -> v4 (CR-0005): the team, PINs and access log now live on the server, so they are dropped here.
 // Jobs, documents, chat and reminders are untouched.
+// v4 -> v5 (CR-0011): inventory. Nothing is made up from old jobs' parts text: a business starts with no items,
+// and the demo business gets its sample stock the next time it is reset.
 
 const DEMO_TEAM_PLACEHOLDER = [];
 
@@ -38,5 +40,8 @@ export function migrate(saved) {
     delete seq.log;
     s = { ...rest, version: 4, seq };
   }
-  return s.version === 4 ? s : null;
+  if (s.version === 4) {
+    s = { ...s, version: 5, items: s.items || [], stock_moves: s.stock_moves || [] };
+  }
+  return s.version === 5 ? s : null;
 }

@@ -9,7 +9,9 @@ import { ApiError, ApiUnreachable } from './api/client.js';
 import { nowStamp } from './clock.js';
 import { uid } from './ids.js';
 
-const KINDS = [['customer', 'customers'], ['job', 'jobs'], ['document', 'documents'], ['message', 'messages']];
+const LEGACY_KINDS = [['customer', 'customers'], ['job', 'jobs'], ['document', 'documents'], ['message', 'messages']];
+// Inventory (CR-0011): items, and stock moves that are never changed once made.
+const KINDS = [...LEGACY_KINDS, ['item', 'items'], ['stock_move', 'stock_moves']];
 const COLLECTION = Object.fromEntries(KINDS);
 const MAX_OPS = 100;
 const LOCAL_ONLY = new Set(['m-welcome']); // the greeting every device draws for itself
@@ -28,7 +30,12 @@ function canon(v) {
 function fingerprint(kind, e) {
   if (kind === 'job' || kind === 'document') {
     const rest = { ...e };
-    for (const k of ['state', 'events', 'otp', 'number']) delete rest[k];
+    for (const k of ['state', 'events', 'otp', 'number', 'parts_used']) delete rest[k];
+    return canon(rest);
+  }
+  if (kind === 'item') { // the quantity in stock is the server's: it changes only through stock moves
+    const rest = { ...e };
+    delete rest.qty;
     return canon(rest);
   }
   return canon(e);
@@ -191,7 +198,7 @@ export function createSync({ store, api, win = globalThis, storage = globalThis.
   // ---------- the one-time move of what this phone held before ----------
   function legacyPayload(st) {
     const out = { device_id: s.device_id };
-    for (const [kind, coll] of KINDS) out[kind] = (st[coll] || []).filter((e) => !LOCAL_ONLY.has(e.id)).map(clone);
+    for (const [kind, coll] of LEGACY_KINDS) out[kind] = (st[coll] || []).filter((e) => !LOCAL_ONLY.has(e.id)).map(clone);
     return out;
   }
   async function moveOldData() {
@@ -199,7 +206,7 @@ export function createSync({ store, api, win = globalThis, storage = globalThis.
     const res = await api.importDevice(payload);
     if (!active || !s) return;
     // Edits queued meanwhile to things that were just moved are dropped (the moved copy replaces them); new things stay queued.
-    s.outbox = s.outbox.filter((o) => !payload[o.kind].some((e) => e.id === o.id));
+    s.outbox = s.outbox.filter((o) => !(payload[o.kind] || []).some((e) => e.id === o.id));
     s.imported = true;
     s.cursor = 0;
     s.readable = [];

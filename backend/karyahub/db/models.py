@@ -162,3 +162,13 @@ class DeviceImport(Base):
     user_id: Mapped[str] = mapped_column(String(40))
     imported_at: Mapped[datetime] = mapped_column(DateTime)
     counts: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+class ItemCode(Base):
+    """An inventory item's code, unique inside one business (CR-0011). The item is a record of kind 'item'."""
+
+    __tablename__ = "item_codes"
+
+    business_id: Mapped[str] = mapped_column(ForeignKey("businesses.id"), primary_key=True)
+    code_key: Mapped[str] = mapped_column(String(24), primary_key=True)  # the code in lower case
+    item_id: Mapped[str] = mapped_column(String(64))

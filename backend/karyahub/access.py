@@ -60,6 +60,14 @@ PERMISSIONS: list[Permission] = [
     Permission(id="manage_renewals", label="See renewals and send reminders", roles=_OFFICE),
     Permission(id="manage_settings", label="Change settings and business details", roles=["owner"]),
     Permission(id="manage_team", label="Add staff, change roles and PINs (Admin)", roles=["owner"]),
+    # Inventory (CR-0011). Technicians work on WhatsApp, so they get none of these unless the owner allows it.
+    Permission(id="view_inventory", label="See inventory (parts and stock)", roles=_OFFICE),
+    Permission(
+        id="manage_inventory",
+        label="Add items, import, stock in and out, counts (Inventory)",
+        roles=_OFFICE,
+    ),
+    Permission(id="use_parts", label="Take parts from inventory for a job", roles=_OFFICE),
 ]
 
 PLATFORM_ROLE = "platform_admin"

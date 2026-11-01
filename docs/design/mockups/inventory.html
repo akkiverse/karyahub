@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KaryaHub mockup: Stock per business (CR-0011)</title>
-<meta name="description" content="Clickable design mockup for KaryaHub CR-0011: the stock list, add and edit an item, CSV import, stock in and out, counts, and parts used on a job.">
+<title>KaryaHub mockup: Inventory per business (CR-0011)</title>
+<meta name="description" content="Clickable design mockup for KaryaHub CR-0011: the inventory list, add and edit an item, CSV import, stock in and out, counts, and parts used on a job.">
 <meta name="theme-color" content="#0f766e">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M9 8v16M9 16l9-8M12.5 13l7.5 11' stroke='%23fff' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <!-- The app's own styles, unchanged. Open this file from the repo so the path resolves.
@@ -177,10 +177,13 @@ const words = (s) => String(s).toLowerCase().replace(/µ/g, 'u').split(/[\s,]+/)
 function matches(item, q) { const hay = norm(item.name) + ' ' + norm(item.code || ''); return words(q).every((w) => hay.includes(w)); }
 
 /* ---------- Sample data for "CoolCare AC Services" (mockup only) ---------- */
-const PEOPLE = { owner: { name: 'Akash Mehta', role: 'owner', label: 'Owner (admin)', initials: 'AM' }, technician: { name: 'Santosh Pawar', role: 'technician', label: 'Technician', initials: 'SP' } };
+const PEOPLE = {
+  owner: { name: 'Akash Mehta', role: 'owner', label: 'Owner (admin)', initials: 'AM' }, technician: { name: 'Santosh Pawar', role: 'technician', label: 'Technician', initials: 'SP' },
+  techparts: { name: 'Imran Khan', role: 'technician', label: 'Technician (allowed to take parts)', initials: 'IK' },
+};
 const I = (id, code, name, unit, qty, low, sale, cost, hsn, gst = 18, stopped = false) => ({ id, code, name, unit, qty, low, sale: sale * 100, cost: cost == null ? null : cost * 100, hsn, gst, stopped });
 const S = {
-  role: params.get('role') === 'technician' ? 'technician' : 'owner',
+  role: ['technician', 'techparts'].includes(params.get('role')) ? params.get('role') : 'owner',
   online: params.get('signal') !== 'off',
   theme: ['light', 'dark'].includes(params.get('theme')) ? params.get('theme') : 'system',
   view: 'window',
@@ -240,7 +243,10 @@ for (const it of S.items) if (!S.moves.some((m) => m.item === it.id)) mv(it.id, 
 /* ---------- Access (the three new permissions, plus the existing ones used here) ---------- */
 const PERMS = {
   owner: ['view_dashboard', 'use_chat', 'view_jobs', 'manage_renewals', 'create_documents', 'manage_team', 'manage_settings', 'view_inventory', 'manage_inventory', 'use_parts'],
-  technician: ['use_chat', 'view_jobs', 'view_inventory', 'use_parts'],
+  // Technicians work on WhatsApp: no inventory permission by default (decided 1 Nov 2026).
+  technician: ['use_chat', 'view_jobs'],
+  // The owner can allow one technician to take parts for a job, and nothing else in inventory.
+  techparts: ['use_chat', 'view_jobs', 'use_parts'],
 };
 const me = () => PEOPLE[S.role];
 const can = (p) => PERMS[S.role].includes(p);
@@ -291,7 +297,7 @@ const NAV = [
   ['home', 'Home', '#/home', 'home', 'Workspace', 'view_dashboard', true],
   ['chat', 'Chat', '#/chat', 'chat', 'Workspace', 'use_chat', true],
   ['jobs', 'Jobs', '#/jobs/J-0042', 'jobs', 'Workspace', 'view_jobs', true],
-  ['stock', 'Stock', '#/stock', 'box', 'Workspace', 'view_inventory', true],
+  ['stock', 'Inventory', '#/stock', 'box', 'Workspace', 'view_inventory', true],
   ['renewals', 'Renewals', '#/renewals', 'renewals', 'Workspace', 'manage_renewals', true],
   ['admin', 'Admin', '#/admin', 'users', 'Manage', 'manage_team', false],
   ['settings', 'Settings', '#/settings', 'settings', 'Manage', 'manage_settings', false],
@@ -346,7 +352,7 @@ function noticeHtml() {
   const n = S.notice;
   return `<p class="notice ${n.kind === 'error' ? 'notice-error' : ''}" role="status" tabindex="-1" data-notice>${icon(n.kind === 'error' ? 'alert' : 'check', 18)}<span>${n.html || esc(n.text)}</span></p>`;
 }
-const noAccess = (what) => `<section class="page" data-testid="access-denied"><div class="empty">${icon('shield', 32)}<h1>You don't have access to ${esc(what)}</h1><p>${esc(me().name)} · ${esc(me().label)}</p><p>Ask your business owner to change your access in Admin.</p><a class="btn btn-primary" href="#/stock">Go to Stock</a></div></section>`;
+const noAccess = (what) => `<section class="page" data-testid="access-denied"><div class="empty">${icon('shield', 32)}<h1>You don't have access to ${esc(what)}</h1><p>${esc(me().name)} · ${esc(me().label)}</p><p>Ask your business owner to change your access in Admin.</p><a class="btn btn-primary" href="#/jobs/J-0042">Go to Jobs</a></div></section>`;
 
 /* ---------- Screen: Stock list ---------- */
 function counts() {
@@ -373,7 +379,7 @@ function listScreen() {
   return `
   <section class="page page-wide" aria-labelledby="h-stock">
     <div class="page-head-row">
-      <div class="page-head"><h1 id="h-stock" tabindex="-1">Stock</h1><p class="muted">Parts in your store. Technicians take them for jobs from the job's screen.</p></div>
+      <div class="page-head"><h1 id="h-stock" tabindex="-1">Inventory</h1><p class="muted">Parts in your store. Parts for a job are taken on the job's screen.</p></div>
       ${manage ? `<div class="actions"><a class="btn btn-ghost" href="#/stock/import">${icon('upload', 18)} Import CSV</a><a class="btn btn-primary" href="#/stock/new">${icon('plus', 18)} Add item</a></div>` : ''}
     </div>
     <ul class="kpis inv-kpis">
@@ -382,9 +388,9 @@ function listScreen() {
       <li class="kpi"><span class="kpi-label">${icon('x', 16)} Out or short</span><span class="kpi-value ${c.out ? 'is-out' : ''}">${c.out}</span><span class="kpi-sub muted">count or reorder</span></li>
       ${manage ? `<li class="kpi"><span class="kpi-label">${icon('file', 16)} Stock value</span><span class="kpi-value money">${rupees(c.value)}</span><span class="kpi-sub muted">at cost price</span></li>` : ''}
     </ul>
-    ${manage ? '' : `<p class="notice">${icon('shield', 18)}<span>You can see stock and take parts for your jobs. Ask the office to add or correct stock.</span></p>`}
+    ${manage ? '' : `<p class="notice">${icon('shield', 18)}<span>You can see inventory. Ask the office to add or correct stock.</span></p>`}
     <div class="inv-tools">
-      <div class="inv-search">${icon('search', 18)}<label class="sr-label" for="inv-q">Search stock by name or code</label><input id="inv-q" type="search" placeholder="Search name or code, e.g. cap 45" value="${esc(S.q)}" autocomplete="off" data-search></div>
+      <div class="inv-search">${icon('search', 18)}<label class="sr-label" for="inv-q">Search inventory by name or code</label><input id="inv-q" type="search" placeholder="Search name or code, e.g. cap 45" value="${esc(S.q)}" autocomplete="off" data-search></div>
       <div class="chips" role="group" aria-label="Show" data-chips>${chipsHtml(c)}</div>
     </div>
     <div data-results>${resultsHtml()}</div>
@@ -414,14 +420,14 @@ function resultsHtml() {
 const KIND = { opening: 'Opening stock', in: 'Stock in', out: 'Stock out', used: 'Used on job', returned: 'Put back from job', count: 'Count correction' };
 function itemScreen(id) {
   const it = itemById(id);
-  if (!it) return `<section class="page"><a class="back" href="#/stock">${icon('arrowLeft', 18)} Stock</a><div class="empty"><p>This item isn't in your stock list.</p></div></section>`;
+  if (!it) return `<section class="page"><a class="back" href="#/stock">${icon('arrowLeft', 18)} Inventory</a><div class="empty"><p>This item isn't in your stock list.</p></div></section>`;
   const manage = can('manage_inventory');
   const moves = S.moves.filter((m) => m.item === id);
   let after = it.qty;
   const withAfter = moves.slice().reverse().map((m) => { const row = { ...m, after }; after = r3(after - m.qty); return row; });
   return `
   <section class="page" aria-labelledby="h-item">
-    <a class="back" href="#/stock">${icon('arrowLeft', 18)} Stock</a>
+    <a class="back" href="#/stock">${icon('arrowLeft', 18)} Inventory</a>
     <div class="page-head-row">
       <div class="item-head"><h1 id="h-item" tabindex="-1">${esc(it.name)} ${markHtml(it)}</h1>
         <p class="muted">${esc(it.code || 'No code')} · ${UNIT_NAMES[it.unit]} · HSN ${esc(it.hsn || '—')} · GST ${it.gst} %${it.stopped ? ' · <strong>Stopped</strong>' : ''}</p></div>
@@ -488,9 +494,9 @@ function sheetHtml() {
       <label class="field">Reason <span class="field-hint">optional</span><input name="note" value="${esc(v.note ?? '')}" placeholder="for example: monthly count" autocomplete="off"></label>`;
   } else if (sh.type === 'pick') {
     if (!it) {
-      title = 'Take a part from stock';
+      title = 'Take a part from inventory';
       const list = S.items.filter((i) => !i.stopped && (!sh.q || matches(i, sh.q))).sort((a, b) => a.name.localeCompare(b.name));
-      body = `<div class="inv-search">${icon('search', 18)}<label class="sr-label" for="pick-q">Search stock</label><input id="pick-q" type="search" placeholder="Search by name or code" value="${esc(sh.q || '')}" data-pick-search data-autofocus autocomplete="off"></div>
+      body = `<div class="inv-search">${icon('search', 18)}<label class="sr-label" for="pick-q">Search inventory</label><input id="pick-q" type="search" placeholder="Search by name or code" value="${esc(sh.q || '')}" data-pick-search data-autofocus autocomplete="off"></div>
         <ul class="pick-list" data-pick-results>${pickRows(list)}</ul>`;
     } else {
       title = `Take for ${S.job.id}: ${it.name}`;
@@ -502,7 +508,7 @@ function sheetHtml() {
     }
   }
   const showSave = !(sh.type === 'pick' && !it);
-  const saveLabel = { in: 'Save stock in', out: 'Save stock out', count: 'Save count', pick: 'Take from stock' }[sh.type];
+  const saveLabel = { in: 'Save stock in', out: 'Save stock out', count: 'Save count', pick: 'Take from inventory' }[sh.type];
   return `<div class="sheet-backdrop" data-act="close-sheet"></div>
   <div class="sheet ${sh.shown ? 'is-shown' : ''}" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
     <form class="stack" data-sheet-form novalidate>
@@ -723,7 +729,7 @@ function importScreen() {
   const tag = { new: '<span class="tag">New</span>', update: '<span class="tag tag-soon">Update</span>', same: '<span class="tag tag-past">No change</span>', problem: '<span class="tag tag-lapsed">Problem</span>' };
   return `
   <section class="page page-wide" aria-labelledby="h-import">
-    <a class="back" href="#/stock">${icon('arrowLeft', 18)} Stock</a>
+    <a class="back" href="#/stock">${icon('arrowLeft', 18)} Inventory</a>
     <div class="page-head"><h1 id="h-import" tabindex="-1">Import items from a CSV file</h1><p class="muted">Make the file in Excel or Google Sheets and save it as CSV. Up to 500 rows at a time.</p></div>
     ${S.csvResult ? `<p class="notice" role="status">${icon('check', 18)}<span>${S.csvResult}</span></p>` : ''}
     ${S.online ? '' : `<p class="notice notice-error" role="status">${icon('cloudOff', 18)}<span>Importing needs a signal, because each code must be checked against the whole business. You can still check the file now.</span></p>`}
@@ -811,14 +817,14 @@ function jobScreen() {
       <div><dt>Parts in the note</dt><dd>${esc(j.parts)}</dd></div>
     </dl>
     <div class="panel" aria-labelledby="h-parts">
-      <div class="panel-head"><h2 class="panel-title" id="h-parts">${icon('box', 18)} Parts used</h2>${usable ? `<button type="button" class="btn btn-secondary btn-small" data-act="pick">${icon('plus', 18)} Take a part from stock</button>` : ''}</div>
+      <div class="panel-head"><h2 class="panel-title" id="h-parts">${icon('box', 18)} Parts used</h2>${usable ? `<button type="button" class="btn btn-secondary btn-small" data-act="pick">${icon('plus', 18)} Take a part from inventory</button>` : ''}</div>
       ${closed ? `<p class="notice">${icon('shield', 18)}<span>This job is closed, so its parts can't change.</span></p>` : ''}
       ${!can('use_parts') ? `<p class="muted">Your access doesn't include taking parts. Ask your business owner.</p>` : ''}
       ${usable && sugg.length ? `<div class="suggest-box"><h3>${icon('sparkle', 16)} From the note</h3><ul class="suggest-list">${sugg.map((s) => s.item
         ? `<li><span><strong>${esc(s.item.name)}</strong> <span class="muted small">“${esc(s.seg)}” · in stock ${esc(qtyU(s.item.qty, s.item.unit))}</span></span><span class="actions"><button type="button" class="btn btn-primary btn-small" data-take="${s.item.id}" data-qty="${s.qty}" data-seg="${esc(s.seg)}">Take ${esc(qtyU(s.qty, s.item.unit))}</button><button type="button" class="btn btn-ghost btn-small" data-dismiss="${esc(s.seg)}" aria-label="Not this one: ${esc(s.seg)}">${icon('x', 16)}</button></span></li>`
-        : `<li><span class="muted">Not in your stock list: <strong>${esc(s.seg)}</strong></span>${can('manage_inventory') ? `<a class="btn btn-ghost btn-small" href="#/stock/new" data-prefill="${esc(s.text)}">${icon('plus', 16)} Add item</a>` : ''}</li>`).join('')}</ul><p class="muted small">Matched by name, without AI. Nothing is taken until you press Take.</p></div>` : ''}
+        : `<li><span class="muted">Not in your inventory: <strong>${esc(s.seg)}</strong></span>${can('manage_inventory') ? `<a class="btn btn-ghost btn-small" href="#/stock/new" data-prefill="${esc(s.text)}">${icon('plus', 16)} Add item</a>` : ''}</li>`).join('')}</ul><p class="muted small">Matched by name, without AI. Nothing is taken until you press Take.</p></div>` : ''}
       ${used.length ? `<ul class="parts-list">${used.map((u) => `<li><span><strong>${esc(u.it.name)}</strong> <span class="muted small">${esc(u.it.code || '')}</span></span><span class="actions" style="align-items:center"><span class="qty">${esc(qtyU(u.qty, u.it.unit))}</span>${money ? `<span class="muted small">${rupees(Math.round(u.qty * u.it.sale))}</span>` : ''}${usable ? `<button type="button" class="btn btn-ghost btn-small" data-remove="${u.id}">${icon('rotate', 16)} Remove</button>` : ''}</span></li>`).join('')}</ul>`
-        : `<p class="muted">${closed ? 'No parts were taken from stock for this job.' : 'No parts taken from stock yet.'}</p>`}
+        : `<p class="muted">${closed ? 'No parts were taken from inventory for this job.' : 'No parts taken from inventory yet.'}</p>`}
       ${money && used.length ? `<div class="stack"><button type="button" class="link-btn" data-act="lines" aria-expanded="${S.showLines}">${S.showLines ? 'Hide' : 'Show'} what goes on the invoice</button>
         ${S.showLines ? `<ul class="lines-preview">${lines.map((l) => `<li><span>${esc(l.d)} <span class="muted small">${fq(l.q)}${l.unit ? ' ' + l.unit : ''} × ${rupees(l.rate)}</span></span><span>${rupees(Math.round(l.q * l.rate))}</span></li>`).join('')}<li class="lines-total"><span>Before GST</span><span>${rupees(sub)}</span></li></ul><p class="muted small">When you press Create invoice, these lines are filled in for you; you can still change any of them. GST is added as today.</p>` : ''}</div>` : ''}
     </div>
@@ -829,13 +835,13 @@ function jobScreen() {
 
 /* ---------- Render and events ---------- */
 function screen(r) {
-  if (!can(NAV.find((n) => n[0] === r.tab)?.[5] || 'view_inventory')) return noAccess(r.tab === 'stock' ? 'Stock' : r.tab);
+  if (!can(NAV.find((n) => n[0] === r.tab)?.[5] || 'view_inventory')) return noAccess(r.tab === 'stock' ? 'Inventory' : r.tab);
   switch (r.name) {
     case 'list': return listScreen();
     case 'item': return itemScreen(r.id);
     case 'item-form': return itemFormScreen(r.id);
     case 'import': return importScreen();
-    case 'job': return r.id === S.job.id ? jobScreen() : `<section class="page placeholder"><a class="back" href="#/stock">${icon('arrowLeft', 18)} Stock</a><div class="empty">${icon('jobs', 28)}<h1>${esc(r.id)}</h1><p>Only job J-0042 is drawn in this mockup. In the app this link opens the job that used the part.</p><a class="btn btn-primary" href="#/jobs/J-0042">Open J-0042</a></div></section>`;
+    case 'job': return r.id === S.job.id ? jobScreen() : `<section class="page placeholder"><a class="back" href="#/stock">${icon('arrowLeft', 18)} Inventory</a><div class="empty">${icon('jobs', 28)}<h1>${esc(r.id)}</h1><p>Only job J-0042 is drawn in this mockup. In the app this link opens the job that used the part.</p><a class="btn btn-primary" href="#/jobs/J-0042">Open J-0042</a></div></section>`;
     default: return `<section class="page placeholder"><div class="empty">${icon('box', 28)}<h1>${esc((r.tab || 'This screen').replace(/^\w/, (c) => c.toUpperCase()))}</h1><p>This screen doesn't change in CR-0011. Use the Stock and Jobs screens, or the mockup bar.</p><a class="btn btn-primary" href="#/stock">Go to Stock</a></div></section>`;
   }
 }
@@ -947,7 +953,7 @@ function downloadTemplate() {
 }
 
 /* ---------- Mockup bar (not part of the app) ---------- */
-const SCREENS = [['#/stock', 'Stock list'], ['#/stock/new', 'Add item'], ['#/stock/item/cap25', 'Item: in, out, count'], ['#/stock/import', 'CSV import'], ['#/jobs/J-0042', 'Job: parts used']];
+const SCREENS = [['#/stock', 'Inventory list'], ['#/stock/new', 'Add item'], ['#/stock/item/cap25', 'Item: in, out, count'], ['#/stock/import', 'CSV import'], ['#/jobs/J-0042', 'Job: parts used']];
 function paintBar() {
   if (EMBED) return;
   const btn = (group, val, label, on) => `<button type="button" data-${group}="${val}" aria-pressed="${on}">${label}</button>`;
@@ -955,7 +961,7 @@ function paintBar() {
   document.getElementById('mockbar').innerHTML = `<div class="mock-bar" role="region" aria-label="Mockup controls, not part of the app">
     <strong>KaryaHub CR-0011 mockup</strong>
     <span class="mock-group"><span>Screen</span>${SCREENS.map(([h, l]) => btn('go', h, l, hash.startsWith(h) && (h !== '#/stock' || hash === '#/stock'))).join('')}</span>
-    <span class="mock-group"><span>Signed in as</span>${btn('role', 'owner', 'Owner', S.role === 'owner')}${btn('role', 'technician', 'Technician', S.role === 'technician')}</span>
+    <span class="mock-group"><span>Signed in as</span>${btn('role', 'owner', 'Owner', S.role === 'owner')}${btn('role', 'technician', 'Technician', S.role === 'technician')}${btn('role', 'techparts', 'Technician + parts', S.role === 'techparts')}</span>
     <span class="mock-group"><span>Signal</span>${btn('signal', 'on', 'On', S.online)}${btn('signal', 'off', 'Off', !S.online)}</span>
     <span class="mock-group"><span>Theme</span>${btn('theme', 'system', 'System', S.theme === 'system')}${btn('theme', 'light', 'Light', S.theme === 'light')}${btn('theme', 'dark', 'Dark', S.theme === 'dark')}</span>
     <span class="mock-group"><span>View</span>${btn('view', 'window', 'This window', S.view === 'window')}${btn('view', 'phone', 'Phone 375', S.view === 'phone')}${btn('view', 'desktop', 'Desktop 1280', S.view === 'desktop')}${btn('view', 'both', 'Both', S.view === 'both')}</span>

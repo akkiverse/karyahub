@@ -126,6 +126,27 @@ flowchart LR
 - **Phone:** `src/sync.js` watches the store, queues a change per edited item (coalescing edits to the same item that has not been sent), persists the queue, sends it when online with growing waits, applies what comes back without re-queuing it, and shows how many changes wait.
 - **Demo business:** no sync; its data stays on the device and the server refuses.
 
+## Inventory (CR-0011)
+
+```mermaid
+flowchart LR
+  subgraph Phone
+    IV[Inventory and job screens] --> M[Stock moves, saved on the phone first]
+    M --> Q[Queue with operation ids]
+  end
+  Q -->|"POST /api/v1/sync"| SV[Sync service + inventory rules]
+  SV -->|"one transaction: move, item quantity, job parts_used and history"| DB[(records: item, stock_move, job; item_codes)]
+  SV -->|"item, move and job come back together"| IV
+  CSV[CSV file] -->|"POST /api/v1/inventory/import (check, then import)"| IM[Import service]
+  IM --> DB
+```
+
+- **Records:** `item` and `stock_move` rows of `records` (ADR-0013), so `business_id`, row-level security and the sync cursor already apply. New table `item_codes` (migration 0003) keeps item codes unique per business.
+- **Quantity:** the server's. A move is applied under the per-business counter lock together with the item's new quantity and, for parts used on a job, the job's `parts_used` and a history entry. Moves are never changed. See ADR-0015.
+- **Permissions:** `view_inventory`, `manage_inventory`, `use_parts` (off for technicians by default). Cost prices are removed from what the server sends to people without `manage_inventory`.
+- **Phone:** `src/domain/inventory.js` (search, marks, the quantity to show, suggestions, validation), `src/domain/stock.js` (actions), `src/views/inventory.js` (screens and sheets), a Parts used panel in `src/views/jobs.js`. The quantity on screen is the server's plus the phone's moves not yet answered.
+- **Activity log:** lines are collected during the sync and written after the business scope is lifted (the log is not a business-data table).
+
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.
 

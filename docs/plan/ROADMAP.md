@@ -21,8 +21,8 @@ KaryaHub is one portal that many firms use. Each firm signs in with mobile numbe
 | 1 | `records`, `sync_ops`, `counters` and `device_imports` all carry `business_id`; `backend/karyahub/data/service.py` filters every statement by it; migration `0002` turns on row-level security with a policy on `business_id`; `tests/api/test_us23_business_data.py` proves the wall. |
 | 2 | The app keeps working from its on-device copy when the server can't be reached; the AI and WhatsApp fall-backs are older (CR-0004). |
 | 3 | `src/sync.js`: changes are written to the device first, queued with an operation id, sent when there is signal, and the server ignores repeats. |
-| 4 | Each kind of record needs a permission to read and to change (`backend/karyahub/data/service.py`, `READ_PERMISSIONS` and `WRITE_PERMISSIONS`); the owner's switches decide. Importing from a device and changing the logo go in the activity log. |
-| 5 | Not built yet (K5, K6). The WhatsApp adapter is the only sender today. |
+| 4 | Each kind of record needs a permission to read and to change (`backend/karyahub/data/service.py`, `READ_PERMISSIONS` and `WRITE_PERMISSIONS`); the owner's switches decide. Importing from a device and changing the logo go in the activity log. Inventory (K2) adds `view_inventory`, `manage_inventory` and `use_parts`, off for technicians, and logs item changes, stock moves and imports. |
+| 5 | Not built yet (K5, K6). The WhatsApp adapter is the only sender today. K2 sends no messages; a low-stock message to the owner is noted for K6. |
 | 6 | Not built yet (K6, stage B). |
 | 7 | ₹, +91 numbers and dd-mm-yyyy are in place; the privacy notice, export and delete come with K8. |
 
@@ -34,9 +34,9 @@ Each step is one change request (CR) and one pull request, approved by the found
 |---|---|---|---|---|
 | Done | Accounts and businesses on the server; sign-in with mobile and PIN; owners manage their team and access | CR-0005 | v0.4.0 | Live |
 | Done | Clear feedback, faster sign-in, AI over a slow link | CR-0006, 0007, 0008 | v0.4.1 to v0.4.3 | Live |
-| **1. K3** | **Business data on the server**: jobs, customers, documents, chat and reminders move from the browser to the database, scoped by business with row-level security; offline changes queue and sync without duplicates; one-time import from the device; business details and logo on the server | CR-0009 | v0.5.0 | This change |
-| 2. B2 | Chat works and AI is smooth (diagnose why Chat fails while AI works elsewhere; longer AI step limit, warm model, streaming) | CR-0010 | v0.6.0 | Planned |
-| 3. K2 | Inventory per business: own items, CSV import, stock in and out, low-stock marks, parts used on a job; permission `manage_inventory` | CR-0011 | v0.7.0 | Planned |
+| 1. K3 | Business data on the server: jobs, customers, documents, chat and reminders move from the browser to the database, scoped by business with row-level security; offline changes queue and sync without duplicates; one-time import from the device; business details and logo on the server | CR-0009 | v0.5.0 | Live |
+| 2. B2 | Chat works and AI is smooth (diagnose why Chat fails while AI works elsewhere; longer AI step limit, warm model, streaming) | CR-0010 | v0.6.0 | Live |
+| **3. K2** | **Inventory per business**: own items, CSV import, stock in and out, counts, low-stock marks, parts used on a job; permissions `view_inventory`, `manage_inventory`, `use_parts` (off for technicians) | CR-0011 | v0.7.0 | This change |
 | 4. K5 | Real paperwork and reminders: numbers per business and financial year with no gaps, the business's own GSTIN, address and logo on every document, a PDF from a link, a rate card, a daily list of AMC renewals due, and the "Send on WhatsApp" link (rule 5) | CR-0012 | v0.8.0 | Planned |
 | 5. D1 | Owner dashboard | CR-0013 | v0.9.0 | Planned |
 | 6. K6 | WhatsApp for every business: stage A Studio test account *(founder)*, stage B "Use our own WhatsApp number", stage C one-click Connect WhatsApp *(founder: Meta Tech Provider)* | one CR per stage | | Planned |
@@ -51,3 +51,10 @@ Each step is one change request (CR) and one pull request, approved by the found
 - **Numbers.** Job and document numbers (`J-0007`, `QT-2026-0003`) are given by the server, one counter per business, so two phones can never choose the same number. Until a new item reaches the server, the phone shows it as "New". K5 turns the document counters into per-financial-year, gap-free numbers.
 - **The demo business** stays on the device and read-only for visitors; it never syncs.
 - **Known limit.** If two people change the same record while both are offline, the later sync wins for ordinary fields. Job state, history and customer codes are the server's and a phone can't overwrite them.
+
+## What K2 settled (so later steps can lean on it)
+
+- **Items and stock moves** are rows of `records` (kinds `item` and `stock_move`), with `item_codes` keeping codes unique per business. The server owns each item's quantity and each job's `parts_used`; a phone only sends moves. K5 reads `parts_used` and item prices and GST rates for documents; D1 can total stock value and low items from the same records.
+- **A move is never changed.** A mistake is fixed with a new move. Later kinds (van stock, part returns, serial numbers) add move kinds, not new rules.
+- **Technicians get no inventory by default.** They report on WhatsApp; the office takes parts for a job from the technician's note (the suggestions on the job screen exist for this). The owner can allow one technician to take parts.
+- **Still to come:** a technician's own van stock, returning old parts within a set time, serial numbers and barcodes, purchase orders and a parts-variance report; a low-stock message to the owner (K6, through the one sender layer).

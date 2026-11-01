@@ -1,17 +1,19 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-01 · **Branch:** `cr/0010-smooth-ai-and-chat` (CR-0010) · **Result:** 231 of 231 tests passing (122 server + 1 Postgres-only test skipped without its database, 109 web), covering all 123 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-01 · **Branch:** `cr/0011-inventory` (CR-0011) · **Result:** 289 of 289 tests passing (151 server + 1 Postgres-only test skipped without its database, 138 web), covering all 142 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
 Three suites:
-- **Web app:** 99 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js`, `tests/fake-accounts.js` and `tests/fake-sync.js` standing in for the server (they record calls and can act unreachable, lose an answer, fail, or refuse a kind of record). AC-2.2 runs with the real step timing under fake timers.
-- **Server:** 110 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
-- **Real Postgres (optional, 1 test):** `test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business` runs when `KARYAHUB_TEST_POSTGRES_URL` is set. It runs the migrations on a real Postgres 16, checks the policies and the restricted role exist, and that a scoped session with no `WHERE` sees only its own business, cannot write into another, and sees nothing with no business set. It was run on PostgreSQL 16.2 for this report, together with an end-to-end smoke run of the whole API (two businesses, sync, import, a proof-of-work step; `/api/health` said `row_level_security: on`). Without the address the test is skipped, so the normal run shows 110 passed and 1 skipped.
+- **Web app:** 138 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js`, `tests/fake-accounts.js` and `tests/fake-sync.js` standing in for the server (they record calls and can act unreachable, lose an answer, fail, or refuse a kind of record). AC-2.2 runs with the real step timing under fake timers.
+- **Server:** 151 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
+- **Real Postgres (optional, 1 test):** `test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business` runs when `KARYAHUB_TEST_POSTGRES_URL` is set. It runs the migrations on a real Postgres 16, checks the policies and the restricted role exist, and that a scoped session with no `WHERE` sees only its own business, cannot write into another, and sees nothing with no business set. It was run on PostgreSQL 16.2 for this report, together with an end-to-end smoke run of the whole API (two businesses, sync, import, a proof-of-work step; `/api/health` said `row_level_security: on`). Without the address the test is skipped, so the normal run shows 151 passed and 1 skipped. CR-0011 extended it to the new `item_codes` table (each business sees only its own codes, the same code can exist in two businesses, and one business cannot write into the other's), and it was run again on PostgreSQL 16.2 for this report; a second smoke run of the API on that database (two businesses, items, moves, a part used on a job, a CSV check and import run twice, the activity log, `/api/health` saying `row_level_security: on`) also passed with the restricted role on.
 
 Some criteria have a test on each side (for example AC-7.2 and AC-23.1: the web app calls the API, and the server does the work). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
 Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see the spec); their old on-device tests were replaced by the tests for AC-18 to AC-22.
+
+CR-0011 changed five older tests for things it meant to change: the data version is now 5 (three tests in `us11-compat.test.js`), the office coordinator's navigation has Inventory (`us14-roles.test.js`, AC-14.3), and the role table has 12 permissions instead of 9 (`us15-admin.test.js`); the technician's navigation test (AC-14.1) did not change, which shows technicians get no inventory by default. The wall coverage test (`test_ac_23_2_every_business_data_table_has_a_row_level_security_policy`) now also covers migration 0003's table.
 
 CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_for_a_role` now puts the job on the server first, because a real business's proof-of-work step now loads the job from the database (AC-23.6).
 
@@ -73,7 +75,7 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-12.1 | `tests/api/test_us12_docs.py::test_ac_12_1_architecture_design_and_risks_are_written_down` (HLD, LLD, RISKS and REFERENCE-REVIEW exist with their key sections.) | Pass |
 | AC-14.1 | `tests/us14-roles.test.js` › AC-14.1: a technician lands on Chat, sees only Chat and Jobs, and job screens hide paperwork and closing | Pass |
 | AC-14.2 | `tests/us14-roles.test.js` › AC-14.2: a technician opening Home, Renewals, Settings, Admin or a document gets a plain no-access page and none of that screen's content | Pass |
-| AC-14.3 | `tests/us14-roles.test.js` › AC-14.3: an office coordinator works with Home, Chat, Jobs and Renewals, can make quotes and close jobs, but not Admin or Settings | Pass |
+| AC-14.3 | `tests/us14-roles.test.js` › AC-14.3: an office coordinator works with Home, Chat, Jobs, Inventory and Renewals, can make quotes and close jobs, but not Admin or Settings | Pass |
 | AC-14.4 | `tests/us14-roles.test.js` › AC-14.4: a technician's proof-of-work step names them in the history, sends no role (the server knows it), and a step their access doesn't cover is refused here too | Pass |
 | AC-14.5 | `tests/us14-roles.test.js` › AC-14.5 (web side): the starting role table matches the server rules for every job action | Pass |
 | AC-14.5 | `tests/api/test_us14_access.py::test_ac_14_5_roles_endpoint_matches_web_app` (GET /api/v1/access/roles returns the same roles and permissions as the web app.) | Pass |
@@ -253,6 +255,65 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-24.13 | `tests/us24-smooth-ai.test.js` › AC-24.13: a stream that ends with an error, an unreachable server and Stop are told apart | Pass |
 | AC-24.13 | `tests/us24-smooth-ai.test.js` › AC-24.13: the app waits longer than the server's 90-second AI step before giving up | Pass |
 | AC-24.14 | `tests/us24-smooth-ai.test.js` › AC-24.14: after a message is read, Send works again for the next one (it stayed greyed out before) | Pass |
+| AC-25.1 | `tests/api/test_us25_inventory.py::test_ac_25_1_an_owner_sees_the_items_and_their_quantity` (items of the business reach the phone with the quantity the server worked out.) | Pass |
+| AC-25.1 | `tests/us25-inventory.test.js` › AC-25.1: Inventory lists the business's items by name with quantity and tiles for items, low and out | Pass |
+| AC-25.1 | `tests/us25-inventory.test.js` › AC-25.1: a real business gets its items from the server, not from the demo sample | Pass |
+| AC-25.2 | `tests/us25-inventory.test.js` › AC-25.2: search finds items by every word of the name or code, ignoring capitals, spaces, dots and µ | Pass |
+| AC-25.2 | `tests/us25-inventory.test.js` › AC-25.2: the chips All, Low, Out and Stopped show their counts and filter the list | Pass |
+| AC-25.3 | `tests/us25-inventory.test.js` › AC-25.3: the mark is Low at or below the level, Out at zero, Short by N below zero, and none with no level | Pass |
+| AC-25.4 | `tests/api/test_us25_inventory.py::test_ac_25_4_an_item_is_checked_and_its_code_is_unique_in_the_business` (each wrong field is refused in plain words; a used code names the item that has it.) | Pass |
+| AC-25.4 | `tests/api/test_us25_inventory.py::test_ac_25_4_a_code_can_be_freed_by_renaming_and_taken_by_another_item` (changing an item's code frees the old one; two phones can't both take the same code.) | Pass |
+| AC-25.4 | `tests/api/test_us25_inventory.py::test_ac_25_4_editing_an_item_never_changes_the_quantity` (the quantity belongs to the server; a phone's copy of it is ignored.) | Pass |
+| AC-25.4 | `tests/us25-inventory.test.js` › AC-25.4: adding an item checks every field, keeps the code unique and saves opening stock as a first move | Pass |
+| AC-25.4 | `tests/us25-inventory.test.js` › AC-25.4: editing an item changes its details and never its quantity | Pass |
+| AC-25.5 | `tests/api/test_us25_inventory.py::test_ac_25_5_an_item_is_stopped_not_deleted` (a stopped item keeps its history, takes no new stock or parts, and can be used again.) | Pass |
+| AC-25.5 | `tests/us25-inventory.test.js` › AC-25.5: an item is stopped, not deleted: it leaves the list and the pickers, keeps its history, and can be used again | Pass |
+| AC-25.6 | `tests/api/test_us25_inventory.py::test_ac_25_6_the_check_lists_every_row_and_saves_nothing` (Check reports new, update and problem rows with row numbers and reasons; nothing is saved.) | Pass |
+| AC-25.6 | `tests/api/test_us25_inventory.py::test_ac_25_6_import_saves_the_good_rows_with_their_opening_stock` (Import adds the good rows and their opening stock, skips the rest, and says what it did.) | Pass |
+| AC-25.6 | `tests/api/test_us25_inventory.py::test_ac_25_6_importing_the_same_file_twice_changes_nothing` (a second import finds every row already there and changes no quantity.) | Pass |
+| AC-25.6 | `tests/api/test_us25_inventory.py::test_ac_25_6_a_row_for_an_existing_item_updates_it_and_ignores_opening_stock` (an existing code (or name) is updated; its quantity stays; the check says opening stock is ignored.) | Pass |
+| AC-25.6 | `tests/api/test_us25_inventory.py::test_ac_25_6_a_bad_file_is_refused_as_a_whole` (an empty file, no name column, too many rows or too big a file is refused with a reason.) | Pass |
+| AC-25.6 | `tests/api/test_us25_inventory.py::test_ac_25_6_the_import_of_a_stopped_item_leaves_it_stopped` (an import updates the details of a stopped item without bringing it back.) | Pass |
+| AC-25.6 | `tests/us25-inventory.test.js` › AC-25.6: Check lists each row and its problems, Import saves the good ones, and a signal is needed | Pass |
+| AC-25.7 | `tests/api/test_us25_inventory.py::test_ac_25_7_stock_in_raises_the_quantity` (stock in adds to the quantity; the move records who, the supplier and the bill.) | Pass |
+| AC-25.7 | `tests/us25-inventory.test.js` › AC-25.7: stock in adds to the quantity, checks the date and the quantity, and appears in the history | Pass |
+| AC-25.8 | `tests/api/test_us25_inventory.py::test_ac_25_8_stock_out_is_refused_when_it_is_more_than_is_in_stock` (a manual stock out can't take the quantity below zero; the message says what is in stock.) | Pass |
+| AC-25.8 | `tests/us25-inventory.test.js` › AC-25.8: stock out needs a reason, refuses more than is in stock, and points to the job screen for parts | Pass |
+| AC-25.9 | `tests/api/test_us25_inventory.py::test_ac_25_9_a_count_records_the_difference_worked_out_by_the_server` (the phone says what is on the shelf; the server records the correction against its own number.) | Pass |
+| AC-25.9 | `tests/us25-inventory.test.js` › AC-25.9: a count shows the difference before saving, records a correction, and saves nothing when it matches | Pass |
+| AC-25.10 | `tests/api/test_us25_inventory.py::test_ac_25_10_a_stock_move_cannot_be_changed` (once saved a move is final; a mistake is fixed with a new move.) | Pass |
+| AC-25.10 | `tests/us25-inventory.test.js` › AC-25.10: an item's history lists every move newest first with who, the job and the quantity after, and has no way to edit one | Pass |
+| AC-25.11 | `tests/api/test_us25_inventory.py::test_ac_25_11_parts_taken_for_a_job_leave_stock_and_show_on_the_job` (the quantity falls, the job lists the part and its history says who used it.) | Pass |
+| AC-25.11 | `tests/api/test_us25_inventory.py::test_ac_25_11_using_more_than_is_in_stock_is_allowed_and_shows_as_short` (a job can use what the records say is not there; the item then shows as short.) | Pass |
+| AC-25.11 | `tests/api/test_us25_inventory.py::test_ac_25_11_a_closed_job_or_an_unknown_job_takes_no_parts` (a closed job's parts can't change; a job the server doesn't have is refused.) | Pass |
+| AC-25.11 | `tests/us25-inventory.test.js` › AC-25.11: taking a part from inventory lowers the stock, lists the part on the job and says so in its history | Pass |
+| AC-25.11 | `tests/us25-inventory.test.js` › AC-25.11: more than is in stock is allowed with a warning and shows as short; a closed job takes no parts | Pass |
+| AC-25.12 | `tests/us25-inventory.test.js` › AC-25.12: parts named in the note are offered by name with no AI, and nothing is taken until Take is pressed | Pass |
+| AC-25.13 | `tests/us25-inventory.test.js` › AC-25.13: the parts a job used become lines on its quote and invoice, after the work lines and still editable | Pass |
+| AC-25.13 | `tests/us25-inventory.test.js` › AC-25.13: a part the job already charges for is not added a second time | Pass |
+| AC-25.14 | `tests/api/test_us25_inventory.py::test_ac_25_14_a_move_sent_twice_is_applied_once` (a lost answer and a retry (the same operation id) change the quantity once.) | Pass |
+| AC-25.14 | `tests/api/test_us25_inventory.py::test_ac_25_14_two_phones_using_the_last_unit_are_both_counted` (both uses count; the item shows as short by one instead of one phone's work being lost.) | Pass |
+| AC-25.14 | `tests/us25-inventory.test.js` › AC-25.14: with no signal a part is taken at once, counted as waiting, and sent once when the signal returns | Pass |
+| AC-25.14 | `tests/us25-inventory.test.js` › AC-25.14: an answer lost on the way, sent again, changes the stock once | Pass |
+| AC-25.14 | `tests/us25-inventory.test.js` › AC-25.14: opening stock for a new item is sent as the item and then a move, in that order | Pass |
+| AC-25.15 | `tests/api/test_us25_inventory.py::test_ac_25_15_the_server_owns_the_quantity_and_the_jobs_parts` (a phone can't write the quantity, a job's list of parts or its history through the job.) | Pass |
+| AC-25.15 | `tests/api/test_us25_inventory.py::test_ac_25_15_a_move_for_something_that_is_not_there_is_refused` (an unknown item, an unknown kind and a move that is not an object are refused, nothing changes.) | Pass |
+| AC-25.15 | `tests/us25-inventory.test.js` › AC-25.15: the quantity is the server\'s: this phone sends moves and never a quantity, and a refused move is taken back | Pass |
+| AC-25.15 | `tests/us25-inventory.test.js` › AC-25.15: editing an item sends the item but never counts a changed quantity as an edit | Pass |
+| AC-25.16 | `tests/api/test_us25_inventory.py::test_ac_25_16_one_business_cannot_read_or_use_anothers_inventory` (items, moves, jobs and codes of one business are invisible and unusable from another.) | Pass |
+| AC-25.16 | `tests/api/test_us23_business_data.py::test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business` (extended to `item_codes`: a scoped session sees only its business's codes, cannot write another's, and the same code can exist in two businesses; needs `KARYAHUB_TEST_POSTGRES_URL`, run on PostgreSQL 16.2.) | Pass (skipped without the database) |
+| AC-25.17 | `tests/api/test_us25_inventory.py::test_ac_25_17_technicians_have_no_inventory_access_unless_the_owner_gives_it` (by default a technician reads and changes no inventory; the owner can allow one person.) | Pass |
+| AC-25.17 | `tests/api/test_us25_inventory.py::test_ac_25_17_cost_prices_reach_only_people_who_manage_inventory` (without manage_inventory the server sends no cost prices, in items or in stock-in moves.) | Pass |
+| AC-25.17 | `tests/api/test_us25_inventory.py::test_ac_25_17_the_platform_admin_and_the_demo_business_have_no_inventory` (the platform admin sees no business data; the demo business never syncs.) | Pass |
+| AC-25.17 | `tests/api/test_us25_inventory.py::test_ac_25_17_importing_needs_manage_inventory` (a person who can't manage inventory can't import.) | Pass |
+| AC-25.17 | `tests/us25-inventory.test.js` › AC-25.17: a technician has no Inventory screen or tab; a person with only view access cannot change anything | Pass |
+| AC-25.17 | `tests/us25-inventory.test.js` › AC-25.17: the three permissions exist, are on for the office and off for technicians | Pass |
+| AC-25.17 | `tests/us25-inventory.test.js` › AC-25.17: a technician the owner allows to take parts can do so, but still sees no Inventory and no cost prices | Pass |
+| AC-25.17 | `tests/us25-inventory.test.js` › AC-25.17: a technician with no inventory permission sees nothing about parts on a job | Pass |
+| AC-25.18 | `tests/api/test_us25_inventory.py::test_ac_25_18_inventory_changes_go_in_the_activity_log` (items, stock in, stock out, counts and imports are logged; parts used go in the job's history.) | Pass |
+| AC-25.19 | `tests/api/test_us25_inventory.py::test_ac_25_19_jobs_from_before_inventory_load_and_take_parts` (a job saved by v0.6.0 has no list of parts; it works, and the first part creates the list.) | Pass |
+| AC-25.19 | `tests/us25-inventory.test.js` › AC-25.19: data saved by v0.6.0 (version 4) loads with no items, keeps its jobs, and nothing is put into stock from their parts text | Pass |
+| AC-25.19 | `tests/us25-inventory.test.js` › AC-25.19: the demo business has sample stock labelled as such, which never syncs and has no CSV import | Pass |
 
 ## Design checklist
 | Check | Result |
@@ -269,6 +330,8 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | Motion: one entrance moment plus action feedback | Yes: processing steps ticking to green; sheet rises; voice-note waveform while playing |
 
 ## Visual check
+**CR-0011:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database), driven by Playwright in Chromium at 375px and 1280px in light and dark (4 runs, each in a fresh business seeded through the sync call: 9 items with one low, two out or short, one job with a note naming parts; 40 screenshots). Per run: Inventory list (cards on the phone, table on the desktop) with its tiles, search ("cap 45" gave one item, a nonsense word gave the empty message), the Low chip; one item with its history; Stock in with a wrong quantity (the message under the box) and then a right one (the notice, "All saved"); Count with the live "This records −1 nos as a count correction." line; Add item with five field messages; CSV import with 2 new, 1 update and 4 problem rows listed by row number; the job with "From the note" suggestions and an unmatched "copper nut"; taking a part from the picker (the short-stock warning for the stabiliser), then the parts list with prices for the owner. A technician signing in saw Chat and Jobs only, no Inventory tab, and "You don't have access to Inventory" at `#/inventory`. No console errors, and page width equals the viewport in every run. The design mockup (`docs/design/mockups/inventory.html`) was walked through the same way before the build; the built screens follow it.
+
 **CR-0010:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database). `AI_ENDPOINTS` pointed at a local stand-in for the Mac's Ollama that has only `gemma4:e4b`, takes 4 s per JSON read and streams the photo text word by word. `AI_MODEL` was set to `qwen3.5:9b`, a model the stand-in lacks, to exercise the fallback. Playwright in Chromium at 375px light and dark and 1280px light:
 - Opening Chat sent one warm-up.
 - A typed note showed "Reading the message… 2 s" with Stop, then the draft card, and the message box and Send were on again.
@@ -296,6 +359,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
+- v0.7.0 (planned): CR-0011 in review; 289 of 289 tests passing (151 server, 138 web), plus the Postgres-only test (run on PostgreSQL 16.2).
 - v0.6.0 (2026-11-01): CR-0010 released; 231 of 231 tests passing (122 server, 109 web), plus the Postgres-only test (skipped here). Founder checked the preview: two notes in a row, Stop and Try again; AI reads took 0.8 to 4.4 s (runtime logs).
 - v0.5.0 (planned): CR-0009 in review; 209 of 209 tests passing (110 server, 99 web), plus the Postgres-only test.
 - v0.1.0 (2026-10-28): CR-0001 released; 23 of 23 acceptance tests passing.

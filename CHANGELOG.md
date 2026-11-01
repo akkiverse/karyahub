@@ -5,6 +5,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **Inventory** for each business: its own items with search, **Low**, **Out** and **Short** marks, add and edit (name, code, unit, sale and cost price, HSN, GST, low-stock level, opening stock), stop and use again, and a history of every move. See [CR-0011](docs/changes/CR-0011-inventory.md) and [ADR-0015](docs/adr/0015-inventory-as-stock-moves-with-a-server-owned-quantity.md).
+- **Stock in, stock out and Count.** A count records the difference against the server's own quantity.
+- **CSV import** of items: the file is checked first, row by row (new, update, problem with its row number and reason), and importing the same file again changes nothing.
+- **Parts used on a job**: take parts from inventory on the job's screen (also with no signal), with one-tap suggestions from the job note matched by name with no AI, **Remove** to put one back, and the parts added as lines to the quote and invoice.
+- Three permissions the owner switches per role or person: *See inventory*, *Add items, import, stock in and out, counts* and *Take parts for a job*. They are on for the owner and the office coordinator and **off for technicians**. Cost prices are not sent to people who can't manage inventory.
+- Activity log lines for item changes, stock in, stock out, counts and imports; parts used and put back appear in the job's history.
+- The demo business has sample stock on the device (it never syncs).
+
+### Changed
+- **Inventory** is on the phone's tab bar; **Admin** moved to the account menu there (the desktop sidebar is unchanged).
+- A job keeps a list of the parts used (`parts_used`) that only the server changes, like its state and history.
+- Data saved on the device is now version 5 (adds items and stock moves); data from v0.6.0 loads unchanged.
+- Database: migration 0003 adds `item_codes` (item codes unique per business) behind the same row-level security.
+
 ## [0.6.0] - 2026-11-01
 
 ### Fixed

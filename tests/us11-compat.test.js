@@ -23,7 +23,7 @@ describe('US-11 Existing data keeps working', () => {
   it('AC-11.1: data saved by v0.1.0 loads with jobs, documents, customers and settings kept, and jobs gain a workflow state', () => {
     t = setup({ saved: savedByV010(), hash: '#/jobs/J-0001' });
     const s = t.app.store.get();
-    expect(s.version).toBe(4); // v1 -> v2 (CR-0002) -> v3 (CR-0003) -> v4 (CR-0005)
+    expect(s.version).toBe(5); // v1 -> v2 (CR-0002) -> v3 (CR-0003) -> v4 (CR-0005) -> v5 (CR-0011)
     expect(s.staff).toBeUndefined(); // the team now lives on the server
     expect(s.settings.mode).toBe('mock');
     expect(s.jobs).toHaveLength(1);
@@ -43,7 +43,7 @@ describe('US-11 Existing data keeps working', () => {
     v2.jobs[0].events = [{ id: 'ev-1', action: 'verify_otp', from_state: 'WORK_DONE', to_state: 'VERIFIED', client_op_id: 'op-1', actor: 'Owner', channel: 'web', detail: 'Customer confirmed with the code' }];
     t = setup({ saved: v2, hash: '#/jobs/J-0001' });
     const s = t.app.store.get();
-    expect(s.version).toBe(4);
+    expect(s.version).toBe(5);
     expect(s.jobs[0].state).toBe('VERIFIED');
     expect(s.jobs[0].events).toHaveLength(1);
     expect(s.staff).toBeUndefined();
@@ -61,7 +61,7 @@ describe('US-11 Existing data keeps working', () => {
     v3.jobs[0].events = [{ id: 'ev-1', action: 'report_done', client_op_id: 'op-1', detail: 'x' }];
     t = setup({ saved: v3, hash: '#/jobs/J-0001' });
     const s = t.app.store.get();
-    expect(s.version).toBe(4);
+    expect(s.version).toBe(5);
     expect(s.staff).toBeUndefined();
     expect(s.access_log).toBeUndefined();
     expect(s.seq.staff).toBeUndefined();

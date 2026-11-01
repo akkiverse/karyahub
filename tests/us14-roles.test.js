@@ -41,9 +41,9 @@ describe('US-14 Roles and limited access', () => {
     }
   });
 
-  it('AC-14.3: an office coordinator works with Home, Chat, Jobs and Renewals, can make quotes and close jobs, but not Admin or Settings', async () => {
+  it('AC-14.3: an office coordinator works with Home, Chat, Jobs, Inventory and Renewals, can make quotes and close jobs, but not Admin or Settings', async () => {
     t = setup({ signedInAs: 'st-coord' });
-    expect(navLabels(t)).toEqual(['Home', 'Chat', 'Jobs', 'Renewals']);
+    expect(navLabels(t)).toEqual(['Home', 'Chat', 'Jobs', 'Inventory', 'Renewals']); // Inventory added by CR-0011
     expect(t.$('.account-menu').textContent).not.toContain('Settings');
     const id = await approvedJob(t);
     t.go(`#/jobs/${id}`);

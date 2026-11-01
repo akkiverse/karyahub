@@ -187,6 +187,8 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     // Business data (CR-0009): one call sends the queued changes and brings back what changed on the server.
     sync: (since, ops) => call('POST', '/sync', { since, ops }, { timeout: SYNC_TIMEOUT_MS }),
     importDevice: (payload) => call('POST', '/import', payload, { timeout: SYNC_TIMEOUT_MS }),
+    // Inventory (CR-0011): check a CSV file, then import it. Needs a signal; the server checks every code.
+    inventoryImport: ({ text, name, check }) => call('POST', '/inventory/import', { text, name, check }, { timeout: SYNC_TIMEOUT_MS }),
 
     // Businesses (platform admin)
     businesses: () => call('GET', '/platform/businesses'),

@@ -21,6 +21,10 @@ export const PERMISSIONS = [
   { id: 'manage_renewals', label: 'See renewals and send reminders', roles: ['owner', 'coordinator'] },
   { id: 'manage_settings', label: 'Change settings and business details', roles: ['owner'] },
   { id: 'manage_team', label: 'Add staff, change roles and PINs (Admin)', roles: ['owner'] },
+  // Inventory (CR-0011). Technicians work on WhatsApp, so they have none of these unless the owner allows it.
+  { id: 'view_inventory', label: 'See inventory (parts and stock)', roles: ['owner', 'coordinator'] },
+  { id: 'manage_inventory', label: 'Add items, import, stock in and out, counts (Inventory)', roles: ['owner', 'coordinator'] },
+  { id: 'use_parts', label: 'Take parts from inventory for a job', roles: ['owner', 'coordinator'] },
 ];
 
 /** The starting permissions for a role (before an owner's switches). Used by tests and the demo. */
@@ -36,6 +40,7 @@ export const roleShort = (role) => (role === PLATFORM_ROLE.id ? PLATFORM_ROLE.sh
 export const ROUTE_PERMISSION = {
   home: 'view_dashboard', chat: 'use_chat', jobs: 'view_jobs', job: 'view_jobs', doc: 'create_documents',
   renewals: 'manage_renewals', settings: 'manage_settings', admin: 'manage_team', businesses: 'manage_businesses',
+  inventory: 'view_inventory', item: 'view_inventory', 'item-form': 'manage_inventory', 'inventory-import': 'manage_inventory',
 };
 export const canOpen = (me, routeName) => !ROUTE_PERMISSION[routeName] || can(me, ROUTE_PERMISSION[routeName]);
 export const landingFor = (me) => {

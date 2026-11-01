@@ -1,9 +1,9 @@
 # CR-0011: Inventory per business
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder (TASKS.md K2, 30 Oct 2026: "each business has its own items: add and edit by hand, import from CSV, stock in and out, low-stock marks, and parts used on a job taken from stock"). On 1 Nov 2026, when approving the design: call it **Inventory**, and technicians get no inventory permission by default ("they use WhatsApp to share snaps or updates and are rarely given access to this portal"; the owner can give one technician access).
 - **Date:** 2026-11-01
-- **Release:** v0.7.0 (planned)
+- **Release:** v0.7.0 (2026-11-01, [PR #13](https://github.com/akkiverse/karyahub/pull/13))
 - **Pull request:** [#13](https://github.com/akkiverse/karyahub/pull/13)
 - **Design mockup:** [docs/design/mockups/inventory.html](../design/mockups/inventory.html)
 

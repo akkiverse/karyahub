@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-01
+
 ### Added
 - **Inventory** for each business: its own items with search, **Low**, **Out** and **Short** marks, add and edit (name, code, unit, sale and cost price, HSN, GST, low-stock level, opening stock), stop and use again, and a history of every move. See [CR-0011](docs/changes/CR-0011-inventory.md) and [ADR-0015](docs/adr/0015-inventory-as-stock-moves-with-a-server-owned-quantity.md).
 - **Stock in, stock out and Count.** A count records the difference against the server's own quantity.
@@ -120,6 +122,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.7.0]: https://github.com/akkiverse/karyahub/pull/13
 [0.6.0]: https://github.com/akkiverse/karyahub/pull/11
 [0.5.0]: https://github.com/akkiverse/karyahub/pull/9
 [0.4.3]: https://github.com/akkiverse/karyahub/pull/8

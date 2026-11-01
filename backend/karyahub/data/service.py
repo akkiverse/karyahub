@@ -16,31 +16,40 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from karyahub.accounts import service as accounts
-from karyahub.data import rls
+from karyahub.data import inventory, rls
 from karyahub.db.models import Counter, DeviceImport, Record, SyncOp
 from karyahub.domain.workflow import STATES
 from karyahub.errors import AppError
 
-KINDS = ("customer", "job", "document", "message")
+KINDS = ("customer", "job", "document", "message", "item", "stock_move")
+# What a phone can move from its old on-device data (inventory is new, so there is nothing to move).
+IMPORT_KINDS = ("customer", "job", "document", "message")
 # What a person needs (any one of these) to read, or to save, each kind of record. The owner decides.
 READ_PERMISSIONS: dict[str, frozenset[str]] = {
     "customer": frozenset({"view_jobs", "use_chat", "manage_renewals", "view_dashboard", "create_documents"}),
     "job": frozenset({"view_jobs", "use_chat", "manage_renewals", "view_dashboard"}),
     "document": frozenset({"create_documents"}),
     "message": frozenset({"use_chat"}),
+    # Inventory (CR-0011): whoever may take parts needs the items; the history is for those who see inventory.
+    "item": frozenset({"view_inventory", "use_parts", "manage_inventory"}),
+    "stock_move": frozenset({"view_inventory", "manage_inventory"}),
 }
 WRITE_PERMISSIONS: dict[str, frozenset[str]] = {
     "customer": frozenset({"use_chat", "manage_renewals", "create_documents"}),
     "job": frozenset({"use_chat"}),
     "document": frozenset({"create_documents"}),
     "message": frozenset({"use_chat", "create_documents"}),
+    "item": frozenset({"manage_inventory"}),
+    "stock_move": frozenset(
+        {"manage_inventory", "use_parts"}
+    ),  # which move needs which one is checked per move
 }
 ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 MAX_OPS = 100
 MAX_BODY_BYTES = 60_000
 MAX_PAGE = 500
 MAX_IMPORT = {"customer": 2000, "job": 2000, "document": 4000, "message": 4000}
-SERVER_OWNED_JOB_FIELDS = ("state", "events", "otp", "number")
+SERVER_OWNED_JOB_FIELDS = ("state", "events", "otp", "number", "parts_used")
 DEMO_LOCAL = AppError(
     "demo_local", "The demo business keeps its data on your own device, so there is nothing to sync.", 403
 )
@@ -61,9 +70,12 @@ def _business(p: accounts.Principal) -> str:
     return business.id
 
 
-def public(rec: Record) -> dict[str, Any]:
-    """The item as the phone holds it, with the server's id and number written in."""
+def public(rec: Record, p: accounts.Principal | None = None) -> dict[str, Any]:
+    """The item as the phone holds it, with the server's id and number written in. Cost prices are left out
+    for people who don't manage the inventory."""
     body = deepcopy(rec.body)
+    if p is not None and not inventory.can_see_cost(p):
+        inventory.hide_cost(rec.kind, body)
     body["id"] = rec.id
     if rec.kind in {"job", "document"}:
         body["number"] = rec.number
@@ -128,6 +140,8 @@ def _clean_body(kind: str, item_id: str, body: Any) -> dict[str, Any]:
         raise AppError("validation_error", "A change must carry the item itself.", 422)
     if len(json.dumps(body, default=str)) > MAX_BODY_BYTES:
         raise AppError("validation_error", "That item is too large to save.", 422)
+    if kind == "item":
+        return inventory.clean_item(item_id, body)
     clean = deepcopy(body)
     clean["id"] = item_id
     if kind == "customer" and not str(clean.get("name", "")).strip():
@@ -170,6 +184,8 @@ async def _store(
             for key in SERVER_OWNED_JOB_FIELDS:
                 if key in existing.body:
                     merged[key] = existing.body[key]
+                elif key == "parts_used":
+                    merged.pop(key, None)  # a phone can't invent a job's list of parts
         existing.body = merged
         existing.seq = seq
         existing.updated_at = now
@@ -187,6 +203,7 @@ async def _store(
                 "WORK_DONE"  # a new job starts where the app starts it; later steps are the server's
             )
         body["otp"] = None
+        body["parts_used"] = {}
         body.setdefault("events", [])
         body["events"] = [e for e in body["events"] if isinstance(e, dict)][:20]
     if number:
@@ -239,6 +256,7 @@ async def sync(
     await rls.scope(db, business_id)
     results: list[dict[str, Any]] = []
     seen: dict[str, dict[str, Any]] = {}
+    audits: list[tuple[str, str]] = []  # activity-log lines, written once the business scope is lifted
     if ops:
         valid_ids = [
             str(o["op_id"]) for o in ops if isinstance(o, dict) and ID_RE.match(str(o.get("op_id", "")))
@@ -251,9 +269,18 @@ async def sync(
             )
             seen = {op_id: result for op_id, result in rows.all()}
         fresh = [o for o in ops if _problem(o) is None and str(o["op_id"]) not in seen]
-        start = (await bump(db, business_id, "seq", len(fresh))) - len(fresh) if fresh else 0
+        # One change number for each record that changes: a stock move also changes its item and its job.
+        need = sum(3 if o["kind"] == "stock_move" else 1 for o in fresh)
+        start = (await bump(db, business_id, "seq", need)) - need if fresh else 0
         existing = await _existing(db, business_id, fresh) if fresh else {}
         next_seq = start
+
+        def take_seq() -> int:
+            nonlocal next_seq
+            next_seq += 1
+            return next_seq
+
+        batch = inventory.Batch(db, p, business_id, take_seq, existing, audits)
         done_here: dict[str, dict[str, Any]] = {}
         for op in ops:
             problem = _problem(op)
@@ -278,15 +305,22 @@ async def sync(
                     raise AppError(
                         "forbidden", "Your access doesn't include this. Ask your business owner.", 403
                     )
-                body = _clean_body(kind, item_id, op.get("body"))
-                next_seq += 1
-                rec = await _store(db, business_id, kind, item_id, body, current, next_seq)
+                if kind == "stock_move":
+                    _clean_body(
+                        kind, item_id, op.get("body")
+                    )  # size and shape; the move itself is checked below
+                    rec = await batch.apply_move(item_id, op.get("body"), current)
+                elif kind == "item":
+                    rec = await batch.put_item(item_id, _clean_body(kind, item_id, op.get("body")), current)
+                else:
+                    body = _clean_body(kind, item_id, op.get("body"))
+                    rec = await _store(db, business_id, kind, item_id, body, current, take_seq())
                 existing[(kind, item_id)] = rec
                 result.update(status="applied", number=rec.number)
             except AppError as exc:
                 result.update(status="rejected", message=exc.message)
                 if current is not None and kind in readable_kinds(p):
-                    result["record"] = public(current)
+                    result["record"] = public(current, p)
             done_here[op_id] = {k: v for k, v in result.items() if k != "record"}
             db.add(
                 SyncOp(
@@ -317,9 +351,14 @@ async def sync(
         )
         more = len(rows) > MAX_PAGE
         for rec in rows[:MAX_PAGE]:
-            changes[rec.kind].append(public(rec))
+            changes[rec.kind].append(public(rec, p))
             last = rec.seq
     cursor = last if more else max(since, cursor_now)
+    if audits:
+        await db.flush()
+        await rls.unscope(db)  # the activity log is not a business-data table
+        for action, text in audits:
+            await accounts.audit(db, business_id, p.user.name, action, text)
     await db.commit()
     return {"cursor": cursor, "more": more, "readable": kinds, "results": results, "changes": changes}
 
@@ -378,12 +417,12 @@ async def import_from_device(
         return {"imported": False, "already": True, "counts": counts_before}
     counts = {"customer": 0, "job": 0, "document": 0, "message": 0, "merged_customers": 0, "skipped": 0}
     tag = re.sub(r"[^A-Za-z0-9]", "", device_id)[:10] or "device"
-    for kind in KINDS:
+    for kind in IMPORT_KINDS:
         if len(data.get(kind, [])) > MAX_IMPORT[kind]:
             raise AppError(
                 "too_many", "There is too much on this phone to move in one go. Ask for help.", 422
             )
-    total = sum(len(data.get(k, [])) for k in KINDS)
+    total = sum(len(data.get(k, [])) for k in IMPORT_KINDS)
     start = (await bump(db, business_id, "seq", max(total, 1))) - max(total, 1)
     seq = start
     # Existing customers by mobile number, so the same customer isn't added twice.

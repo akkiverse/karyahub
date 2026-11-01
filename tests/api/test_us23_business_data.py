@@ -133,21 +133,25 @@ def test_ac_23_2_every_business_data_table_has_a_row_level_security_policy():
     """AC-23.2: each table with a business_id (except the account tables) is covered by the migration's policy."""
     from karyahub.db.models import Base
 
-    migration = importlib.import_module("karyahub.db.migrations.versions.0002_business_data")
-    steps = migration.rls_statements()["policies"]
+    first = importlib.import_module("karyahub.db.migrations.versions.0002_business_data")
+    later = importlib.import_module(
+        "karyahub.db.migrations.versions.0003_inventory"
+    )  # CR-0011 added item_codes
+    steps = first.rls_statements()["policies"] + later.rls_statements()["policies"]
+    tables = set(first.TABLES) | set(later.TABLES)
     account_tables = {
         "users",
         "role_permissions",
         "audit_log",
     }  # people and the activity log: platform admin flows
     with_business = {t.name for t in Base.metadata.tables.values() if "business_id" in t.columns}
-    assert with_business - account_tables == set(migration.TABLES) == set(rls.TABLES)
-    for table in migration.TABLES:
+    assert with_business - account_tables == tables == set(rls.TABLES)
+    for table in tables:
         assert f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" in steps
         assert f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY" in steps
         policy = next(s for s in steps if s.startswith(f"CREATE POLICY business_wall ON {table} "))
         assert "business_id = current_setting('app.business_id', true)" in policy and "WITH CHECK" in policy
-    role = " ".join(migration.rls_statements()["role"])
+    role = " ".join(first.rls_statements()["role"] + later.rls_statements()["role"])
     assert "NOLOGIN NOBYPASSRLS" in role and "TO karyahub_app" in role
 
 
@@ -511,7 +515,7 @@ def test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business(
     import asyncio
 
     from karyahub.db import engine as eng
-    from karyahub.db.models import Business, Record
+    from karyahub.db.models import Business, ItemCode, Record
     from karyahub.settings import Settings
     from sqlalchemy import select, text
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -524,6 +528,7 @@ def test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business(
         engine = eng.get_engine(settings)
         async with engine.begin() as conn:
             for t in (
+                "item_codes",
                 "records",
                 "sync_ops",
                 "counters",
@@ -569,6 +574,29 @@ def test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business(
                 (await db.execute(select(Record))).scalars().all()
             )  # no WHERE: the database does the fencing
             assert [r.business_id for r in rows] == ["b-one"]
+            # Item codes (CR-0011) sit behind the same wall: each business sees only its own, and can't write another's.
+            db.add(ItemCode(business_id="b-one", code_key="cap-45", item_id="it-1"))
+            await db.flush()
+            db.add(ItemCode(business_id="b-two", code_key="cap-45", item_id="it-2"))
+            with pytest.raises(Exception, match="row-level security"):
+                await db.flush()
+            await db.rollback()
+            await rls.scope(db, "b-one")
+            db.add(ItemCode(business_id="b-one", code_key="cap-45", item_id="it-1"))
+            await db.commit()
+        async with AsyncSession(engine, expire_on_commit=False) as db:
+            await rls.scope(db, "b-two")
+            db.add(
+                ItemCode(business_id="b-two", code_key="cap-45", item_id="it-2")
+            )  # the same code in another business
+            await db.commit()
+        async with AsyncSession(engine, expire_on_commit=False) as db:
+            await rls.scope(db, "b-one")
+            assert [(c.business_id, c.item_id) for c in (await db.execute(select(ItemCode))).scalars()] == [
+                ("b-one", "it-1")
+            ]
+        async with AsyncSession(engine, expire_on_commit=False) as db:
+            await rls.scope(db, "b-one")
             db.add(
                 Record(business_id="b-two", kind="job", id="j-2", number="", body={}, seq=2, updated_at=now)
             )

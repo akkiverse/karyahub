@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from karyahub.accounts import service as accounts
 from karyahub.accounts.deps import BusinessPrincipalDep, DbDep, require
-from karyahub.data import logo, service
+from karyahub.data import inventory_import, logo, service
 
 router = APIRouter(prefix="/api/v1")
 
@@ -25,6 +25,12 @@ class ImportRequest(BaseModel):
     message: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class InventoryImportRequest(BaseModel):
+    text: str = Field(max_length=1_200_000)
+    name: str = Field("", max_length=120)
+    check: bool = True  # look at the file first; nothing is saved unless this is false
+
+
 class LogoRequest(BaseModel):
     data_url: str = Field(max_length=300_000)
 
@@ -36,8 +42,13 @@ async def sync(req: SyncRequest, p: BusinessPrincipalDep, db: DbDep) -> dict[str
 
 @router.post("/import")
 async def import_device(req: ImportRequest, p: BusinessPrincipalDep, db: DbDep) -> dict[str, Any]:
-    data = {k: getattr(req, k) for k in service.KINDS}
+    data = {k: getattr(req, k) for k in service.IMPORT_KINDS}
     return await service.import_from_device(db, p, device_id=req.device_id, data=data)
+
+
+@router.post("/inventory/import")
+async def import_inventory(req: InventoryImportRequest, p: BusinessPrincipalDep, db: DbDep) -> dict[str, Any]:
+    return await inventory_import.import_csv(db, p, text=req.text, name=req.name, check=req.check)
 
 
 ManageSettings = Annotated[accounts.Principal, Depends(require("manage_settings"))]

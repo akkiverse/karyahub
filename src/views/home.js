@@ -2,11 +2,14 @@ import { icon } from '../ui/icons.js';
 import { rupees, prettyDate, daysBetween, escapeHtml } from '../format.js';
 import { dueWithin, moneyAtStake } from '../domain/renewals.js';
 import { today } from '../clock.js';
+import { billFigures } from '../domain/bills.js';
+import { homeBills } from './bills.js';
 
 export const HEADLINE = 'Never miss an AMC renewal again';
 
 export function home({ state, me }) {
   const t = today();
+  const can = (perm) => Boolean(me && (me.permissions || []).includes(perm));
   const demo = Boolean(state.settings.is_demo);
   const due90 = dueWithin(state.customers, t, 90);
   const total = moneyAtStake(due90);
@@ -29,7 +32,8 @@ export function home({ state, me }) {
     </div>
 
 ` : '<h1 id="page-title" class="sr-only" tabindex="-1">Home</h1>'}
-    <article class="stake-card" aria-labelledby="stake-label" data-testid="money-at-stake">
+    ${can('create_documents') ? homeBills(billFigures(state.documents, t), demo) : ''}
+    ${can('manage_renewals') ? `<article class="stake-card" aria-labelledby="stake-label" data-testid="money-at-stake">
       <h2 id="stake-label" class="stake-label">Money at stake in the next 90 days</h2>
       <p class="stake-value" data-testid="stake-value" data-amount="${total}">${rupees(total)}</p>
       <p class="stake-sub">${due90.length} AMC contracts at ${escapeHtml(state.settings.business_name)}${state.settings.is_demo ? ' (demo)' : ''} end by ${prettyDate(addDaysLabel(t))}. Each one is a renewal you either win or lose.</p>
@@ -39,17 +43,17 @@ export function home({ state, me }) {
         .map((c) => `<li><span>${escapeHtml(c.name)}</span><span class="muted">in ${daysBetween(t, c.amc_expiry)} days</span><strong>${rupees(c.amc_value)}</strong></li>`)
         .join('')}</ul>` : ''}
       <a class="link-arrow" href="#/renewals">See all renewals ${icon('arrowRight', { size: 16 })}</a>
-    </article>
+    </article>` : ''}
 
-    <section class="today" aria-labelledby="today-title" data-testid="today-kpis">
+    ${can('view_jobs') ? `<section class="today" aria-labelledby="today-title" data-testid="today-kpis">
       <div class="panel-head"><h2 class="section-title" id="today-title">${me ? `Good to see you, ${escapeHtml(me.name.split(' ')[0])}. ` : ''}Today at ${escapeHtml(state.settings.business_name)}</h2>${demo ? '<span class="muted small">Sample data</span>' : ''}</div>
       <ul class="kpis">
         <li class="kpi"><span class="kpi-label">${icon('jobs', { size: 16 })} Jobs recorded</span><span class="kpi-value" data-kpi="jobs">${state.jobs.length}</span><a class="kpi-sub" href="#/jobs">Open jobs</a></li>
         <li class="kpi"><span class="kpi-label">${icon('shield', { size: 16 })} Waiting for customer check</span><span class="kpi-value" data-kpi="waiting">${state.jobs.filter((j) => (j.state || 'WORK_DONE') === 'WORK_DONE').length}</span><span class="kpi-sub muted">Proof of work pending</span></li>
         <li class="kpi"><span class="kpi-label">${icon('renewals', { size: 16 })} Renewals in 30 days</span><span class="kpi-value" data-kpi="due30">${dueWithin(state.customers, t, 30).length}</span><span class="kpi-sub money">${rupees(buckets[0].value)} at stake</span></li>
-        <li class="kpi"><span class="kpi-label">${icon('file', { size: 16 })} Quotes and invoices</span><span class="kpi-value" data-kpi="docs">${state.documents.length}</span><span class="kpi-sub muted">Sent on WhatsApp (simulated)</span></li>
+        <li class="kpi"><span class="kpi-label">${icon('file', { size: 16 })} Estimates and bills</span><span class="kpi-value" data-kpi="docs">${state.documents.filter((d) => !d.deleted).length}</span><a class="kpi-sub" href="#/bills">See bills</a></li>
       </ul>
-    </section>
+    </section>` : ''}
 
     ${demo ? `    <h2 class="section-title">What goes wrong today</h2>
     <ul class="problems" data-testid="problem-cards">

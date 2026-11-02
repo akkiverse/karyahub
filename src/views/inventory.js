@@ -1,3 +1,4 @@
+import { W } from '../words.js';
 // Inventory screens (CR-0011, US-25): the list, one item with its history, the add and edit form, the CSV import,
 // and the sheets for stock in, stock out, count and taking a part for a job.
 import { icon } from '../ui/icons.js';
@@ -16,11 +17,13 @@ export const CSV_COLUMNS = ['code', 'name', 'unit', 'sale_price', 'cost_price', 
 export const CSV_TEMPLATE = `${CSV_COLUMNS.join(',')}\nCAP-35,Capacitor 35 µF,nos,380,170,8532,18,5,10\n`;
 
 function markHtml(state, item) {
+  if (item.service) return `<span class="mark mark-service" data-testid="mark">${W.service}</span>`; // CR-0012: never counted
   const q = stockOf(state, item);
   const m = markOf(q, item.low);
   return m ? `<span class="mark mark-${m.kind}" data-testid="mark">${m.kind === 'low' ? icon('alert', { size: 12 }) : ''}${e(markText(m, q, item.unit))}</span>` : '';
 }
 function qtyHtml(state, item) {
+  if (item.service) return '<span class="qty" data-testid="qty">–</span>';
   const q = stockOf(state, item);
   const m = markOf(q, item.low);
   return `<span class="qty ${m ? `is-${m.kind}` : ''}" data-testid="qty">${e(qtyText(q, item.unit))}</span>`;
@@ -131,7 +134,7 @@ export function itemForm({ state, ui, params }) {
   const key = params.id || 'new';
   const f = ui.inv && ui.inv.form && ui.inv.form.key === key ? ui.inv.form : null;
   const v = (f && f.values) || (it
-    ? { name: it.name, code: it.code || '', unit: it.unit, sale: it.sale / 100, cost: it.cost == null ? '' : it.cost / 100, hsn: it.hsn || '', gst: String(it.gst), low: it.low ?? '' }
+    ? { name: it.name, code: it.code || '', unit: it.unit, sale: it.sale / 100, cost: it.cost == null ? '' : it.cost / 100, hsn: it.hsn || '', gst: String(it.gst), low: it.low ?? '', price_includes_gst: Boolean(it.price_includes_gst), service: Boolean(it.service) }
     : { unit: 'nos', gst: '18', name: (ui.inv && ui.inv.prefill) || '' });
   const errors = (f && f.errors) || {};
   const input = (k, label, hint = '', extra = '') => `<label class="field">${label}${hint ? ` <span class="field-hint">${hint}</span>` : ''}<input name="${k}" value="${e(v[k] ?? '')}" ${inv(errors, k)} ${extra} autocomplete="off">${fieldErr(errors, k)}</label>`;
@@ -144,10 +147,12 @@ export function itemForm({ state, ui, params }) {
         ${input('name', 'Name', '', 'data-autofocus placeholder="for example Capacitor 35 µF"')}
         ${input('code', 'Code', 'optional, unique in your business', 'placeholder="for example CAP-35"')}
         <label class="field">Unit<select name="unit" ${inv(errors, 'unit')}>${Object.keys(UNITS).map((u) => `<option value="${u}" ${v.unit === u ? 'selected' : ''}>${UNIT_NAMES[u]}</option>`).join('')}</select>${fieldErr(errors, 'unit')}</label>
-        ${input('sale', 'Sale price (₹)', 'per unit, used on quotes and invoices', 'inputmode="decimal"')}
+        ${input('sale', 'Sale price (₹)', 'per unit, used on estimates and bills', 'inputmode="decimal"')}
         ${input('cost', 'Cost price (₹)', 'optional; only people who manage inventory see it', 'inputmode="decimal"')}
         ${input('hsn', 'HSN code', 'optional, 4, 6 or 8 digits', 'inputmode="numeric"')}
         <label class="field">GST rate<select name="gst" ${inv(errors, 'gst')}>${GST_RATES.map((g) => `<option value="${g}" ${String(v.gst) === String(g) ? 'selected' : ''}>${g} %</option>`).join('')}</select>${fieldErr(errors, 'gst')}</label>
+        <label class="check"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}> ${W.priceIncludesGst} <span class="muted small">(MRP)</span></label>
+        <label class="check"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}> ${W.service} <span class="muted small">(for example Gas refill)</span></label>
         ${input('low', 'Low-stock level', 'optional; marked Low at or below this', 'inputmode="decimal"')}
         ${it ? '' : input('opening', 'Opening stock', 'optional; what is on the shelf today', 'inputmode="decimal"')}
       </div>

@@ -25,15 +25,18 @@ import { syncChip, syncBanner } from './views/syncstatus.js';
 import { resizeLogo } from './data/logo.js';
 import { inventory, itemPage, itemForm, inventoryImport, resultsHtml, chipsHtml, pickRows, CSV_TEMPLATE } from './views/inventory.js';
 import { qtyText, signedText, stockOf, matches as itemMatches, nameOf, parseQty, r3 } from './domain/inventory.js';
+import { billsList, billEditor, billView, setupScreen as businessSetup, newMenu } from './views/bills.js';
+import { createBills } from './bills-app.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
 // [route, label, href, icon, section, on the phone tab bar]
 const NAV = [
   ['home', 'Home', '#/', 'home', 'Workspace', true],
+  ['bills', 'Bills', '#/bills', 'file', 'Workspace', true], // CR-0012: Bills joins the phone tab bar
   ['chat', 'Chat', '#/chat', 'chat', 'Workspace', true],
   ['jobs', 'Jobs', '#/jobs', 'jobs', 'Workspace', true],
   ['inventory', 'Inventory', '#/inventory', 'box', 'Workspace', true],
-  ['renewals', 'Renewals', '#/renewals', 'renewals', 'Workspace', true],
+  ['renewals', 'Renewals', '#/renewals', 'renewals', 'Workspace', false], // on the phone: the account menu, so the bar keeps five places
   ['businesses', 'Businesses', '#/businesses', 'building', 'Platform', true],
   ['admin', 'Admin', '#/admin', 'users', 'Manage', false], // on the phone it is in the account menu, so the tab bar keeps five places
   ['settings', 'Settings', '#/settings', 'settings', 'Manage', false],
@@ -49,6 +52,13 @@ export function parseRoute(hash) {
     if (b === 'item' && c) return { name: 'item', tab: 'inventory', params: { id: decodeURIComponent(c) } };
     return { name: 'inventory', tab: 'inventory' };
   }
+  if (a === 'bills' || a === 'estimates') {
+    const type = a === 'bills' ? 'invoice' : 'quote';
+    if (b === 'new') return { name: 'bill-new', tab: 'bills', params: { type } };
+    if (a === 'bills' && b && c === 'edit') return { name: 'bill-edit', tab: 'bills', params: { id: decodeURIComponent(b) } };
+    if (a === 'bills' && b) return { name: 'bill', tab: 'bills', params: { id: decodeURIComponent(b) } };
+    return { name: a, tab: 'bills' };
+  }
   if (a === 'chat') return { name: 'chat', tab: 'chat' };
   if (a === 'jobs' && b) return { name: 'job', tab: 'jobs', params: { id: decodeURIComponent(b) } };
   if (a === 'jobs') return { name: 'jobs', tab: 'jobs' };
@@ -60,10 +70,13 @@ export function parseRoute(hash) {
   if (a === 'account') return { name: 'account', tab: 'account' };
   return { name: 'home', tab: 'home' };
 }
-const VIEWS = { home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account, inventory, item: itemPage, 'item-form': itemForm, 'inventory-import': inventoryImport };
-const TITLES = { home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in', inventory: 'Inventory', item: 'Item', 'item-form': 'Item', 'inventory-import': 'Import items' };
+const billNew = () => '<section class="page"><h1 id="page-title" tabindex="-1">New</h1></section>';
+const VIEWS = { bills: (p) => billsList({ ...p, kind: 'invoice' }), estimates: (p) => billsList({ ...p, kind: 'quote' }), bill: billView, 'bill-edit': billEditor, 'bill-new': billNew, home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account, inventory, item: itemPage, 'item-form': itemForm, 'inventory-import': inventoryImport };
+const TITLES = { bills: 'Bills', estimates: 'Estimates', bill: 'Bill', 'bill-edit': 'Bill', 'bill-new': 'New', setup: 'Your business', home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in', inventory: 'Inventory', item: 'Item', 'item-form': 'Item', 'inventory-import': 'Import items' };
 
 const PERMISSION_LABELS = PERMISSIONS;
+// The one + New button (AC-26.5) sits on the main screens, not where a bottom bar or form needs the corner.
+const NEW_ON = new Set(['home', 'bills', 'estimates', 'jobs', 'inventory', 'renewals']);
 // What the submit button says while the server is working (the button is switched off meanwhile).
 const WORKING = { 'add-staff': 'Adding…', 'import-staff': 'Importing…', 'add-business': 'Creating…', 'business-profile': 'Saving…', 'account-pin': 'Changing…' };
 function showWorking(form, label) {
@@ -121,6 +134,7 @@ export function mountApp(root, options = {}) {
     renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
   };
   let alive = true;
+  const bills = createBills({ store, api, session, sync, ui, render: () => render(), navigate: (h) => navigate(h), root, win, meOf, msg });
 
   // ---------- who is signed in ----------
   function applySession(me) {
@@ -184,6 +198,12 @@ export function mountApp(root, options = {}) {
       try { ui.meta = { data: await api.meta() }; } catch (e) { ui.meta = { error: e.message }; }
       if (alive && route.name === 'settings') render();
     }
+    if (route.name === 'bill-new') {
+      const d = bills.load(route);
+      if (d) win.history?.replaceState?.(null, '', `#/bills/${encodeURIComponent(d.id)}/edit`);
+      return;
+    }
+    bills.load(route);
     if (route.name === 'chat') warmAi(me);
     if (route.name === 'job') loadPlan(route.params.id);
     if (route.name === 'admin' && can(me, 'manage_team') && !ui.admin.data) loadAdmin();
@@ -259,6 +279,7 @@ export function mountApp(root, options = {}) {
             <div class="account-menu">
               <p><strong>${escapeHtml(me.name)}</strong><span class="muted small" data-testid="current-role">${escapeHtml(roleName(me.role))}</span></p>
               <a href="#/account" class="menu-item">${icon('user', { size: 18 })} My account</a>
+              ${can(me, 'manage_renewals') ? `<a href="#/renewals" class="menu-item menu-phone">${icon('renewals', { size: 18 })} Renewals</a>` : ''}
               ${can(me, 'manage_settings') ? `<a href="#/settings" class="menu-item">${icon('settings', { size: 18 })} Settings</a>` : ''}
               ${can(me, 'manage_team') ? `<a href="#/admin" class="menu-item">${icon('users', { size: 18 })} Admin</a>` : ''}
               <button type="button" class="menu-item" data-action="sign-out">${icon('logout', { size: 18 })} Sign out</button>
@@ -274,6 +295,7 @@ export function mountApp(root, options = {}) {
       </nav>
       <nav class="bottom-tabs" aria-label="Main (phone)">${allowed.filter((n) => n[5]).map(link).join('')}</nav>
       <main id="main" class="main"><div data-slot="sync-banner">${syncBanner(sync.status())}</div>${html}
+        ${NEW_ON.has(route.name) ? newMenu(me, ui.newOpen) : ''}
         <footer class="site-foot no-print"><a href="${HUB_URL}">Part of Idea Studio by AkkiVerse</a>${demo ? '<span>Sample data only. No real messages are sent.</span>' : ''}</footer>
       </main>
     </div>`;
@@ -310,8 +332,10 @@ export function mountApp(root, options = {}) {
       root.innerHTML = `<main id="main" class="auth-main">${mustChangePin({ ui, me, hubUrl: HUB_URL })}</main>`;
     } else {
       const allow = (perm) => can(me, perm);
-      const props = { state, ui, params: route.params || {}, busy: actions.isBusy(), me, allow, permissionLabels: PERMISSION_LABELS };
-      const html = canOpen(me, route.name) ? VIEWS[route.name](props) : denied({ me, routeName: TITLES[route.name] || route.name });
+      const props = { state, ui, params: route.params || {}, busy: actions.isBusy(), me, allow, permissionLabels: PERMISSION_LABELS, today: today() };
+      // AC-26.1: a business not yet set up asks its owner once what kind of business it is.
+      const asking = me.business && me.business.setup_needed && allow('manage_settings') && route.name !== 'account';
+      const html = asking ? businessSetup(props) : canOpen(me, route.name) ? VIEWS[route.name](props) : denied({ me, routeName: TITLES[route.name] || route.name });
       root.innerHTML = shell(me, html);
     }
     paintTimers();
@@ -380,7 +404,7 @@ export function mountApp(root, options = {}) {
     const el = e.target.closest('[data-action]');
     if (!el || !root.contains(el)) return;
     const a = el.dataset.action;
-    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role', 'member-permission', 'role-permission', 'pick-csv', 'pick-logo', 'pick-inv-csv'].includes(a)) return; // handled on change
+    if (['edit-line', 'set-mode', 'set-theme', 'toggle-failure', 'set-role', 'member-permission', 'role-permission', 'pick-csv', 'pick-logo', 'pick-inv-csv', 'pick-signature', 'bill-more'].includes(a)) return; // handled on change
     if (a !== 'download') e.preventDefault();
     if (a === 'use-demo') {
       ui.auth = { phone: el.dataset.phone, pin: el.dataset.pin };
@@ -397,6 +421,7 @@ export function mountApp(root, options = {}) {
     }
     if (a === 'retry-boot') { boot(); return; }
     if (a.startsWith('inv-')) { await onInventoryAction(a, el); return; }
+    if (a.startsWith('bill-') && (await bills.onClick(a, el))) return;
     if (a === 'dismiss-sync-notice') { sync.dismissNotice(); return; }
     if (a === 'dismiss-sync-rejected') { sync.dismissRejected(); return; }
     if (a === 'goto-add-person') {
@@ -478,12 +503,9 @@ export function mountApp(root, options = {}) {
     else if (a === 'approve') approve(el.dataset.id, {});
     else if (a === 'play-voice') { ui.playing = ui.playing === el.dataset.id ? null : el.dataset.id; render(); if (ui.playing) { const id = ui.playing; setTimeout(() => { if (ui.playing === id) { ui.playing = null; render(); } }, 3000); } }
     else if (a === 'create-doc') {
-      const res = await actions.createDocument(el.dataset.job, el.dataset.type);
-      if (res.docId) {
-        navigate(`#/doc/${res.docId}`);
-        ui.toast = res.error ? { where: 'doc', error: true, text: `Document created, but it couldn't be sent: ${res.error}` } : { where: 'doc', text: `${el.dataset.type === 'invoice' ? 'Invoice' : 'Quotation'} sent to ${store.get().jobs.find((j) => j.id === el.dataset.job).customer_name} on WhatsApp (simulated). See it in Chat.` };
-        render();
-      } else { ui.toast = { where: 'job', error: true, text: res.error }; render(); }
+      // AC-29.4 (CR-0012): Make estimate and Make bill open the editor with the job's lines and parts used.
+      const res = bills.fromJob(el.dataset.job, el.dataset.type);
+      if (res.error) { ui.toast = { where: 'job', error: true, text: res.error }; render(); }
     } else if (a === 'download') win.print();
     else if (a === 'filter') { ui.renewalsFilter = el.dataset.filter; render(); }
     else if (a === 'remind') {
@@ -792,6 +814,7 @@ export function mountApp(root, options = {}) {
     if (!form) return;
     e.preventDefault();
     const kind = form.dataset.form;
+    if (kind.startsWith('bill-')) { bills.onSubmit(form); return; }
     if (['signin', 'forgot', 'reset', 'setup', 'change-pin'].includes(kind)) { submitAuth(form); return; }
     if (['add-staff', 'import-staff', 'add-business', 'business-profile', 'account-pin'].includes(kind)) {
       if (form.dataset.busy === '1') return; // a second press while the first is still working
@@ -820,6 +843,8 @@ export function mountApp(root, options = {}) {
   async function onChange(e) {
     const el = e.target;
     const a = el.dataset.action;
+    if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0]); return; }
+    if (bills.onChange(e)) return;
     if (a === 'edit-line') actions.updateDocumentLine(el.dataset.doc, Number(el.dataset.index), { [el.dataset.key]: el.value === '' ? NaN : Number(el.value) });
     else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
     else if (a === 'set-theme') actions.setSetting('theme', el.value);
@@ -863,6 +888,7 @@ export function mountApp(root, options = {}) {
   }
   function onInput(e) {
     const t = e.target;
+    if (bills.onInput(e)) return;
     if (t.id === 'composer-input') ui.draft = t.value;
     else if (t.matches('[data-inv-search]')) { ui.inv.q = t.value; paintInv(); }
     else if (t.matches('[data-pick-search]') && ui.inv.sheet) {
@@ -890,6 +916,8 @@ export function mountApp(root, options = {}) {
   root.addEventListener('submit', onSubmit);
   root.addEventListener('change', onChange);
   root.addEventListener('input', onInput);
+  // More options stays open across redraws while a bill is being made.
+  root.addEventListener('toggle', (e) => { if (e.target.matches?.('.more-options') && ui.billEd) ui.billEd.more = e.target.open; }, true);
   root.ownerDocument.addEventListener('keydown', onKey);
   applyTheme();
 
@@ -909,6 +937,6 @@ export function mountApp(root, options = {}) {
   return {
     store, actions, session, ui, navigate, render, ready,
     sync,
-    unmount() { alive = false; if (timerTick) win.clearInterval(timerTick); sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
+    unmount() { alive = false; bills.stop(); if (timerTick) win.clearInterval(timerTick); sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
   };
 }

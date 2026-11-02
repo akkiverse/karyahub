@@ -318,6 +318,14 @@ export function createSync({ store, api, win = globalThis, storage = globalThis.
       await run();
       return Boolean(active && s) && !pendingFor(kind, id);
     },
+    /** A record the server just answered with (a bill sent, paid or cancelled, CR-0012): written as the server's,
+     * so it is not queued back. */
+    accept(kind, record) {
+      if (!active || !s) return false;
+      applyRemote({ changes: { [kind]: [record] }, readable: s.readable.length ? s.readable : KINDS.map(([k]) => k) });
+      save();
+      return true;
+    },
     dismissRejected() { if (s) { s.rejected = []; save(); } emit(); },
     dismissNotice() { notice = null; emit(); },
   };

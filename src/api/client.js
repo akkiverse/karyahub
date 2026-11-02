@@ -183,6 +183,15 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     saveBusinessProfile: (fields) => put('/business/profile', fields),
     saveLogo: (dataUrl) => put('/business/logo', { data_url: dataUrl }),
     removeLogo: () => call('DELETE', '/business/logo'),
+    // Bills that are right (CR-0012)
+    saveSetup: (fields) => put('/business/setup', fields),
+    saveBillLook: (fields) => put('/business/bill-look', fields),
+    saveSignature: (dataUrl) => put('/business/signature', { data_url: dataUrl }),
+    removeSignature: () => call('DELETE', '/business/signature'),
+    documentAction: (id, action, extra = {}) => call('POST', `/documents/${encodeURIComponent(id)}/actions`, { action, ...extra }),
+    documentLink: (id, on) => put(`/documents/${encodeURIComponent(id)}/link`, { on }),
+    sendDocument: (id) => call('POST', `/documents/${encodeURIComponent(id)}/send`),
+    makeBill: (estimateId, billId) => call('POST', `/documents/${encodeURIComponent(estimateId)}/make-bill`, { bill_id: billId }),
 
     // Business data (CR-0009): one call sends the queued changes and brings back what changed on the server.
     sync: (since, ops) => call('POST', '/sync', { since, ops }, { timeout: SYNC_TIMEOUT_MS }),

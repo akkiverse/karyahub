@@ -8,7 +8,7 @@ import {
   billList, CHIPS, docWord, figuresOf, isBill, isV2, lookOf, numberText, saveProblem, sellerOf, statusOf, STATUS_WORDS, totalOf, LAYOUTS, COLOURS,
 } from '../domain/bills.js';
 
-const rp = (paise) => rupeesExact((Number(paise) || 0) / 100);
+const rp = (paise) => (Number(paise) < 0 ? `−${rupeesExact(-Number(paise) / 100)}` : rupeesExact((Number(paise) || 0) / 100));
 const rw = (paise) => rupees((Number(paise) || 0) / 100);
 const ddmmyyyy = (iso) => (iso ? `${iso.slice(8, 10)}-${iso.slice(5, 7)}-${iso.slice(0, 4)}` : '');
 const can = (me, p) => Boolean(me && (me.permissions || []).includes(p));
@@ -31,8 +31,8 @@ export function billsList({ state, ui, me, today, kind = 'invoice' }) {
     <header class="page-head"><h1 id="page-title" tabindex="-1">${kind === 'quote' ? W.estimates : W.bills}</h1>
       <nav class="segs" aria-label="${W.bills}">${tab('invoice', W.bills, '#/bills')}${tab('quote', W.estimates, '#/estimates')}</nav></header>
     ${b.notice ? `<p class="notice ${b.notice.error ? 'notice-error' : ''}" role="status" data-testid="bills-notice">${e(b.notice.text)}${b.notice.undo ? ` <button type="button" class="btn btn-ghost btn-small" data-action="bill-undo-delete">${W.undo}</button>` : ''}</p>` : ''}
-    <label class="search"><span class="sr-only">${W.searchBills}</span>${icon('search', { size: 18 })}<input type="search" data-bill-search placeholder="${W.searchBills}" value="${e(q)}"></label>
-    <div class="chips" role="group" aria-label="${W.bills}">${CHIPS.filter(([k]) => kind === 'invoice' || !['unpaid', 'overdue', 'paid'].includes(k)).map(([k, label]) => `<button type="button" class="chip ${chip === k ? 'is-on' : ''}" aria-pressed="${chip === k}" data-action="bill-chip" data-chip="${k}">${label} <span class="chip-count" data-chip-count="${k}">${counts[k]}</span></button>`).join('')}</div>
+    <label class="search"><span class="sr-only">${W.searchBills}</span>${icon('search', { size: 18 })}<input type="search" data-bill-search placeholder="${W.searchBillsShort}" value="${e(q)}"></label>
+    <div class="chips chips-scroll" role="group" aria-label="${W.bills}">${CHIPS.filter(([k]) => kind === 'invoice' || !['unpaid', 'overdue', 'paid'].includes(k)).map(([k, label]) => `<button type="button" class="chip ${chip === k ? 'is-on' : ''}" aria-pressed="${chip === k}" data-action="bill-chip" data-chip="${k}">${label} <span class="chip-count" data-chip-count="${k}">${counts[k]}</span></button>`).join('')}</div>
     <div data-slot="bill-rows">${rows.length ? billRows(rows, today) : `<p class="empty" data-testid="bills-empty">${e(empty)}</p>`}</div>
   </section>`;
 }
@@ -195,7 +195,7 @@ export function billPaper(doc, { business, settings = {}, sample = false, look =
       <p class="doc-biz">${e(seller.name)}</p>${seller.address ? `<p class="muted">${e(seller.address)}</p>` : ''}
       ${seller.gstin ? `<p class="muted">GSTIN <span data-testid="seller-gstin">${e(seller.gstin)}</span></p>` : ''}${seller.phone ? `<p class="muted">${e(seller.phone)}</p>` : ''}
     </div><div class="doc-meta"><h2 class="doc-heading" data-testid="bill-heading">${e(heading)}</h2><p><strong data-testid="bill-number">${e(doc.number || numberText(doc))}</strong></p>
-      <p class="muted">${W.billDate} ${ddmmyyyy(doc.date)}</p>${isBill(doc) && doc.due_date ? `<p class="muted">${W.dueDate} ${doc.due_date === doc.date ? 'On receipt' : ddmmyyyy(doc.due_date)}</p>` : ''}${!isBill(doc) && doc.valid_until ? `<p class="muted">${W.validUntil} ${ddmmyyyy(doc.valid_until)}</p>` : ''}</div></header>
+      <p class="muted">${W.billDate} ${ddmmyyyy(doc.date)}</p>${isBill(doc) && doc.due_date ? `<p class="muted">${doc.due_date === doc.date ? W.dueOnReceipt : `${W.dueDate} ${ddmmyyyy(doc.due_date)}`}</p>` : ''}${!isBill(doc) && doc.valid_until ? `<p class="muted">${W.validUntil} ${ddmmyyyy(doc.valid_until)}</p>` : ''}</div></header>
     ${seller.registration === 'composition' && isBill(doc) ? '<p class="muted small" data-testid="composition-line">Composition taxable person, not eligible to collect tax on supplies</p>' : ''}
     <section class="doc-to"><p class="label">Bill to</p><p><strong data-testid="bill-customer">${e(c.name || W.walkIn)}</strong></p>${c.address ? `<p class="muted">${e(c.address)}</p>` : ''}${c.gstin ? `<p class="muted">GSTIN ${e(c.gstin)}</p>` : ''}
       ${taxed ? `<p class="muted" data-testid="place-of-supply">${W.placeOfSupply}: ${e(stateLabel(place))}</p>` : ''}</section>
@@ -230,22 +230,23 @@ export function billView({ state, ui, me, params, today }) {
   const make = can(me, 'create_documents');
   const btn = (action, label, ic, cls = 'btn-secondary', extra = '') => `<button type="button" class="btn ${cls}" data-action="${action}" data-doc="${e(doc.id)}" ${extra}>${icon(ic, { size: 18 })} ${label}</button>`;
   const estimateBilled = doc.type === 'quote' && doc.bill_id;
-  const actions = [];
+  const actions = []; // the main step and the common ones
+  const more = []; // everything else, behind More (rule 6: one main action per screen)
+  if (make && doc.type === 'quote' && numbered && !estimateBilled && s !== 'cancelled') actions.push(btn('bill-make-bill', W.makeBill, 'file', 'btn-primary'));
   if (make && live) {
-    actions.push(btn('bill-send', W.sendWhatsApp, 'send', 'btn-primary', 'data-testid="send-whatsapp"'));
+    actions.push(btn('bill-send', W.sendWhatsApp, 'send', doc.type === 'quote' && !estimateBilled ? 'btn-secondary' : 'btn-primary', 'data-testid="send-whatsapp"'));
     actions.push(btn('bill-copy-link', W.copyLink, 'file'));
-    if (win().navigator && win().navigator.share) actions.push(btn('bill-share', W.share, 'arrowRight'));
-    if (s !== 'sent' && s !== 'paid') actions.push(btn('bill-mark-sent', W.markSent, 'check'));
     if (isBill(doc) && s !== 'paid') actions.push(btn('bill-mark-paid', W.markPaid, 'checks'));
+    if (win().navigator && win().navigator.share) more.push(btn('bill-share', W.share, 'arrowRight', 'btn-ghost'));
+    if (s !== 'sent' && s !== 'paid') more.push(btn('bill-mark-sent', W.markSent, 'check', 'btn-ghost'));
   }
   if (make && !numbered) actions.push(`<a class="btn btn-primary" href="#/bills/${encodeURIComponent(doc.id)}/edit">${icon('pencil', { size: 18 })} ${W.edit}</a>`);
-  if (make && doc.status === 'saved') actions.push(`<a class="btn btn-ghost" href="#/bills/${encodeURIComponent(doc.id)}/edit">${icon('pencil', { size: 18 })} ${W.edit}</a>`);
-  if (make && doc.type === 'quote' && numbered && !estimateBilled && s !== 'cancelled') actions.push(btn('bill-make-bill', W.makeBill, 'file', 'btn-primary'));
-  if (make && numbered) actions.push(btn('bill-copy', W.makeCopy, 'rotate', 'btn-ghost'));
-  if (numbered && doc.link_token && !demo) actions.push(`<a class="btn btn-ghost" href="/b/${e(doc.link_token)}/pdf" download data-testid="download-pdf">${icon('download', { size: 18 })} ${W.downloadPdf}</a>`);
-  if (numbered) actions.push(`<button type="button" class="btn btn-ghost" data-action="download" data-testid="download">${icon('download', { size: 18 })} ${W.print}</button>`);
-  if (can(me, isBill(doc) ? 'cancel_bills' : 'create_documents') && live) actions.push(btn('bill-cancel', W.cancelBill, 'x', 'btn-ghost danger-text'));
-  if (make && live && doc.link_token && !demo) actions.push(btn('bill-link', doc.link_on === false ? W.linkOn : W.linkOff, 'eyeOff', 'btn-ghost'));
+  if (make && doc.status === 'saved') more.push(`<a class="btn btn-ghost" href="#/bills/${encodeURIComponent(doc.id)}/edit">${icon('pencil', { size: 18 })} ${W.edit}</a>`);
+  if (make && numbered) (s === 'cancelled' ? actions : more).push(btn('bill-copy', W.makeCopy, 'rotate', s === 'cancelled' ? 'btn-primary' : 'btn-ghost'));
+  if (numbered && doc.link_token && !demo) more.push(`<a class="btn btn-ghost" href="/b/${e(doc.link_token)}/pdf" download data-testid="download-pdf">${icon('download', { size: 18 })} ${W.downloadPdf}</a>`);
+  if (numbered) more.push(`<button type="button" class="btn btn-ghost" data-action="download" data-testid="download">${icon('download', { size: 18 })} ${W.print}</button>`);
+  if (make && live && doc.link_token && !demo) more.push(btn('bill-link', doc.link_on === false ? W.linkOn : W.linkOff, 'eyeOff', 'btn-ghost'));
+  if (can(me, isBill(doc) ? 'cancel_bills' : 'create_documents') && live) more.push(btn('bill-cancel', W.cancelBill, 'x', 'btn-ghost danger-text'));
   const billedLine = estimateBilled ? `<p class="notice" data-testid="billed-as">${W.billedAs} <strong>${e(doc.bill_number || '')}</strong> <a href="#/bills/${encodeURIComponent(doc.bill_id)}">${W.openBill}</a></p>` : '';
   const fromEst = doc.estimate_id ? state.documents.find((d) => d.id === doc.estimate_id) : null;
   return `<section class="page doc-page bill-view">
@@ -258,7 +259,7 @@ export function billView({ state, ui, me, params, today }) {
     ${billedLine}${fromEst ? `<p class="muted small no-print">From ${W.estimate.toLowerCase()} <a href="#/bills/${encodeURIComponent(fromEst.id)}">${e(fromEst.number)}</a></p>` : ''}
     ${doc.job_id ? `<p class="muted small no-print">Job <a href="#/jobs/${encodeURIComponent(doc.job_id)}">${e(doc.job_id)}</a></p>` : ''}
     ${v.cancelling ? `<form class="panel no-print" data-form="bill-cancel" data-doc="${e(doc.id)}"><label class="field"><span>${W.cancelReason}</span><input name="reason" maxlength="200"></label><div class="actions"><button type="submit" class="btn btn-primary danger">${W.cancelBill}</button><button type="button" class="btn btn-ghost" data-action="bill-cancel-close">Keep it</button></div></form>` : ''}
-    <div class="actions bill-actions no-print" data-testid="bill-actions">${actions.join('')}</div>
+    <div class="actions bill-actions no-print" data-testid="bill-actions">${actions.join('')}${more.length ? `<details class="more-actions" ${v.cancelling || v.moreOpen ? 'open' : ''}><summary class="btn btn-ghost">${W.more}</summary><div class="more-list">${more.join('')}</div></details>` : ''}</div>
     ${billPaper(doc, { business: me.business, settings: state.settings, sample: demo || doc.sample })}
     ${(doc.history || []).length ? `<details class="panel no-print"><summary>${W.history}</summary><ul class="history">${doc.history.map((h) => `<li><span>${e(h.what)}</span><span class="muted small">${e(h.who)} · ${e(String(h.at).replace('T', ' ').slice(0, 16))}</span></li>`).join('')}</ul></details>` : ''}
   </section>`;

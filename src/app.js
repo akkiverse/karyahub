@@ -367,6 +367,7 @@ export function mountApp(root, options = {}) {
   function navigate(hash) {
     if (win.location.hash !== hash) win.location.hash = hash;
     route = parseRoute(hash);
+    ui.newOpen = false;
     ui.toast = null;
     ui.sheet = null;
     ui.wfNote = null;
@@ -382,7 +383,7 @@ export function mountApp(root, options = {}) {
     ui.inv.sheet = null;
     if (ui.inv.notice && ui.inv.notice.at !== noticeKey(route)) ui.inv.notice = null;
   }
-  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
+  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.newOpen = false; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
   win.addEventListener('hashchange', onHash);
   // Something that arrived from the server must not redraw the page under a finger that is typing.
   let renderWhenDone = false;

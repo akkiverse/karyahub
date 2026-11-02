@@ -67,6 +67,7 @@ export const W = {
   notes: 'Notes',
   terms: 'Terms',
   dueDate: 'Due date',
+  dueOnReceipt: 'Due on receipt',
   validUntil: 'Valid until',
   billDate: 'Date',
   placeOfSupply: 'Place of supply',
@@ -94,6 +95,7 @@ export const W = {
   chipUnpaid: 'Unpaid',
   // the list (AC-28.6)
   searchBills: 'Search by number, customer name or phone',
+  searchBillsShort: 'Number, name or phone',
   noBills: 'No bills yet. Tap New to make your first bill.',
   noBillsMatch: 'No bills match. Clear the search or make a new bill.',
   noEstimates: 'No estimates yet. Tap New to make one.',
@@ -113,6 +115,7 @@ export const W = {
   openBill: 'Open bill',
   alreadyBilled: 'This estimate is already billed as',
   edit: 'Change',
+  more: 'More',
   downloadPdf: 'Download PDF',
   print: 'Print',
   linkOff: 'Turn link off',

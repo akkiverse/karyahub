@@ -6,6 +6,7 @@
 - **Kind:** Feature (minor version)
 - **Release:** v0.8.0 (planned)
 - **Branch:** `cr/0012-bills-that-are-right`
+- **Pull request:** [#15](https://github.com/akkiverse/karyahub/pull/15)
 - **References:** [Product Spec v3](https://claude.ai/artifact/AtyPCQQWYaVSmg1K8gPxgC) (US-26 to US-31, 38 criteria, the 10 easy-UI rules), [Business Brief v3](https://claude.ai/artifact/5mTrLnxr7tM48yVfN2P7aR), [Idea Document v2](https://claude.ai/artifact/XKdtbEg3dxPaCS62WTSVuL)
 
 ## Why

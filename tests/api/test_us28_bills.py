@@ -145,14 +145,24 @@ def test_ac_29_1_an_estimate_never_takes_stock(biller):
 
 
 # ---------- US-28 ----------
-def test_ac_28_1_numbers_follow_the_series_of_the_financial_year(biller):
+def test_ac_28_1_numbers_follow_the_series_of_the_financial_year(biller, monkeypatch):
     """AC-28.1: bills are 26-27/0001, 0002...; estimates E/26-27/0001; a new year starts at 0001."""
     owner = biller()["owner"]
     numbers = [put_doc(owner, f"n-{i}", save=True, lines=[line()])[1]["number"] for i in range(3)]
     assert numbers == ["26-27/0001", "26-27/0002", "26-27/0003"]
     assert put_doc(owner, "n-e", save=True, type="quote", lines=[line()])[1]["number"] == "E/26-27/0001"
+    monkeypatch.setattr(
+        bills, "today", lambda: date(2027, 4, 5)
+    )  # later in the year, so these dates are past
     assert put_doc(owner, "n-m", save=True, date="2027-03-31", lines=[line()])[1]["number"] == "26-27/0004"
     assert put_doc(owner, "n-a", save=True, date="2027-04-01", lines=[line()])[1]["number"] == "27-28/0001"
+
+
+def test_ac_28_1_a_date_in_the_future_gets_no_number(biller):
+    """AC-28.1: the date decides the series, so a bill dated after tomorrow stays a draft with the reason."""
+    owner = biller()["owner"]
+    _, body = put_doc(owner, "f-1", save=True, date="2027-04-01", lines=[line()])
+    assert (body["status"], body["save_problem"]) == ("draft", "A bill's date can't be in the future.")
 
 
 def test_ac_28_1_financial_year_runs_april_to_march():

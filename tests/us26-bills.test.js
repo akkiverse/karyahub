@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mountApp } from '../src/app.js';
-import { setToday } from '../src/clock.js';
+import { setToday, setDeviceNow } from '../src/clock.js';
 import { fakeApi } from './fake-api.js';
 import { PEOPLE, meFor, REAL_BUSINESS, DEMO_BUSINESS } from './fake-accounts.js';
-import { setup, until } from './helpers.js';
+import { setup, until, sendSample } from './helpers.js';
 import { defaultPermissions } from '../src/domain/access.js';
 import { BANNED_WORDS } from '../src/words.js';
 
@@ -19,6 +19,7 @@ const owner = (business = SHREE, extra = {}) => meFor({ id: 'u-shree', name: 'Mi
 function real({ api = fakeApi(), me = owner(), hash = '#/' } = {}) {
   localStorage.clear();
   setToday('2027-01-01');
+  setDeviceNow('2027-01-01T10:00:00');
   window.location.hash = hash;
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.getElementById('app');
@@ -225,6 +226,16 @@ describe('US-28 Numbers and status (screens)', () => {
     expect(t.$('[data-testid="bill-row"]').textContent).toContain('26-27/0001');
   });
 
+  it('AC-28.1: a real business bills on the phone\'s real date, not the demo\'s fixed date', async () => {
+    t = real();
+    setDeviceNow('2027-04-02T09:30:00');
+    await newBill(t, { item: null, qty: '1', rate: '100' });
+    expect(t.app.store.get().documents[0].date).toBe('2027-04-02');
+    t.click('[data-testid="save-and-share"]');
+    await until(() => t.app.store.get().documents[0].number === '27-28/0001');
+    setDeviceNow('2027-01-01T10:00:00');
+  });
+
   it('AC-28.5: a sent bill opens as a bill, not the editor; Cancel takes a reason, keeps the number and can be undone', async () => {
     const api = fakeApi();
     t = real({ api });
@@ -305,6 +316,22 @@ describe('US-29 Estimate to bill (screens)', () => {
     t.go(`#/bills/${est.id}`);
     expect(t.$('[data-testid="billed-as"]').textContent).toContain('Billed as 26-27/0001');
     expect(t.$('[data-action="bill-make-bill"]')).toBeNull();
+  });
+
+  it('AC-29.4: a job\'s Make bill starts from its lines and parts used, and the bill links to the job', async () => {
+    t = setup();
+    await sendSample(t, 's-ramesh');
+    t.click('[data-action="approve"]');
+    const job = t.app.store.get().jobs[0];
+    t.go(`#/jobs/${job.id}`);
+    t.click('[data-action="create-doc"][data-type="invoice"]');
+    await until(() => t.$('[data-testid="bill-editor"]'));
+    const d = t.app.store.get().documents[0];
+    expect([d.type, d.job_id, d.customer.name]).toEqual(['invoice', job.id, 'Ramesh Sharma']);
+    expect(d.lines.map((l) => l.description)).toEqual(job.lines.map((l) => l.description));
+    t.click('[data-testid="save-and-share"]');
+    await until(() => t.$('[data-testid="bill-paper"]'));
+    expect(t.$(`a[href="#/jobs/${job.id}"]`)).toBeTruthy();
   });
 
   it('AC-29.3: on a real business a second Make bill is refused with the bill\'s number and Open bill', async () => {

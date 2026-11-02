@@ -5,6 +5,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **Bills that are right** (phase 1 of KaryaHub for every business). See [CR-0012](docs/changes/CR-0012-bills-that-are-right.md) and [ADR-0016](docs/adr/0016-one-tax-engine-and-pdf-with-fpdf2.md).
+- **Business type and packs:** a new business's owner is asked once what kind of business it is (Repair and service, Trader or distributor, Shop or counter sales, Other), its GST registration and its state. **Field service** (jobs, Chat, renewals, AMC, proof of work) is a pack that can be switched off in Settings; its screens disappear and its data stays.
+- **+ New** on the main screens: Bill, Estimate, Item, Job, as permissions allow.
+- **Bills and estimates:** walk-in or a customer (search by name or phone), items or typed lines, the customer's last price, line and whole-bill discounts (% or ₹), GST 0, 0.25, 3, 5, 18 and 40 %, CGST and SGST or IGST by place of supply, prices that include GST (MRP), Composition ("Bill of Supply") and Not registered ("Bill"), a tax summary per rate, round off and the total in words.
+- **Numbers** per business and financial year with no gaps (26-27/0001; estimates E/26-27/0001) and an optional prefix; with no signal a bill waits as "Number given when online".
+- **Status** Draft, Saved, Sent, Paid, Overdue and Cancelled (with Undo); sent and paid bills are locked; Make a copy.
+- **Estimate to bill** in one tap, once.
+- **Bill look:** A4 classic, A4 modern or an 80 mm receipt, six colours, bank details, UPI ID, terms and a signature, with a live preview.
+- **A link for every bill** (`/b/<token>`, no sign-in, noindex) with a PDF that prints ₹; a link can be turned off and on.
+- **Send on WhatsApp**, Copy link, Share and Mark as sent, through one sender layer; each is in the bill's history and the activity log, and messages are counted per month.
+- A bill made without a job takes its items out of stock ("Sold on <number>"); cancelling puts them back. Items can be **Service, no stock**.
+- Home shows Billed today, Unpaid and Overdue.
+
+### Changed
+- A job's **Create quote** and **Create invoice** are now **Make estimate** and **Make bill**: they open the bill editor with the job's lines and parts used, instead of sending at once.
+- The permission "Create quotes and invoices" is now "Make estimates and bills"; a new permission **Cancel bills** is on for the owner only.
+- **Bills** is on the phone's tab bar; **Renewals** moved to the account menu there.
+- Quotes and invoices saved by v0.7.0 open unchanged, show as Saved, and are never worked out again.
+- Database: migration 0004 adds the business type, packs, GST registration, bill look and signature, and a table of bill links.
+
 ## [0.7.0] - 2026-11-01
 
 ### Added

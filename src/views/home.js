@@ -1,7 +1,7 @@
 import { icon } from '../ui/icons.js';
 import { rupees, prettyDate, daysBetween, escapeHtml } from '../format.js';
 import { dueWithin, moneyAtStake } from '../domain/renewals.js';
-import { today } from '../clock.js';
+import { today, deviceToday } from '../clock.js';
 import { billFigures } from '../domain/bills.js';
 import { homeBills } from './bills.js';
 
@@ -32,7 +32,7 @@ export function home({ state, me }) {
     </div>
 
 ` : '<h1 id="page-title" class="sr-only" tabindex="-1">Home</h1>'}
-    ${can('create_documents') ? homeBills(billFigures(state.documents, t), demo) : ''}
+    ${can('create_documents') ? homeBills(billFigures(state.documents, demo ? t : deviceToday()), demo) : ''}
     ${can('manage_renewals') ? `<article class="stake-card" aria-labelledby="stake-label" data-testid="money-at-stake">
       <h2 id="stake-label" class="stake-label">Money at stake in the next 90 days</h2>
       <p class="stake-value" data-testid="stake-value" data-amount="${total}">${rupees(total)}</p>

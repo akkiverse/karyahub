@@ -201,7 +201,10 @@ def work_out(body: dict[str, Any], seller: dict[str, Any]) -> None:
 
 
 def save_checks(body: dict[str, Any]) -> None:
-    """AC-27.8: the customer's GSTIN, a big bill's address and state, every line's description."""
+    """AC-27.8: the customer's GSTIN, a big bill's address and state, every line's description; and a date
+    that isn't in the future, because the date decides the financial year's series (AC-28.1)."""
+    if date.fromisoformat(body["date"]) > today() + timedelta(days=1):
+        raise AppError("validation_error", "A bill's date can't be in the future.", 422)
     if not body["lines"]:
         raise AppError("validation_error", "Add an item or type a line.", 422)
     for i, line in enumerate(body["lines"], start=1):

@@ -2,7 +2,7 @@
 // forms to this controller. Real businesses save through the sync queue (a number comes from the server,
 // AC-28.1, AC-28.3); the demo numbers bills on the device and never syncs (AC-30.6).
 import { W } from './words.js';
-import { today } from './clock.js';
+import { today as demoToday, deviceToday } from './clock.js';
 import { uid } from './ids.js';
 import { norm, partsOnJob, words } from './domain/inventory.js';
 import {
@@ -26,6 +26,8 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
   const me = () => meOf();
   const business = () => (me() && me().business) || null;
   const demo = () => Boolean(store.get().settings.is_demo);
+  // A real business bills on the phone's real date; the demo keeps its fixed date (the renewals story).
+  const today = () => (demo() ? demoToday() : deviceToday());
   const docOf = (id) => store.get().documents.find((d) => d.id === id);
   const timers = [];
   ui.bills = ui.bills || {};

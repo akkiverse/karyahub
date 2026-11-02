@@ -82,7 +82,7 @@ def model(body: dict[str, Any], business_name: str, look: dict[str, Any]) -> dic
     dates = [("Date", bills.pretty_date(body.get("date", "")))]
     if is_bill and body.get("due_date"):
         due = body["due_date"]
-        dates.append(("Due", "On receipt" if due == body.get("date") else bills.pretty_date(due)))
+        dates.append(("Due", "on receipt" if due == body.get("date") else bills.pretty_date(due)))
     if not is_bill and body.get("valid_until"):
         dates.append(("Valid until", bills.pretty_date(body["valid_until"])))
     place = body.get("place_of_supply", "")

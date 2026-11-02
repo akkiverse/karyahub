@@ -10,7 +10,7 @@ import { documentView } from './views/document.js';
 import { renewals } from './views/renewals.js';
 import { settings } from './views/settings.js';
 import { prettyDate, escapeHtml } from './format.js';
-import { today } from './clock.js';
+import { today, deviceToday } from './clock.js';
 import { SAMPLES } from './data/demo.js';
 import { createApiClient, ApiUnreachable } from './api/client.js';
 import { createSession } from './session.js';
@@ -332,7 +332,7 @@ export function mountApp(root, options = {}) {
       root.innerHTML = `<main id="main" class="auth-main">${mustChangePin({ ui, me, hubUrl: HUB_URL })}</main>`;
     } else {
       const allow = (perm) => can(me, perm);
-      const props = { state, ui, params: route.params || {}, busy: actions.isBusy(), me, allow, permissionLabels: PERMISSION_LABELS, today: today() };
+      const props = { state, ui, params: route.params || {}, busy: actions.isBusy(), me, allow, permissionLabels: PERMISSION_LABELS, today: state.settings.is_demo ? today() : deviceToday() };
       // AC-26.1: a business not yet set up asks its owner once what kind of business it is.
       const asking = me.business && me.business.setup_needed && allow('manage_settings') && route.name !== 'account';
       const html = asking ? businessSetup(props) : canOpen(me, route.name) ? VIEWS[route.name](props) : denied({ me, routeName: TITLES[route.name] || route.name });

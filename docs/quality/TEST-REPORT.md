@@ -1,17 +1,21 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-01 · **Branch:** `cr/0011-inventory` (CR-0011) · **Result:** 289 of 289 tests passing (151 server + 1 Postgres-only test skipped without its database, 138 web), covering all 142 current acceptance criteria (13 criteria were retired by CR-0005) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-02 · **Branch:** `cr/0012-bills-that-are-right` (CR-0012) · **Result:** 443 of 443 tests passing (241 server + 1 Postgres-only test skipped without its database, 202 web), covering all 179 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
 Three suites:
-- **Web app:** 138 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js`, `tests/fake-accounts.js` and `tests/fake-sync.js` standing in for the server (they record calls and can act unreachable, lose an answer, fail, or refuse a kind of record). AC-2.2 runs with the real step timing under fake timers.
-- **Server:** 151 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
+- **Web app:** 202 tests with Vitest 5 in jsdom on the fixed demo date 2027-01-01, against the real app (`mountApp`), with `tests/fake-api.js`, `tests/fake-accounts.js` and `tests/fake-sync.js` standing in for the server (they record calls and can act unreachable, lose an answer, fail, or refuse a kind of record). AC-2.2 runs with the real step timing under fake timers.
+- **Server:** 241 tests with pytest and FastAPI's test client against `backend/karyahub` and an in-memory SQLite database (async, the same migrations as production), in mock mode (live-mode tests set `KARYAHUB_MODE=live`; Studio AI tests set `AI_ENDPOINTS` to a mocked server; forgot-PIN delivery uses a fake WhatsApp adapter).
 - **Real Postgres (optional, 1 test):** `test_ac_23_2_on_a_real_postgres_a_scoped_session_sees_only_its_own_business` runs when `KARYAHUB_TEST_POSTGRES_URL` is set. It runs the migrations on a real Postgres 16, checks the policies and the restricted role exist, and that a scoped session with no `WHERE` sees only its own business, cannot write into another, and sees nothing with no business set. It was run on PostgreSQL 16.2 for this report, together with an end-to-end smoke run of the whole API (two businesses, sync, import, a proof-of-work step; `/api/health` said `row_level_security: on`). Without the address the test is skipped, so the normal run shows 151 passed and 1 skipped. CR-0011 extended it to the new `item_codes` table (each business sees only its own codes, the same code can exist in two businesses, and one business cannot write into the other's), and it was run again on PostgreSQL 16.2 for this report; a second smoke run of the API on that database (two businesses, items, moves, a part used on a job, a CSV check and import run twice, the activity log, `/api/health` saying `row_level_security: on`) also passed with the restricted role on.
 
 Some criteria have a test on each side (for example AC-7.2 and AC-23.1: the web app calls the API, and the server does the work). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
 Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see the spec); their old on-device tests were replaced by the tests for AC-18 to AC-22.
+
+**CR-0012** added 90 server tests (`test_us26_packs.py`, `test_us27_tax.py`, `test_us28_bills.py`, `test_us30_links.py`) and 65 web tests (`us26-bills.test.js`, `us27-tax.test.js`). The tax engine's 36 shared cases in `tests/fixtures/gst_cases.json` run on both sides, one test each, and must give identical figures (AC-27.9). It changed older tests where it meant to change behaviour: the US-4 tests now go through Make estimate and Make bill and the bill editor (AC-4.1 to AC-4.3 changed; AC-4.4 retired), the AC-25.13 tests check the editor's lines, the coordinator's navigation has Bills (AC-14.3), the technician's job screen says "Estimates and bills are made by the office." (AC-14.1), the role table has 13 permissions (AC-19.1), and the wall coverage test allows `doc_links` (a token hash looked up before the business is known; ADR-0016). The Postgres-only test was run again on PostgreSQL 16.2 with migration 0004, and an end-to-end run of the API on that database with the restricted role on (`row_level_security: on`) made a business, answered the type question, synced an item, its opening stock and a saved bill (numbered 26-27/0001, ₹3,393; stock 10 → 7.5), sent it (wa.me link), opened the public page (noindex) and PDF (22 KB, ₹ printed), refused a wrong token (404), and cancelled the bill (stock back to 10).
+
+The one flaky older test seen during the work: `test_ac_18_4_the_database_holds_no_plain_pin` failed once because a random salted hash happened to contain the digits of a demo PIN; it passed on every rerun. It is unchanged here and noted for a later fix.
 
 CR-0011 changed five older tests for things it meant to change: the data version is now 5 (three tests in `us11-compat.test.js`), the office coordinator's navigation has Inventory (`us14-roles.test.js`, AC-14.3), and the role table has 12 permissions instead of 9 (`us15-admin.test.js`); the technician's navigation test (AC-14.1) did not change, which shows technicians get no inventory by default. The wall coverage test (`test_ac_23_2_every_business_data_table_has_a_row_level_security_policy`) now also covers migration 0003's table.
 
@@ -33,10 +37,10 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-3.2 | `tests/api/test_us7_server.py::test_ac_7_2_pipeline_matches_the_demo_extraction` (transcribe and extract on the server give the AC-3.2 fields for the Ramesh sample.) | Pass |
 | AC-3.3 | `tests/us3-processing.test.js` › AC-3.3: Edit, change a field and Approve saves the job with my value, first on the Jobs screen | Pass |
 | AC-3.4 | `tests/us3-processing.test.js` › AC-3.4: with Simulate failure on, the failed step is red with the error text and nothing is saved | Pass |
-| AC-4.1 | `tests/us4-documents.test.js` › AC-4.1: quote and invoice show business, GSTIN, customer, lines, subtotal, CGST 9% + SGST 9% and a rounded total | Pass |
-| AC-4.2 | `tests/us4-documents.test.js` › AC-4.2: every document carries a visible "DEMO, not a valid tax invoice" watermark | Pass |
-| AC-4.3 | `tests/us4-documents.test.js` › AC-4.3: Download opens the browser print dialog with a print-styled layout and no external service | Pass |
-| AC-4.4 | `tests/us4-documents.test.js` › AC-4.4: the chat shows "Quotation sent to Ramesh Sharma" with a simulated document attachment | Pass |
+| AC-4.1 | `tests/us4-documents.test.js` › AC-4.1: a bill made from a job shows the business, GSTIN, customer, lines, CGST and SGST and a total rounded to the rupee | Pass |
+| AC-4.2 | `tests/us4-documents.test.js` › AC-4.2: every demo bill and estimate carries a visible Sample mark | Pass |
+| AC-4.3 | `tests/us4-documents.test.js` › AC-4.3: Print opens the browser print dialog with a print-styled layout and no external service | Pass |
+| AC-4.4 | Retired in CR-0012 (sending is now Send on WhatsApp, AC-31.1 to AC-31.4); its test was removed | Retired |
 | AC-5.1 | `tests/us5-renewals.test.js` › AC-5.1: the 30-day filter lists only customers expiring by 2027-01-31, soonest first | Pass |
 | AC-5.2 | `tests/us5-renewals.test.js` › AC-5.2: with the 90-day filter, Money at stake equals the sum of listed AMC values | Pass |
 | AC-5.3 | `tests/us5-renewals.test.js` › AC-5.3: a customer whose AMC expired before today appears under Lapsed with a red label | Pass |
@@ -289,7 +293,7 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-25.11 | `tests/us25-inventory.test.js` › AC-25.11: taking a part from inventory lowers the stock, lists the part on the job and says so in its history | Pass |
 | AC-25.11 | `tests/us25-inventory.test.js` › AC-25.11: more than is in stock is allowed with a warning and shows as short; a closed job takes no parts | Pass |
 | AC-25.12 | `tests/us25-inventory.test.js` › AC-25.12: parts named in the note are offered by name with no AI, and nothing is taken until Take is pressed | Pass |
-| AC-25.13 | `tests/us25-inventory.test.js` › AC-25.13: the parts a job used become lines on its quote and invoice, after the work lines and still editable | Pass |
+| AC-25.13 | `tests/us25-inventory.test.js` › AC-25.13 (changed CR-0012): the parts a job used become lines on its estimate and bill, after the work lines and still editable | Pass |
 | AC-25.13 | `tests/us25-inventory.test.js` › AC-25.13: a part the job already charges for is not added a second time | Pass |
 | AC-25.14 | `tests/api/test_us25_inventory.py::test_ac_25_14_a_move_sent_twice_is_applied_once` (a lost answer and a retry (the same operation id) change the quantity once.) | Pass |
 | AC-25.14 | `tests/api/test_us25_inventory.py::test_ac_25_14_two_phones_using_the_last_unit_are_both_counted` (both uses count; the item shows as short by one instead of one phone's work being lost.) | Pass |
@@ -315,6 +319,93 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-25.19 | `tests/us25-inventory.test.js` › AC-25.19: data saved by v0.6.0 (version 4) loads with no items, keeps its jobs, and nothing is put into stock from their parts text | Pass |
 | AC-25.19 | `tests/us25-inventory.test.js` › AC-25.19: the demo business has sample stock labelled as such, which never syncs and has no CSV import | Pass |
 
+| AC-26.1 | `tests/api/test_us26_packs.py::test_ac_26_1_a_new_business_is_asked_once_and_service_gets_field_service` | Pass |
+| AC-26.1 | `tests/api/test_us26_packs.py::test_ac_26_1_other_types_get_the_core_only` | Pass |
+| AC-26.1 | `tests/api/test_us26_packs.py::test_ac_26_1_the_state_is_needed` | Pass |
+| AC-26.1 | `tests/us26-bills.test.js` › AC-26.1: an owner of a business not set up is asked once; saving it opens the app | Pass |
+| AC-26.1 | `tests/us26-bills.test.js` › AC-26.1: the state is needed: "Pick your state to work out GST." | Pass |
+| AC-26.2 | `tests/api/test_us26_packs.py::test_ac_26_2_the_demo_and_older_businesses_are_service_with_field_service` | Pass |
+| AC-26.2 | `tests/api/test_us26_packs.py::test_ac_26_2_the_migration_makes_existing_businesses_service` | Pass |
+| AC-26.2 | `tests/us26-bills.test.js` › AC-26.2: the demo and older businesses (no packs saved) keep every v0.7.0 screen and are never asked | Pass |
+| AC-26.3 | `tests/api/test_us26_packs.py::test_ac_26_3_field_service_off_hides_and_refuses_its_routes` | Pass |
+| AC-26.3 | `tests/us26-bills.test.js` › AC-26.3: with Field service off there is no menu, Home figure or + New choice for jobs, Chat or renewals | Pass |
+| AC-26.4 | `tests/api/test_us26_packs.py::test_ac_26_4_only_manage_settings_changes_packs_and_it_is_logged` | Pass |
+| AC-26.4 | `tests/api/test_us26_packs.py::test_ac_26_4_the_demo_business_cannot_change_its_setup` | Pass |
+| AC-26.4 | `tests/us26-bills.test.js` › AC-26.4: Settings shows the type, GST registration and pack switch to people with manage_settings, and saves them | Pass |
+| AC-26.5 | `tests/us26-bills.test.js` › AC-26.5: one + New button offers Bill, Estimate, Item, Job, in that order, only as permissions allow | Pass |
+| AC-26.6 | `tests/us26-bills.test.js` › AC-26.6: the new and changed screens take their words from one file and never say voucher, ledger, debit note or credit note | Pass |
+| AC-27.1 | `tests/us26-bills.test.js` › AC-27.1: + New → Bill opens dated today for "Walk-in customer", with Save and share as the one main button and the rest under More options | Pass |
+| AC-27.2 | `tests/us26-bills.test.js` › AC-27.2: an item line takes the unit, sale price and GST rate; the customer\'s last price is used and marked; service items are offered | Pass |
+| AC-27.3 | `tests/api/test_us27_tax.py::test_ac_27_3_bill_discount_spread_last_line_takes_the_paisa` | Pass |
+| AC-27.3 | `tests/us26-bills.test.js` › AC-27.3 and AC-27.4: line and bill discounts show at once: 2 × ₹1,250 at 18% less 10% is ₹2,655 | Pass |
+| AC-27.4 | `tests/api/test_us27_tax.py::test_ac_27_4_spec_example_same_state` | Pass |
+| AC-27.4 | `tests/api/test_us27_tax.py::test_ac_27_4_other_state_is_igst` | Pass |
+| AC-27.4 | `tests/us26-bills.test.js` › AC-27.3 and AC-27.4: line and bill discounts show at once: 2 × ₹1,250 at 18% less 10% is ₹2,655 | Pass |
+| AC-27.5 | `tests/api/test_us27_tax.py::test_ac_27_5_price_includes_gst` | Pass |
+| AC-27.6 | `tests/api/test_us27_tax.py::test_ac_27_6_tax_summary_one_row_per_rate` | Pass |
+| AC-27.6 | `tests/api/test_us27_tax.py::test_ac_27_6_place_of_supply_from_gstin_and_state_names` | Pass |
+| AC-27.6 | `tests/api/test_us28_bills.py::test_ac_27_6_place_of_supply_from_the_customer_gives_igst` | Pass |
+| AC-27.6 | `tests/us27-tax.test.js` › AC-27.6: place of supply from the GSTIN, printed as name (code) | Pass |
+| AC-27.7 | `tests/api/test_us27_tax.py::test_ac_27_7_composition_and_not_registered_have_no_tax` | Pass |
+| AC-27.7 | `tests/api/test_us28_bills.py::test_ac_27_7_composition_and_not_registered_bills` | Pass |
+| AC-27.8 | `tests/api/test_us27_tax.py::test_ac_27_8_gstin_pattern_and_check_character` | Pass |
+| AC-27.8 | `tests/api/test_us28_bills.py::test_ac_27_8_a_wrong_gstin_keeps_the_bill_a_draft_with_the_reason` | Pass |
+| AC-27.8 | `tests/api/test_us28_bills.py::test_ac_27_8_a_big_bill_without_gstin_needs_address_and_state` | Pass |
+| AC-27.8 | `tests/api/test_us28_bills.py::test_ac_27_8_every_line_needs_a_description_and_quantity` | Pass |
+| AC-27.8 | `tests/us26-bills.test.js` › AC-27.8: a wrong GSTIN stops the save with the message, and the bill stays a draft | Pass |
+| AC-27.8 | `tests/us27-tax.test.js` › AC-27.8: GSTIN pattern and check character | Pass |
+| AC-27.9 | `tests/api/test_us27_tax.py::test_ac_27_9_fixture_has_at_least_twenty_cases_of_every_kind` | Pass |
+| AC-27.9 | `tests/api/test_us27_tax.py::test_ac_27_9_server_gives_the_shared_figures` (36 shared cases plus GSTIN and words, one test each) | Pass |
+| AC-27.9 | `tests/api/test_us27_tax.py::test_ac_27_9_engine_never_uses_floats_for_money` | Pass |
+| AC-27.9 | `tests/api/test_us28_bills.py::test_ac_27_9_the_server_works_out_and_stores_its_own_figures` | Pass |
+| AC-27.9 | `tests/us27-tax.test.js` › AC-27.9: the phone gives the shared figures (36 cases, one test each) | Pass |
+| AC-27.10 | `tests/api/test_us28_bills.py::test_ac_27_10_a_bill_takes_stock_and_cancelling_returns_it` | Pass |
+| AC-27.10 | `tests/api/test_us28_bills.py::test_ac_27_10_changing_a_saved_bill_moves_only_the_difference` | Pass |
+| AC-28.1 | `tests/api/test_us28_bills.py::test_ac_28_1_numbers_follow_the_series_of_the_financial_year` | Pass |
+| AC-28.1 | `tests/api/test_us28_bills.py::test_ac_28_1_financial_year_runs_april_to_march` | Pass |
+| AC-28.1 | `tests/api/test_us28_bills.py::test_ac_28_1_two_saves_at_once_get_consecutive_numbers_and_a_failed_save_uses_none` | Pass |
+| AC-28.1 | `tests/us26-bills.test.js` › AC-28.1: the demo numbers bills and estimates in their own series for the financial year | Pass |
+| AC-28.1 | `tests/api/test_us28_bills.py::test_ac_28_1_a_date_in_the_future_gets_no_number` | Pass |
+| AC-28.1 | `tests/us26-bills.test.js` › AC-28.1: a real business bills on the phone's real date, not the demo's fixed date | Pass |
+| AC-28.2 | `tests/api/test_us28_bills.py::test_ac_28_2_prefix_is_optional_short_and_applies_from_the_next_bill` | Pass |
+| AC-28.3 | `tests/api/test_us28_bills.py::test_ac_28_3_a_draft_has_no_number_until_saved` | Pass |
+| AC-28.3 | `tests/us26-bills.test.js` › AC-28.3: with no signal Save keeps the bill as "Number given when online"; the number shows once it is sent | Pass |
+| AC-28.4 | `tests/api/test_us28_bills.py::test_ac_28_4_overdue_is_worked_out_and_drafts_can_be_deleted` | Pass |
+| AC-28.5 | `tests/api/test_us28_bills.py::test_ac_28_5_a_sent_or_paid_bill_cant_change_and_cancel_keeps_its_number` | Pass |
+| AC-28.5 | `tests/us26-bills.test.js` › AC-28.5: a sent bill opens as a bill, not the editor; Cancel takes a reason, keeps the number and can be undone | Pass |
+| AC-28.6 | `tests/us26-bills.test.js` › AC-28.6: the Bills list searches by number, name or phone and filters with chips and counts, newest first | Pass |
+| AC-28.7 | `tests/api/test_us28_bills.py::test_ac_28_7_old_quotes_and_invoices_open_unchanged` | Pass |
+| AC-28.7 | `tests/us26-bills.test.js` › AC-28.7: quotes and invoices from v0.7.0 show in the list as Saved with their own number and open in the old view | Pass |
+| AC-28.8 | `tests/api/test_us26_packs.py::test_ac_28_8_cancel_bills_is_an_owner_permission` | Pass |
+| AC-28.8 | `tests/api/test_us28_bills.py::test_ac_28_8_cancelling_needs_cancel_bills_and_technicians_make_no_bills` | Pass |
+| AC-28.8 | `tests/us26-bills.test.js` › AC-28.8: a coordinator makes bills but sees no Cancel; a technician has no Bills | Pass |
+| AC-29.1 | `tests/api/test_us28_bills.py::test_ac_29_1_an_estimate_never_takes_stock` | Pass |
+| AC-29.1 | `tests/us26-bills.test.js` › AC-29.1 to AC-29.3: an estimate is valid for 15 days; Make bill copies it once, then says it is already billed | Pass |
+| AC-29.2 | `tests/api/test_us30_links.py::test_ac_29_2_make_bill_copies_the_estimate_and_links_both` | Pass |
+| AC-29.3 | `tests/api/test_us30_links.py::test_ac_29_3_an_estimate_is_billed_only_once` | Pass |
+| AC-29.3 | `tests/us26-bills.test.js` › AC-29.1 to AC-29.3: an estimate is valid for 15 days; Make bill copies it once, then says it is already billed | Pass |
+| AC-29.3 | `tests/us26-bills.test.js` › AC-29.3: on a real business a second Make bill is refused with the bill\'s number and Open bill | Pass |
+| AC-29.4 | `tests/us26-bills.test.js` › AC-29.4: a job's Make bill starts from its lines and parts used, and the bill links to the job | Pass |
+| AC-30.1 | `tests/api/test_us30_links.py::test_ac_30_1_bill_look_is_checked_and_needs_manage_settings` | Pass |
+| AC-30.1 | `tests/us26-bills.test.js` › AC-30.1: Settings → Bill look has the layouts, six colours and a live preview of a sample bill | Pass |
+| AC-30.2 | `tests/api/test_us27_tax.py::test_ac_30_2_total_in_words_indian_style` | Pass |
+| AC-30.2 | `tests/api/test_us30_links.py::test_ac_30_2_the_pdf_has_every_part_of_a_tax_invoice` | Pass |
+| AC-30.2 | `tests/us26-bills.test.js` › AC-30.2 and AC-30.5: a real bill shows Tax Invoice, place of supply and Download PDF; the link can be turned off and on | Pass |
+| AC-30.2 | `tests/us27-tax.test.js` › AC-30.2: totals in words, Indian style | Pass |
+| AC-30.3 | `tests/api/test_us30_links.py::test_ac_30_3_the_link_needs_no_sign_in_and_says_nothing_for_a_wrong_token` | Pass |
+| AC-30.4 | `tests/api/test_us30_links.py::test_ac_30_4_pdf_is_small_prints_rupees_and_shows_cancelled` | Pass |
+| AC-30.5 | `tests/api/test_us30_links.py::test_ac_30_5_a_link_turned_off_says_so_and_comes_back_the_same` | Pass |
+| AC-30.5 | `tests/us26-bills.test.js` › AC-30.2 and AC-30.5: a real bill shows Tax Invoice, place of supply and Download PDF; the link can be turned off and on | Pass |
+| AC-30.6 | `tests/api/test_us30_links.py::test_ac_30_6_the_demo_makes_no_links` | Pass |
+| AC-30.6 | `tests/us26-bills.test.js` › AC-30.6: demo bills carry Sample, get no link, and Send on WhatsApp opens with sample text | Pass |
+| AC-31.1 | `tests/api/test_us30_links.py::test_ac_31_1_send_opens_whatsapp_with_the_message_and_marks_sent` | Pass |
+| AC-31.1 | `tests/api/test_us30_links.py::test_ac_31_1_an_estimate_message_and_no_mobile` | Pass |
+| AC-31.1 | `tests/us26-bills.test.js` › AC-31.1: Send goes through the server, opens WhatsApp with the message and the bill becomes Sent | Pass |
+| AC-31.2 | `tests/api/test_us30_links.py::test_ac_31_2_the_same_call_sends_directly_once_a_number_is_connected` | Pass |
+| AC-31.3 | `tests/api/test_us30_links.py::test_ac_31_3_copy_share_or_mark_sent_makes_it_sent` (36 shared cases plus GSTIN and words, one test each) | Pass |
+| AC-31.3 | `tests/us26-bills.test.js` › AC-31.3: Copy link copies it and marks the bill Sent; Mark as sent does the same without sharing | Pass |
+| AC-31.4 | `tests/api/test_us30_links.py::test_ac_31_4_history_activity_log_and_monthly_count` | Pass |
+
 ## Design checklist
 | Check | Result |
 |---|---|
@@ -330,6 +421,8 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | Motion: one entrance moment plus action feedback | Yes: processing steps ticking to green; sheet rises; voice-note waveform while playing |
 
 ## Visual check
+**CR-0012:** the app served by `vite` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database), driven by Playwright in Chromium at 375px and 1280px in light and dark (4 runs, 20 screenshots), signed in as the demo owner: + New → Bill, a typed line and an item from the search with a quantity of 1.5 kg (the editor with its sticky total bar), Save and share (the bill view with the Tax Invoice paper and its tax summary), the Bills list with the + New menu open (cards on the phone, a table on the desktop), Home with Billed today, Unpaid and Overdue, and Settings with Business type and packs and Bill look with its live preview. No page errors, and page width equals the viewport in every run. Fixes made after looking: the Draft chip stretched across the page; round off read "₹-0.32" (now "−₹0.32"); "Save and share" wrapped onto three lines on a phone; the bill view had seven buttons above the bill (now one main button, Copy link, Mark as paid and a More menu, rule 6); the + New menu stayed open after moving to another page; six chips took three rows on a phone (now one scrolling row); the search hint was cut off; "Due date On receipt" (now "Due on receipt", on the PDF too); the Bills and Estimates switch stretched across the desktop. The PDF from the Postgres run was opened and read back: Tax Invoice, both parties, place of supply, both lines with HSN, discount, taxable value and tax, the tax summary, round off, ₹3,393 and the words.
+
 **CR-0011:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database), driven by Playwright in Chromium at 375px and 1280px in light and dark (4 runs, each in a fresh business seeded through the sync call: 9 items with one low, two out or short, one job with a note naming parts; 40 screenshots). Per run: Inventory list (cards on the phone, table on the desktop) with its tiles, search ("cap 45" gave one item, a nonsense word gave the empty message), the Low chip; one item with its history; Stock in with a wrong quantity (the message under the box) and then a right one (the notice, "All saved"); Count with the live "This records −1 nos as a count correction." line; Add item with five field messages; CSV import with 2 new, 1 update and 4 problem rows listed by row number; the job with "From the note" suggestions and an unmatched "copper nut"; taking a part from the picker (the short-stock warning for the stabiliser), then the parts list with prices for the owner. A technician signing in saw Chat and Jobs only, no Inventory tab, and "You don't have access to Inventory" at `#/inventory`. No console errors, and page width equals the viewport in every run. The design mockup (`docs/design/mockups/inventory.html`) was walked through the same way before the build; the built screens follow it.
 
 **CR-0010:** the production build served by `vite preview` with `/api` going to the real server (`uv run uvicorn api.index:app`, in-memory database). `AI_ENDPOINTS` pointed at a local stand-in for the Mac's Ollama that has only `gemma4:e4b`, takes 4 s per JSON read and streams the photo text word by word. `AI_MODEL` was set to `qwen3.5:9b`, a model the stand-in lacks, to exercise the fallback. Playwright in Chromium at 375px light and dark and 1280px light:
@@ -359,6 +452,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
+- v0.8.0 (planned): CR-0012 in review; 443 of 443 tests passing (241 server, 202 web), plus the Postgres-only test (run on PostgreSQL 16.2).
 - v0.7.0 (2026-11-01): CR-0011 released; 289 of 289 tests passing (151 server, 138 web), plus the Postgres-only test (run on PostgreSQL 16.2). Founder merged PR #13 after its preview built; the same 289 pass again on `main`.
 - v0.6.0 (2026-11-01): CR-0010 released; 231 of 231 tests passing (122 server, 109 web), plus the Postgres-only test (skipped here). Founder checked the preview: two notes in a row, Stop and Try again; AI reads took 0.8 to 4.4 s (runtime logs).
 - v0.5.0 (planned): CR-0009 in review; 209 of 209 tests passing (110 server, 99 web), plus the Postgres-only test.

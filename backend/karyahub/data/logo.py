@@ -22,18 +22,29 @@ MAGIC = {
 BAD_LOGO = "Use a PNG, JPEG or WebP picture of up to 200 KB for the logo."
 
 
-def _decode(data_url: str) -> tuple[str, bytes]:
+def decode_image(
+    data_url: str,
+    *,
+    max_bytes: int = MAX_LOGO_BYTES,
+    mimes: tuple[str, ...] = tuple(MAGIC),
+    message: str = BAD_LOGO,
+) -> tuple[str, bytes]:
+    """A data URL's picture, checked: one of ``mimes``, up to ``max_bytes``, and really that kind of file."""
     match = DATA_URL.match(data_url or "")
-    if not match:
-        raise AppError("validation_error", BAD_LOGO, 422)
+    if not match or match.group(1) not in mimes:
+        raise AppError("validation_error", message, 422)
     mime = match.group(1)
     try:
         raw = base64.b64decode(re.sub(r"\s", "", match.group(2)), validate=True)
     except (binascii.Error, ValueError) as exc:
-        raise AppError("validation_error", BAD_LOGO, 422) from exc
-    if not raw or len(raw) > MAX_LOGO_BYTES or not MAGIC[mime](raw):
-        raise AppError("validation_error", BAD_LOGO, 422)
+        raise AppError("validation_error", message, 422) from exc
+    if not raw or len(raw) > max_bytes or not MAGIC[mime](raw):
+        raise AppError("validation_error", message, 422)
     return mime, raw
+
+
+def _decode(data_url: str) -> tuple[str, bytes]:
+    return decode_image(data_url)
 
 
 async def set_logo(db: AsyncSession, p: accounts.Principal, data_url: str) -> dict:

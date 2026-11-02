@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from karyahub.accounts import service as accounts
 from karyahub.accounts.deps import BusinessPrincipalDep, DbDep, require
-from karyahub.data import inventory_import, logo, service
+from karyahub.data import business_setup, inventory_import, logo, service
 
 router = APIRouter(prefix="/api/v1")
 
@@ -33,6 +33,17 @@ class InventoryImportRequest(BaseModel):
 
 class LogoRequest(BaseModel):
     data_url: str = Field(max_length=300_000)
+
+
+class SignatureRequest(BaseModel):
+    data_url: str = Field(max_length=420_000)
+
+
+class SetupRequest(BaseModel):
+    business_type: str | None = Field(None, max_length=12)
+    gst_registration: str | None = Field(None, max_length=14)
+    state_code: str | None = Field(None, max_length=2)
+    packs: list[str] | None = Field(None, max_length=5)
 
 
 @router.post("/sync")
@@ -69,3 +80,34 @@ async def get_logo(p: BusinessPrincipalDep, db: DbDep) -> Response:
     mime, raw = await logo.get_logo(db, p)
     headers = {"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"}
     return Response(content=raw, media_type=mime, headers=headers)
+
+
+# ---------- business type, packs and bill look (CR-0012) ----------
+@router.get("/business/setup")
+async def get_setup(p: BusinessPrincipalDep) -> dict[str, Any]:
+    return business_setup.setup_dict(accounts._require_business(p))
+
+
+@router.put("/business/setup")
+async def put_setup(req: SetupRequest, p: ManageSettings, db: DbDep) -> dict[str, Any]:
+    return await business_setup.put_setup(db, p, req.model_dump())
+
+
+@router.get("/business/bill-look")
+async def get_look(p: BusinessPrincipalDep) -> dict[str, Any]:
+    return business_setup.look_of(accounts._require_business(p))
+
+
+@router.put("/business/bill-look")
+async def put_look(req: dict[str, Any], p: ManageSettings, db: DbDep) -> dict[str, Any]:
+    return await business_setup.put_look(db, p, req)
+
+
+@router.put("/business/signature")
+async def put_signature(req: SignatureRequest, p: ManageSettings, db: DbDep) -> dict:
+    return await business_setup.set_signature(db, p, req.data_url)
+
+
+@router.delete("/business/signature")
+async def delete_signature(p: ManageSettings, db: DbDep) -> dict:
+    return await business_setup.clear_signature(db, p)

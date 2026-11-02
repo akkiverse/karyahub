@@ -286,7 +286,9 @@ def create_app() -> FastAPI:
         who: BusinessPrincipalDep,
         db: DbDep,
     ) -> workflow.TransitionResult:
-        access.check_action(who.permissions, req.action)  # the server's own record of who this is
+        access.check_action(
+            who.permissions, req.action, who.pack_off
+        )  # the server's own record of who this is
         stored = None
         if not tenant.is_demo:
             # A real business's job lives on the server: its state comes from there, not the phone (CR-0009).

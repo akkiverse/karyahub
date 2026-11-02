@@ -33,6 +33,14 @@ class Business(Base):
     # The logo (CR-0009) is a small image kept as a data URL, deferred so it is not read on every request.
     logo_data: Mapped[str | None] = deferred(mapped_column(Text, nullable=True))
     logo_version: Mapped[str] = mapped_column(String(12), default="")
+    # Bills that are right (CR-0012). No type yet means the owner hasn't been asked; no packs means Field
+    # service on, as every business had in v0.7.0 (AC-26.2).
+    business_type: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    packs: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    gst_registration: Mapped[str] = mapped_column(String(14), default="regular")
+    bill_look: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    signature_data: Mapped[str | None] = deferred(mapped_column(Text, nullable=True))
+    signature_version: Mapped[str] = mapped_column(String(12), default="")
 
 
 class User(Base):
@@ -162,6 +170,16 @@ class DeviceImport(Base):
     user_id: Mapped[str] = mapped_column(String(40))
     imported_at: Mapped[datetime] = mapped_column(DateTime)
     counts: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+class DocLink(Base):
+    """A bill's or estimate's public link (CR-0012): its token's SHA-256, so the page needs no sign-in."""
+
+    __tablename__ = "doc_links"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    business_id: Mapped[str] = mapped_column(ForeignKey("businesses.id"))
+    doc_id: Mapped[str] = mapped_column(String(64))
 
 
 class ItemCode(Base):

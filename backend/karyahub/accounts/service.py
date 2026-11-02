@@ -58,6 +58,8 @@ class Principal:
     user: User
     business: Business | None
     permissions: frozenset[str]
+    # Permissions the business's packs switched off (CR-0012): asking for one answers 403 pack_off.
+    pack_off: frozenset[str] = frozenset()
 
     def can(self, permission: str) -> bool:
         return permission in self.permissions
@@ -87,9 +89,14 @@ async def permissions_for(db: AsyncSession, user: User) -> frozenset[str]:
     return access.effective_permissions(user.role, role_over, user_over)
 
 
+async def make_principal(db: AsyncSession, user: User, business: Business | None) -> Principal:
+    granted, off = access.apply_packs(await permissions_for(db, user), business)
+    return Principal(user, business, granted, off)
+
+
 async def _principal(db: AsyncSession, user: User) -> Principal:
     business = await db.get(Business, user.business_id) if user.business_id else None
-    return Principal(user, business, await permissions_for(db, user))
+    return await make_principal(db, user, business)
 
 
 async def audit(db: AsyncSession, business_id: str | None, actor: str, action: str, detail: str = "") -> None:
@@ -113,7 +120,7 @@ async def principal_for_token(db: AsyncSession, token: str | None) -> Principal 
     sess, user, business = row
     if sess.expires_at <= utcnow() or not user.active or (business is not None and not business.active):
         return None
-    return Principal(user, business, await permissions_for(db, user))
+    return await make_principal(db, user, business)
 
 
 async def _start_session(db: AsyncSession, settings: Settings, user: User) -> str:
@@ -196,7 +203,7 @@ async def sign_in(db: AsyncSession, settings: Settings, phone_raw: str, pin: str
     user.last_sign_in = utcnow()
     await audit(db, user.business_id, user.name, "sign_in", f"Signed in as {user.role}")
     await db.commit()
-    return Principal(user, business, await permissions_for(db, user)), token
+    return await make_principal(db, user, business), token
 
 
 # ---------- the platform admin ----------
@@ -727,7 +734,12 @@ async def list_audit(db: AsyncSession, p: Principal, limit: int = 50) -> list[di
 
 
 def business_dict(b: Business) -> dict:
+    from karyahub.data import business_setup  # setup imports this module
+
     return {
+        **business_setup.setup_dict(b),
+        "bill_look": business_setup.look_of(b),
+        "signature_version": b.signature_version or "",
         "id": b.id,
         "name": b.name,
         "address": b.address,

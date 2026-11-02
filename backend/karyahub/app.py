@@ -418,6 +418,7 @@ def create_app() -> FastAPI:
     app.include_router(api)
     app.include_router(account_routes.router)
     app.include_router(data_routes.router)
+    app.include_router(data_routes.public)
     app.include_router(v1)
     return app
 

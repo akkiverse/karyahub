@@ -186,7 +186,7 @@ def compute(bill: dict[str, Any]) -> dict[str, Any]:
         lines_out.append(
             {
                 "amount": w["amount"],
-                "discount": w["discount"],
+                "line_discount": w["discount"],
                 "bill_discount": share,
                 "taxable": taxable,
                 "gst_rate": rate_text(w["gst"]),

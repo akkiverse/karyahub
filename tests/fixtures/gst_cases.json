@@ -25,7 +25,7 @@
     "lines": [
      {
       "amount": 250000,
-      "discount": 25000,
+      "line_discount": 25000,
       "bill_discount": 0,
       "taxable": 225000,
       "gst_rate": "18",
@@ -79,7 +79,7 @@
     "lines": [
      {
       "amount": 250000,
-      "discount": 25000,
+      "line_discount": 25000,
       "bill_discount": 0,
       "taxable": 225000,
       "gst_rate": "18",
@@ -130,7 +130,7 @@
     "lines": [
      {
       "amount": 11800,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 10000,
       "gst_rate": "18",
@@ -181,7 +181,7 @@
     "lines": [
      {
       "amount": 10000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 8475,
       "gst_rate": "18",
@@ -232,7 +232,7 @@
     "lines": [
      {
       "amount": 10000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 8475,
       "gst_rate": "18",
@@ -307,7 +307,7 @@
     "lines": [
      {
       "amount": 50000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 50000,
       "gst_rate": "0",
@@ -317,7 +317,7 @@
      },
      {
       "amount": 650000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 650000,
       "gst_rate": "0.25",
@@ -327,7 +327,7 @@
      },
      {
       "amount": 2500000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 2500000,
       "gst_rate": "3",
@@ -337,7 +337,7 @@
      },
      {
       "amount": 69800,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 69800,
       "gst_rate": "5",
@@ -347,7 +347,7 @@
      },
      {
       "amount": 129900,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 129900,
       "gst_rate": "18",
@@ -357,7 +357,7 @@
      },
      {
       "amount": 4500000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 4500000,
       "gst_rate": "40",
@@ -462,7 +462,7 @@
     "lines": [
      {
       "amount": 50000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 50000,
       "gst_rate": "0",
@@ -472,7 +472,7 @@
      },
      {
       "amount": 104700,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 104700,
       "gst_rate": "5",
@@ -482,7 +482,7 @@
      },
      {
       "amount": 129900,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 129900,
       "gst_rate": "18",
@@ -492,7 +492,7 @@
      },
      {
       "amount": 129900,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 129900,
       "gst_rate": "18",
@@ -502,7 +502,7 @@
      },
      {
       "amount": 4500000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 4500000,
       "gst_rate": "40",
@@ -582,7 +582,7 @@
     "lines": [
      {
       "amount": 189900,
-      "discount": 9900,
+      "line_discount": 9900,
       "bill_discount": 0,
       "taxable": 180000,
       "gst_rate": "18",
@@ -592,7 +592,7 @@
      },
      {
       "amount": 90000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 90000,
       "gst_rate": "5",
@@ -663,7 +663,7 @@
     "lines": [
      {
       "amount": 120000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 6000,
       "taxable": 114000,
       "gst_rate": "18",
@@ -673,7 +673,7 @@
      },
      {
       "amount": 99900,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 4995,
       "taxable": 94905,
       "gst_rate": "5",
@@ -683,7 +683,7 @@
      },
      {
       "amount": 9999,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 500,
       "taxable": 9499,
       "gst_rate": "0",
@@ -761,7 +761,7 @@
     "lines": [
      {
       "amount": 10000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 3333,
       "taxable": 6667,
       "gst_rate": "18",
@@ -771,7 +771,7 @@
      },
      {
       "amount": 10000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 3333,
       "taxable": 6667,
       "gst_rate": "18",
@@ -781,7 +781,7 @@
      },
      {
       "amount": 10000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 3334,
       "taxable": 6666,
       "gst_rate": "18",
@@ -853,7 +853,7 @@
     "lines": [
      {
       "amount": 250000,
-      "discount": 25000,
+      "line_discount": 25000,
       "bill_discount": 3665,
       "taxable": 221335,
       "gst_rate": "18",
@@ -863,7 +863,7 @@
      },
      {
       "amount": 80000,
-      "discount": 5000,
+      "line_discount": 5000,
       "bill_discount": 1221,
       "taxable": 73779,
       "gst_rate": "5",
@@ -873,7 +873,7 @@
      },
      {
       "amount": 10000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 164,
       "taxable": 9836,
       "gst_rate": "18",
@@ -941,7 +941,7 @@
     "lines": [
      {
       "amount": 59900,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 4492,
       "taxable": 46956,
       "gst_rate": "18",
@@ -951,7 +951,7 @@
      },
      {
       "amount": 23600,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 1771,
       "taxable": 20790,
       "gst_rate": "5",
@@ -1008,7 +1008,7 @@
     "lines": [
      {
       "amount": 36149,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 36149,
       "gst_rate": "18",
@@ -1063,7 +1063,7 @@
     "lines": [
      {
       "amount": 1,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 1,
       "gst_rate": "18",
@@ -1073,7 +1073,7 @@
      },
      {
       "amount": 33,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 33,
       "gst_rate": "5",
@@ -1135,7 +1135,7 @@
     "lines": [
      {
       "amount": 1000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 1000,
       "gst_rate": "0.25",
@@ -1145,7 +1145,7 @@
      },
      {
       "amount": 10010,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 10010,
       "gst_rate": "0.25",
@@ -1195,7 +1195,7 @@
     "lines": [
      {
       "amount": 6825000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 6825000,
       "gst_rate": "3",
@@ -1250,7 +1250,7 @@
     "lines": [
      {
       "amount": 12345,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 12345,
       "gst_rate": "18",
@@ -1260,7 +1260,7 @@
      },
      {
       "amount": 10070,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 10070,
       "gst_rate": "5",
@@ -1309,7 +1309,7 @@
     "lines": [
      {
       "amount": 99999,
-      "discount": 2500,
+      "line_discount": 2500,
       "bill_discount": 9750,
       "taxable": 87749,
       "gst_rate": "18",
@@ -1355,7 +1355,7 @@
     "lines": [
      {
       "amount": 150100,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 150100,
       "gst_rate": "18",
@@ -1365,7 +1365,7 @@
      },
      {
       "amount": 1999,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 1999,
       "gst_rate": "0",
@@ -1412,7 +1412,7 @@
     "lines": [
      {
       "amount": 0,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 0,
       "gst_rate": "18",
@@ -1422,7 +1422,7 @@
      },
      {
       "amount": 49900,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 49900,
       "gst_rate": "18",
@@ -1481,7 +1481,7 @@
     "lines": [
      {
       "amount": 49900,
-      "discount": 49900,
+      "line_discount": 49900,
       "bill_discount": 0,
       "taxable": 0,
       "gst_rate": "18",
@@ -1491,7 +1491,7 @@
      },
      {
       "amount": 10000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 10000,
       "gst_rate": "18",
@@ -1550,7 +1550,7 @@
     "lines": [
      {
       "amount": 49900,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 49900,
       "taxable": 0,
       "gst_rate": "18",
@@ -1560,7 +1560,7 @@
      },
      {
       "amount": 20000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 20000,
       "taxable": 0,
       "gst_rate": "5",
@@ -1617,7 +1617,7 @@
     "lines": [
      {
       "amount": 8517,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 8517,
       "gst_rate": "18",
@@ -1667,7 +1667,7 @@
     "lines": [
      {
       "amount": 10000000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 10000000,
       "gst_rate": "18",
@@ -1722,7 +1722,7 @@
     "lines": [
      {
       "amount": 150000000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 150000000,
       "gst_rate": "18",
@@ -1732,7 +1732,7 @@
      },
      {
       "amount": 1234500,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 1234500,
       "gst_rate": "5",
@@ -1803,7 +1803,7 @@
     "lines": [
      {
       "amount": 3333,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 333,
       "taxable": 3000,
       "gst_rate": "18",
@@ -1813,7 +1813,7 @@
      },
      {
       "amount": 6667,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 668,
       "taxable": 5999,
       "gst_rate": "5",
@@ -1823,7 +1823,7 @@
      },
      {
       "amount": 0,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 0,
       "gst_rate": "18",
@@ -1880,7 +1880,7 @@
     "lines": [
      {
       "amount": 100000,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 100000,
       "gst_rate": "18",
@@ -1930,7 +1930,7 @@
     "lines": [
      {
       "amount": 99750,
-      "discount": 0,
+      "line_discount": 0,
       "bill_discount": 0,
       "taxable": 99750,
       "gst_rate": "5",

@@ -15,9 +15,10 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from karyahub import access
 from karyahub.accounts import service as accounts
-from karyahub.data import inventory, rls
-from karyahub.db.models import Counter, DeviceImport, Record, SyncOp
+from karyahub.data import bills, inventory, rls
+from karyahub.db.models import Business, Counter, DeviceImport, Record, SyncOp
 from karyahub.domain.workflow import STATES
 from karyahub.errors import AppError
 
@@ -63,11 +64,21 @@ def can_write(p: accounts.Principal, kind: str) -> bool:
     return bool(WRITE_PERMISSIONS[kind] & p.permissions)
 
 
-def _business(p: accounts.Principal) -> str:
+def pack_refuses(p: accounts.Principal, kind: str) -> bool:
+    """Field service off (CR-0012): its jobs and chat can't be written, though they stay on the server."""
+    needed = WRITE_PERMISSIONS[kind]
+    return bool(needed & p.pack_off) and not needed & p.permissions
+
+
+def _business_record(p: accounts.Principal) -> Business:
     business = accounts._require_business(p)
     if business.is_demo:
         raise DEMO_LOCAL
-    return business.id
+    return business
+
+
+def _business(p: accounts.Principal) -> str:
+    return _business_record(p).id
 
 
 def public(rec: Record, p: accounts.Principal | None = None) -> dict[str, Any]:
@@ -151,7 +162,7 @@ def _clean_body(kind: str, item_id: str, body: Any) -> dict[str, Any]:
             raise AppError("validation_error", "A job needs a customer name.", 422)
         if clean.get("state") not in STATES:
             clean["state"] = "WORK_DONE"
-    if kind == "document":
+    if kind == "document" and not bills.is_v2(clean):
         if clean.get("type") not in {"quote", "invoice"}:
             raise AppError("validation_error", "A document is a quote or an invoice.", 422)
         if not isinstance(clean.get("lines", []), list):
@@ -250,7 +261,8 @@ async def sync(
     ops: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Apply the phone's queued changes once each, then answer with all that changed after ``since``."""
-    business_id = _business(p)
+    business = _business_record(p)
+    business_id = business.id
     if len(ops) > MAX_OPS:
         raise AppError("too_many", f"Send at most {MAX_OPS} changes at a time.", 422)
     await rls.scope(db, business_id)
@@ -281,6 +293,7 @@ async def sync(
             return next_seq
 
         batch = inventory.Batch(db, p, business_id, take_seq, existing, audits)
+        bill_book = bills.Bills(batch, business)
         done_here: dict[str, dict[str, Any]] = {}
         for op in ops:
             problem = _problem(op)
@@ -301,6 +314,8 @@ async def sync(
             result: dict[str, Any] = {"op_id": op_id, "kind": kind, "id": item_id}
             current = existing.get((kind, item_id))
             try:
+                if pack_refuses(p, kind):
+                    raise AppError("pack_off", access.PACK_OFF_MESSAGE, 403)
                 if not can_write(p, kind):
                     raise AppError(
                         "forbidden", "Your access doesn't include this. Ask your business owner.", 403
@@ -312,6 +327,11 @@ async def sync(
                     rec = await batch.apply_move(item_id, op.get("body"), current)
                 elif kind == "item":
                     rec = await batch.put_item(item_id, _clean_body(kind, item_id, op.get("body")), current)
+                elif kind == "document" and (
+                    bills.is_v2(op.get("body")) or (current is not None and bills.is_v2(current.body))
+                ):
+                    _clean_body(kind, item_id, op.get("body"))  # size and shape
+                    rec = await bill_book.apply(item_id, op["body"], current)
                 else:
                     body = _clean_body(kind, item_id, op.get("body"))
                     rec = await _store(db, business_id, kind, item_id, body, current, take_seq())
@@ -331,6 +351,8 @@ async def sync(
                 )
             )
             results.append(result)
+        if fresh and next_seq > start + need:  # bills took more change numbers than were set aside
+            await bump(db, business_id, "seq", next_seq - start - need)
     cursor_now = await counter_value(db, business_id, "seq")
     kinds = readable_kinds(p)
     changes = {k: [] for k in KINDS}

@@ -146,3 +146,77 @@ def make_business(platform, make_client):
         return {"business": r.json()["business"], "owner": owner, "phone": owner_phone, "pin": final_pin}
 
     return make
+
+
+# ---------- bills (CR-0012) ----------
+@pytest.fixture
+def fixed_today(monkeypatch):
+    """The Spec's test date: 2 Nov 2026, financial year 2026-27."""
+    from datetime import date
+
+    from karyahub.data import bills
+
+    monkeypatch.setattr(bills, "today", lambda: date(2026, 11, 2))
+    return date(2026, 11, 2)
+
+
+@pytest.fixture
+def biller(make_business, fixed_today):
+    """A real business, set up as Repair and service, GST Regular in Maharashtra, with a GSTIN."""
+
+    def make(name="Shree Cool AC", owner_phone="9811100001", **setup):
+        made = make_business(name=name, owner_phone=owner_phone)
+        owner = made["owner"]
+        r = owner.put(
+            "/api/v1/business/profile",
+            json={
+                "name": name,
+                "address": "12 MG Road, Pune",
+                "gstin": "27AAPFU0939F1ZV",
+                "state_code": "27",
+            },
+        )
+        assert r.status_code == 200, r.text
+        body = {"business_type": "service", "gst_registration": "regular", "state_code": "27", **setup}
+        r = owner.put("/api/v1/business/setup", json=body)
+        assert r.status_code == 200, r.text
+        return made
+
+    return make
+
+
+_ops = iter(range(1, 10**9))
+
+
+def sync_ops(c, *ops, since=0):
+    """Send changes as a phone does; each gets its own operation id."""
+    sent = [{"op_id": f"op-t-{next(_ops)}", **op} for op in ops]
+    r = c.post("/api/v1/sync", json={"since": since, "ops": sent})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def put_doc(c, doc_id, *, save=False, **fields):
+    """A version-2 estimate or bill as the phone sends it; returns (result, stored body or None)."""
+    body = {"doc_version": 2, "type": "invoice", "lines": [], **fields}
+    if save:
+        body["save"] = True
+    res = sync_ops(c, {"kind": "document", "id": doc_id, "body": body})
+    return res["results"][0], stored(c, "document", doc_id)
+
+
+def stored(c, kind, rid):
+    found = None
+    since = 0
+    while True:
+        res = sync_ops(c, since=since)
+        for rec in res["changes"][kind]:
+            if rec["id"] == rid:
+                found = rec["body"]
+        if not res["more"]:
+            return found
+        since = res["cursor"]
+
+
+def line(description="AC service", qty=1, rate=100000, gst_rate=18, **extra):
+    return {"description": description, "qty": qty, "rate": rate, "gst_rate": gst_rate, **extra}

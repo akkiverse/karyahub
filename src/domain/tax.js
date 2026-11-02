@@ -134,7 +134,7 @@ export function compute(bill) {
       row.igst += igst;
       summary.set(w.gst, row);
     }
-    return { amount: w.amount, discount: w.discount, bill_discount: shares[i], taxable, gst_rate: rateText(w.gst), cgst, sgst, igst };
+    return { amount: w.amount, line_discount: w.discount, bill_discount: shares[i], taxable, gst_rate: rateText(w.gst), cgst, sgst, igst };
   });
 
   const sum = (key) => lines.reduce((s, l) => s + l[key], 0n);

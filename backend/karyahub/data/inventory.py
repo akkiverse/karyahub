@@ -45,7 +45,8 @@ UNIT_ALIASES = {
     "sets": "set",
     "rolls": "roll",
 }
-GST_RATES = (0, 5, 18, 40)
+# 0.25% (rough diamonds and stones) and 3% (gold and silver) were added by CR-0012 (AC-27.6).
+GST_RATES = (0, 0.25, 3, 5, 18, 40)
 MOVE_KINDS = ("opening", "in", "out", "used", "returned", "count")
 # What a person needs to save each kind of move. Parts for a job are the office's call,
 # or an allowed technician's.
@@ -140,7 +141,7 @@ def clean_item(item_id: str, body: Any) -> dict[str, Any]:
         raise AppError("validation_error", "An HSN code has 4, 6 or 8 digits.", 422)
     gst = body.get("gst", 18)
     if isinstance(gst, bool) or gst not in GST_RATES:
-        raise AppError("validation_error", "Pick a GST rate: 0, 5, 18 or 40 %.", 422)
+        raise AppError("validation_error", "Pick a GST rate: 0, 0.25, 3, 5, 18 or 40 %.", 422)
     low = _number(body.get("low"))
     if low is not None and not 0 <= low <= MAX_QTY:
         raise AppError("validation_error", "The low-stock level must be a number from 0 up.", 422)
@@ -152,7 +153,10 @@ def clean_item(item_id: str, body: Any) -> dict[str, Any]:
         "sale": _paise(body.get("sale"), required=True),
         "cost": _paise(body.get("cost")),
         "hsn": hsn,
-        "gst": int(gst),
+        "gst": int(gst) if float(gst).is_integer() else float(gst),
+        # CR-0012: a price that already includes GST (MRP), and a service that is never counted in stock.
+        "price_includes_gst": bool(body.get("price_includes_gst", False)),
+        "service": bool(body.get("service", False)),
         "low": None if low is None else r3(low),
         "stopped": bool(body.get("stopped", False)),
     }
@@ -281,6 +285,8 @@ class Batch:
             raise AppError("not_found", "That item isn't in your inventory.", 404)
         name, unit = item.body["name"], item.body["unit"]
         have = float(item.body.get("qty", 0))
+        if item.body.get("service"):
+            raise AppError("service_item", f"{name} is a service, so it has no stock.", 409)
         if item.body.get("stopped") and kind != "returned":
             raise AppError("stopped", f"{name} is not in use. Use it again first.", 409)
 
@@ -359,6 +365,45 @@ class Batch:
         self.found[("stock_move", move_id)] = rec
         self._audit_move(kind, name, unit, qty, move)
         return rec
+
+    async def bill_move(self, item_id: str, qty: float, note: str, doc_id: str, number: str) -> None:
+        """A stock move made by a bill (CR-0012, AC-27.10): ``sold`` takes stock out, ``sale_cancelled`` puts
+        it back. Only the server makes these. A bill is never refused for stock: the shelf may be ahead of the
+        records, and the low-stock marks show it."""
+        item = await self.record("item", item_id)
+        if item is None:
+            return
+        kind = "sold" if qty < 0 else "sale_cancelled"
+        after = r3(float(item.body.get("qty", 0)) + qty)
+        move_id = f"bill-{doc_id}-{self.take_seq()}"[:64]
+        move = {
+            "id": move_id,
+            "item_id": item.id,
+            "kind": kind,
+            "qty": r3(qty),
+            "after": after,
+            "date": self.now.date().isoformat(),
+            "at": self.now.isoformat(timespec="seconds"),
+            "who": self.p.user.name,
+            "who_id": self.p.user.id,
+            "note": note,
+            "doc_id": doc_id,
+            "bill": number,
+        }
+        item.body = {**item.body, "qty": after}
+        item.seq = self.take_seq()
+        item.updated_at = self.now
+        rec = Record(
+            business_id=self.business_id,
+            kind="stock_move",
+            id=move_id,
+            number="",
+            body=move,
+            seq=self.take_seq(),
+            updated_at=self.now,
+        )
+        self.db.add(rec)
+        self.found[("stock_move", move_id)] = rec
 
     def _date(self, value: Any) -> str:
         today = self.now.date()

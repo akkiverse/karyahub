@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-04
+
 ### Added
 - **Bills that are right** (phase 1 of KaryaHub for every business). See [CR-0012](docs/changes/CR-0012-bills-that-are-right.md) and [ADR-0016](docs/adr/0016-one-tax-engine-and-pdf-with-fpdf2.md).
 - **Business type and packs:** a new business's owner is asked once what kind of business it is (Repair and service, Trader or distributor, Shop or counter sales, Other), its GST registration and its state. **Field service** (jobs, Chat, renewals, AMC, proof of work) is a pack that can be switched off in Settings; its screens disappear and its data stays.
@@ -143,6 +145,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.8.0]: https://github.com/akkiverse/karyahub/pull/15
 [0.7.0]: https://github.com/akkiverse/karyahub/pull/13
 [0.6.0]: https://github.com/akkiverse/karyahub/pull/11
 [0.5.0]: https://github.com/akkiverse/karyahub/pull/9

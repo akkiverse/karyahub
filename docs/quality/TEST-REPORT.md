@@ -452,7 +452,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
-- v0.8.0 (planned): CR-0012 in review; 443 of 443 tests passing (241 server, 202 web), plus the Postgres-only test (run on PostgreSQL 16.2).
+- v0.8.0 (2026-11-04): CR-0012 released; 443 of 443 tests passing (241 server, 202 web), plus the Postgres-only test (run on PostgreSQL 16.2). Founder merged PR #15 after its preview built; production deployment `dpl_3x9GBr7kYuxXQSqee7AK9fvZ549Y` (commit `100b0af`) is READY and serves `/api/health`, the app and the public bill page (wrong token answers 404, noindex).
 - v0.7.0 (2026-11-01): CR-0011 released; 289 of 289 tests passing (151 server, 138 web), plus the Postgres-only test (run on PostgreSQL 16.2). Founder merged PR #13 after its preview built; the same 289 pass again on `main`.
 - v0.6.0 (2026-11-01): CR-0010 released; 231 of 231 tests passing (122 server, 109 web), plus the Postgres-only test (skipped here). Founder checked the preview: two notes in a row, Stop and Try again; AI reads took 0.8 to 4.4 s (runtime logs).
 - v0.5.0 (planned): CR-0009 in review; 209 of 209 tests passing (110 server, 99 web), plus the Postgres-only test.

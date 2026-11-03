@@ -56,7 +56,9 @@ PERMISSIONS: list[Permission] = [
     Permission(id="view_jobs", label="See jobs", roles=_ALL),
     Permission(id="verify_work", label="Send the customer code and verify work", roles=_ALL),
     Permission(id="close_jobs", label="Close jobs", roles=_OFFICE),
-    Permission(id="create_documents", label="Create quotes and invoices", roles=_OFFICE),
+    Permission(id="create_documents", label="Make estimates and bills", roles=_OFFICE),
+    # Cancelling a numbered bill (CR-0012) is the owner's unless they switch it on for a role or a person.
+    Permission(id="cancel_bills", label="Cancel bills", roles=["owner"]),
     Permission(id="manage_renewals", label="See renewals and send reminders", roles=_OFFICE),
     Permission(id="manage_settings", label="Change settings and business details", roles=["owner"]),
     Permission(id="manage_team", label="Add staff, change roles and PINs (Admin)", roles=["owner"]),
@@ -69,6 +71,28 @@ PERMISSIONS: list[Permission] = [
     ),
     Permission(id="use_parts", label="Take parts from inventory for a job", roles=_OFFICE),
 ]
+
+# Packs (CR-0012, AC-26.3). Field service is jobs, Chat, renewals, AMC and proof of work; when a business
+# switches it off, these permissions are taken away from everyone and their routes answer 403 pack_off.
+FIELD_SERVICE_PERMISSIONS = frozenset(
+    {"use_chat", "view_jobs", "verify_work", "close_jobs", "manage_renewals", "use_parts"}
+)
+PACK_OFF_MESSAGE = "This part of KaryaHub is switched off for your business."
+
+
+def packs_of(business: object | None) -> list[str]:
+    """A business's packs. None (every business before v0.8.0, and a new one not set up) is Field service."""
+    packs = getattr(business, "packs", None)
+    return ["field_service"] if packs is None else list(packs)
+
+
+def apply_packs(granted: frozenset[str], business: object | None) -> tuple[frozenset[str], frozenset[str]]:
+    """(what the person may do, what their business's packs switched off)."""
+    if business is None or "field_service" in packs_of(business):
+        return granted, frozenset()
+    off = granted & FIELD_SERVICE_PERMISSIONS
+    return granted - off, FIELD_SERVICE_PERMISSIONS
+
 
 PLATFORM_ROLE = "platform_admin"
 PLATFORM_PERMISSION = "manage_businesses"
@@ -124,11 +148,15 @@ def can(role: str, permission: str) -> bool:
     return bool(p and role in p.roles)
 
 
-def check_action(permissions: frozenset[str] | None, action: str) -> None:
+def check_action(
+    permissions: frozenset[str] | None, action: str, pack_off: frozenset[str] = frozenset()
+) -> None:
     """Refuse a job action the signed-in person's permissions don't cover. None means a system call."""
     if permissions is None:
         return
     needed = ACTION_PERMISSION.get(action)
+    if needed and needed in pack_off:
+        raise AppError("pack_off", PACK_OFF_MESSAGE, 403)
     if needed and needed not in permissions:
         raise AppError(
             "forbidden",

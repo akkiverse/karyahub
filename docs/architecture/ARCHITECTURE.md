@@ -147,6 +147,30 @@ flowchart LR
 - **Phone:** `src/domain/inventory.js` (search, marks, the quantity to show, suggestions, validation), `src/domain/stock.js` (actions), `src/views/inventory.js` (screens and sheets), a Parts used panel in `src/views/jobs.js`. The quantity on screen is the server's plus the phone's moves not yet answered.
 - **Activity log:** lines are collected during the sync and written after the business scope is lifted (the log is not a business-data table).
 
+## Bills that are right (CR-0012)
+```mermaid
+flowchart LR
+  Ed[Bill editor on the phone] -- figures while typing --> TJ[src/domain/tax.js]
+  Ed -- draft, then save: true --> Q[(sync queue)]
+  Q -- POST /api/v1/sync --> B[data/bills.py]
+  B -- every figure --> TP[domain/tax.py]
+  TJ -. same 36 cases .- F[(tests/fixtures/gst_cases.json)]
+  TP -. same 36 cases .- F
+  B -- number in the same transaction --> C[(counters bill:fy, estimate:fy)]
+  B -- stock taken or returned --> I[inventory.Batch.bill_move]
+  B -- token hash --> L[(doc_links)]
+  V[Bill view] -- send, mark sent, paid, cancel, link --> A[/documents/id/.../]
+  A --> S[sender.py: wa.me link until K6 connects a number]
+  P[Customer's phone] -- GET /b/token and /pdf, no sign-in --> R[bill_render.py: page and fpdf2 PDF]
+  R --> L
+```
+- **Who owns what.** The phone owns what a person types; the server owns the number, status, every figure, the seller's details at saving, the link, the stock taken and the history (`backend/karyahub/data/bills.py`). Documents from v0.7.0 have no `doc_version` and keep their old shape.
+- **Saving.** A save is a field on the queued change (`save: true`), so it works with no signal. The server checks the bill (AC-27.8), takes the next number of the business's series for the financial year of the bill's date in the same transaction, and stores its figures. A save it refuses stays a draft with `save_problem`, because a refused change would vanish from the phone.
+- **Packs.** `access.apply_packs` takes Field service's permissions away when the pack is off; `require()` answers 403 `pack_off`. The business's `packs`, type, GST registration and bill look travel in `/auth/me`.
+- **Public link.** `doc_links` holds the SHA-256 of a 192-bit token, the business and the document. It sits outside row-level security because it is read before the business is known; the bill is then read under that business's scope. Pages and PDFs carry `X-Robots-Tag: noindex` and `no-store`.
+- **Sending.** `sender.sender_for(business)` returns the business's connected sender (K6) or the link sender; each send, copy, share or mark as sent adds to the `msg:<yyyy-mm>` counter and the bill's history.
+- See [ADR-0016](../adr/0016-one-tax-engine-and-pdf-with-fpdf2.md).
+
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.
 

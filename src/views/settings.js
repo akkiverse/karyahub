@@ -1,6 +1,7 @@
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../format.js';
 import { SERVICES, SERVER_KEYS, configuredKeys } from '../config.js';
+import { setupPanel, lookPanel } from './bills.js';
 
 const BANNERS = {
   server: ['Server mode: KaryaHub API', 'Messages are read by the KaryaHub server (Python). It holds the outside services and their keys; today it answers them with demo data, so nothing real is sent.'],
@@ -27,7 +28,7 @@ function logoBlock(me) {
   const version = me && me.business && me.business.logo_version;
   return `<div class="logo-field" data-testid="logo-field">
     <span class="logo-label">Logo</span>
-    ${version ? `<img class="logo-preview" data-testid="logo-preview" alt="Your logo" src="/api/v1/business/logo?v=${escapeHtml(version)}">` : '<span class="muted small">No logo yet. It shows on your quotes and invoices.</span>'}
+    ${version ? `<img class="logo-preview" data-testid="logo-preview" alt="Your logo" src="/api/v1/business/logo?v=${escapeHtml(version)}">` : '<span class="muted small">No logo yet. It shows on your estimates and bills.</span>'}
     <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${version ? 'Replace logo' : 'Add a logo'}<input class="sr-only" type="file" name="logo" accept="image/png,image/jpeg,image/webp" data-action="pick-logo"></label>${version ? `<button type="button" class="btn btn-ghost btn-small" data-action="remove-logo">Remove logo</button>` : ''}</div>
   </div>`;
 }
@@ -36,7 +37,7 @@ function profileForm(s, ui, locked, me) {
   const f = ui.profile || {};
   return `<section class="panel" aria-labelledby="profile-title">
     <div class="panel-head"><h2 class="panel-title" id="profile-title">Business details</h2></div>
-    <p class="muted small">These appear on your quotes, invoices and reminders.</p>
+    <p class="muted small">These appear on your estimates, bills and reminders.</p>
     ${f.notice ? `<p class="notice ${f.notice.error ? 'notice-error' : ''}" role="${f.notice.error ? 'alert' : 'status'}" data-testid="profile-notice">${escapeHtml(f.notice.text)}</p>` : ''}
     <form data-form="business-profile" class="stack" novalidate>
       <label class="field"><span>Business name</span><input name="name" value="${escapeHtml(f.name ?? s.business_name)}" ${locked ? 'disabled' : ''}></label>
@@ -64,6 +65,8 @@ export function settings({ state, ui, me }) {
   return `<section class="page">
     <header class="page-head"><h1 id="page-title" tabindex="-1">Settings</h1></header>
     ${profileForm(s, ui, demo, me)}
+    ${me && me.business ? setupPanel({ me, ui }) : ''}
+    ${me && me.business ? lookPanel({ me, ui, state }) : ''}
     ${demo ? `<div class="mode-banner ${mode === 'live' ? 'is-live' : ''}" data-testid="mode-banner">${icon(mode === 'server' ? 'server' : 'plug')}<div><strong>${title}</strong><p>${text}</p></div></div>` : ''}
     ${serverLine}
     <h2 class="section-title">Services</h2>

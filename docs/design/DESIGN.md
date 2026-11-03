@@ -84,3 +84,28 @@ Design record: the clickable mockup `docs/design/mockups/inventory.html` (uses `
 - **Parts used on a job:** a panel under the charges: **Take a part from inventory**, a tinted "From the note" box with one **Take 1 kg** button per matched part (and a small cross to decline), the parts taken with their quantity (and price for people who make paperwork) and **Remove**, and a line that they are added to the quote and invoice.
 - **States:** empty list ("No items yet." with Add item), no match for a search, a stopped item, a part that is short (red note on the item page), a closed job ("This job is closed, so its parts can't change."), no signal for an import (the file stays, **Try again**), and the read-only note for people who can see but not change.
 - No new colours or fonts; new classes are `inv-*`, `mark-*`, `qty`, `moves`, `unit-field`, `suggest-box`, `parts-list` and `pick-list`. Every control is 44 px or taller.
+
+## Additions in CR-0012 (Bills that are right)
+### The 10 easy-UI rules (Product Spec v3; every new screen is checked against them)
+1. **Show only what this business uses.** A pack that is off leaves no menu, field or button behind.
+2. **One + New button everywhere**, offering only what the packs and permissions allow.
+3. **A bill in 3 taps:** customer (or walk-in), items, Save and share; everything else behind More options.
+4. **Shopkeeper words:** "Bill", "Money in", "Who owes you"; never "voucher", "ledger" or "debit note" on screen.
+5. **Smart defaults:** today's date, the item's GST rate, the customer's last price, the business's state.
+6. **One main action per screen,** a big button within thumb reach on a phone.
+7. **Undo, not "Are you sure?"** A cancelled bill keeps its number; everything else can be undone for 10 seconds.
+8. **Same list pattern everywhere:** search on top, status chips, cards on a phone, a table from 760 px.
+9. **Hindi later, built in now:** screen words live in one file (`src/words.js`), so Hindi is a translation, not a rebuild.
+10. **Test with a real owner:** each phase's design is tried by one owner on a phone before it is built (5 minutes, watched).
+
+### How the bill screens follow them
+- **+ New** (rules 2, 6): a round teal button at the bottom right, above the phone tab bar (thumb reach), on Home, Bills, Jobs, Inventory and Renewals; not on Chat (its send box owns the corner) or in forms. It opens a short menu: Bill, Estimate, Item, Job, only as permissions and packs allow.
+- **Navigation:** Bills joins the sidebar and the phone tab bar (file icon). On a phone Renewals moves into the account menu so the bar keeps five places; Chat, Jobs and Renewals disappear when Field service is off.
+- **Bills list** (rule 8): Bills and Estimates as a two-part switch, a 48 px search, chips All, Draft, Unpaid, Overdue, Paid, Cancelled with counts (one scrolling row on a phone), cards on a phone and a table from 760 px. **Status chips** are the same everywhere: Draft grey, Saved teal, Sent blue, Paid green, Overdue red, Cancelled grey and struck through.
+- **Editor** (rules 3, 5): customer card (Walk-in customer, Change opens a search by name or phone, with "Use as a new customer"), item search that also offers "Add as a line" for what was typed, one card per line (description, quantity with its unit, rate in ₹, GST %, its taxable value; Discount folded), More options (bill discount, dates, place of supply, customer GSTIN, address and state, notes, terms, Delete draft). A **sticky total bar** stays above the tab bar with the total in large numerals, the taxes and round off under it, any problem in red, and **Save and share** as the one main button.
+- **Bill view** (rules 6, 7): the status chip top right; one main button (Send on WhatsApp, or Make bill on an estimate, or Make a copy on a cancelled bill), Copy link and Mark as paid beside it, and everything else under **More** (Share, Mark as sent, Change, Make a copy, Download PDF, Print, link on or off, Cancel bill). Cancel asks only for an optional reason and offers Undo for 10 seconds; a deleted draft also has Undo.
+- **The paper** is always light (printed-paper neutral). A4 classic is black on white; **A4 modern** adds the business's colour as a 6 px top rule and on the heading, the business name and the table heads; the **80 mm receipt** is narrow and centred. Cancelled bills carry a red CANCELLED stamp, demo bills a faint "Sample" mark. The table scrolls sideways inside the paper on a phone; the page itself never does.
+- **Settings:** Business type and packs (type as four radio cards, GST registration, state, the Field service switch, Trading and Shop counter marked "Coming soon") and Bill look (layout, six colour swatches that pass contrast, phone, bank, UPI ID, terms, prefix, due days, estimate days, signature) with a **live preview** of a sample bill.
+- **First sign-in of a new business:** one screen, "What kind of business do you run?", with the four types, GST registration and state, and Save and start.
+- **Public bill page** (`/b/<token>`): served by the server, one bill in the business's layout and colour, a Download PDF button, noindex; PDFs use Noto Sans so ₹ prints.
+- New classes: `segs`, `search`, `chip-status`, `status-*`, `bill-*`, `cust-card`, `pick-row`, `totals-bar`, `more-options`, `more-actions`, `fab*`, `radio-card`, `swatch*`, `look-preview`, `stamp`. No new colours or fonts; every control is 44 px or taller.

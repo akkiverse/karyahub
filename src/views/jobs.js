@@ -1,3 +1,4 @@
+import { isV2, docWord, numberText, totalOf } from '../domain/bills.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml, rupees, prettyDate, prettyPhone } from '../format.js';
 import { docLabel } from '../domain/documents.js';
@@ -92,7 +93,7 @@ function partsPanel(j, state, ui, allow) {
       ? `<li><span><strong>${escapeHtml(sg.item.name)}</strong> <span class="muted small">“${escapeHtml(sg.seg)}” · in stock ${escapeHtml(qtyText(stockOf(state, sg.item), sg.item.unit))}</span></span><span class="actions"><button type="button" class="btn btn-primary btn-small" data-action="inv-take" data-job="${j.id}" data-item="${escapeHtml(sg.item.id)}" data-qty="${sg.qty}" data-seg="${escapeHtml(sg.seg)}">Take ${escapeHtml(qtyText(sg.qty, sg.item.unit))}</button><button type="button" class="btn btn-ghost btn-small" data-action="inv-dismiss" data-job="${j.id}" data-seg="${escapeHtml(sg.seg)}" aria-label="Not this one: ${escapeHtml(sg.seg)}">${icon('x', { size: 16 })}</button></span></li>`
       : `<li><span class="muted" data-testid="part-unmatched">Not in your inventory: <strong>${escapeHtml(sg.seg)}</strong></span>${allow('manage_inventory') ? `<button type="button" class="btn btn-ghost btn-small" data-action="inv-add" data-name="${escapeHtml(sg.text)}">${icon('plus', { size: 16 })} Add item</button>` : ''}</li>`)).join('')}</ul><p class="muted small">Matched by name, without AI. Nothing is taken until you press Take.</p></div>` : ''}
     ${used.length ? `<ul class="parts-list" data-testid="parts-list">${used.map((u) => `<li data-item="${escapeHtml(u.id)}"><span><strong>${escapeHtml(u.item ? u.item.name : 'A part')}</strong> <span class="muted small">${escapeHtml((u.item && u.item.code) || '')}</span></span><span class="actions" style="align-items:center"><span class="qty">${escapeHtml(u.item ? qtyText(u.qty, u.item.unit) : String(u.qty))}</span>${money && u.item ? `<span class="muted small">${rupees((u.qty * u.item.sale) / 100)}</span>` : ''}${canUse ? `<button type="button" class="btn btn-ghost btn-small" data-action="inv-remove" data-job="${j.id}" data-item="${escapeHtml(u.id)}">${icon('rotate', { size: 16 })} Remove</button>` : ''}</span></li>`).join('')}</ul>
-      ${money ? '<p class="muted small">These parts are added to the quote and invoice. You can still change each line.</p>' : ''}`
+      ${money ? '<p class="muted small">These parts are added to the estimate and bill. You can still change each line.</p>' : ''}`
     : `<p class="muted" data-testid="parts-empty">${closed ? 'No parts were taken from inventory for this job.' : 'No parts taken from inventory yet.'}</p>`}
     ${ui.inv && ui.inv.sheet && ui.inv.sheet.job === j.id ? stockSheet({ state, ui }) : ''}
   </section>`;
@@ -101,7 +102,7 @@ function partsPanel(j, state, ui, allow) {
 export function job({ state, params, ui, allow = () => true }) {
   const j = state.jobs.find((x) => x.id === params.id);
   if (!j) return `<section class="page"><h1 id="page-title" tabindex="-1">Job not found</h1><p>This job isn't on this device any more.</p><a class="btn btn-ghost" href="#/jobs">Back to Jobs</a></section>`;
-  const docs = state.documents.filter((d) => d.job_id === j.id);
+  const docs = state.documents.filter((d) => d.job_id === j.id && !d.deleted);
   const sub = j.lines.reduce((s, l) => s + l.qty * l.rate, 0);
   return `<section class="page">
     <a class="back" href="#/jobs">${icon('arrowLeft', { size: 18 })} Jobs</a>
@@ -118,12 +119,12 @@ export function job({ state, params, ui, allow = () => true }) {
     <ul class="lines">${j.lines.map((l) => `<li><span>${escapeHtml(l.description)}${l.qty > 1 ? ` x ${l.qty}` : ''}</span><span>${rupees(l.qty * l.rate)}</span></li>`).join('')}<li class="lines-total"><span>Before GST</span><span>${rupees(sub)}</span></li></ul>
     ${ui.toast && ui.toast.where === 'job' ? `<p class="notice ${ui.toast.error ? 'notice-error' : ''}" role="status">${escapeHtml(ui.toast.text)}</p>` : ''}
     ${allow('create_documents') ? `<div class="actions">
-      <button type="button" class="btn btn-primary" data-action="create-doc" data-type="quote" data-job="${j.id}">${icon('file', { size: 18 })} Create quote</button>
-      <button type="button" class="btn btn-secondary" data-action="create-doc" data-type="invoice" data-job="${j.id}">${icon('file', { size: 18 })} Create invoice</button>
-    </div>` : '<p class="muted small" data-testid="docs-hidden">Quotes and invoices are made by the office.</p>'}
+      <button type="button" class="btn btn-primary" data-action="create-doc" data-type="quote" data-job="${j.id}">${icon('file', { size: 18 })} Make estimate</button>
+      <button type="button" class="btn btn-secondary" data-action="create-doc" data-type="invoice" data-job="${j.id}">${icon('file', { size: 18 })} Make bill</button>
+    </div>` : '<p class="muted small" data-testid="docs-hidden">Estimates and bills are made by the office.</p>'}
     ${partsPanel(j, state, ui, allow)}
     ${proofOfWork(j, ui, allow)}
     ${visitPlan(j, ui)}
-    ${docs.length && allow('create_documents') ? `<h2 class="section-title">Documents</h2><ul class="list">${docs.map((d) => `<li class="row-card"><a class="row-link" href="#/doc/${d.id}"><span class="row-main"><strong>${docLabel(d)}</strong><span class="muted">${prettyDate(d.date)}</span></span><span class="row-side"><strong>${rupees(d.total)}</strong>${icon('arrowRight', { size: 18 })}</span></a></li>`).join('')}</ul>` : ''}
+    ${docs.length && allow('create_documents') ? `<h2 class="section-title">Documents</h2><ul class="list">${docs.map((d) => `<li class="row-card"><a class="row-link" href="${isV2(d) ? `#/bills/${encodeURIComponent(d.id)}${d.status === 'draft' ? '/edit' : ''}` : `#/doc/${d.id}`}"><span class="row-main"><strong>${isV2(d) ? `${docWord(d)} ${escapeHtml(numberText(d))}` : docLabel(d)}</strong><span class="muted">${prettyDate(d.date)}</span></span><span class="row-side"><strong>${rupees((totalOf(d) || 0) / 100)}</strong>${icon('arrowRight', { size: 18 })}</span></a></li>`).join('')}</ul>` : ''}
   </section>`;
 }

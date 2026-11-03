@@ -1,6 +1,7 @@
 // A stand-in for the server's business-data calls in UI tests (the real rules are tested with pytest in tests/api/).
 // It keeps records, applies each operation id once, gives numbers, and can lose its network, drop an answer, or refuse.
 import { ApiError, ApiUnreachable } from '../src/api/client.js';
+import { figuresOf, fyOf, numberOf, saveProblem, sellerOf, addDays, messageText, waLink } from '../src/domain/bills.js';
 
 const KINDS = ['customer', 'job', 'document', 'message', 'item', 'stock_move'];
 const SIGNED = { opening: 1, in: 1, returned: 1, out: -1, used: -1 };
@@ -13,6 +14,47 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
   const calls = { sync: [], import: [] };
   const key = (kind, id) => `${kind}:${id}`;
   const pub = (r) => ({ kind: r.kind, id: r.id, number: r.number, seq: r.seq, body: { ...clone(r.body), id: r.id, ...(r.kind === 'job' || r.kind === 'document' ? { number: r.number } : {}) } });
+
+  // Bills (CR-0012), in short: no number until saved; Save numbers the bill in its series; sent bills are locked.
+  const BIZ = { id: business, name: 'Shree Cool AC', address: '12 MG Road, Pune', gstin: '27AAPFU0939F1ZV', state_code: '27', gst_registration: 'regular', bill_look: {} };
+  function putBill(id, body) {
+    const existing = server.records.get(key('document', id));
+    const cur = existing ? existing.body : null;
+    if (cur && ['sent', 'paid'].includes(cur.status)) return { error: "A sent bill can't be changed. Cancel it and make a copy." };
+    const next = { ...(cur || {}), ...clone(body), doc_version: 2, status: cur ? cur.status : 'draft' };
+    delete next.save;
+    delete next.save_problem;
+    if (body.deleted) { next.deleted = true; next.lines = []; }
+    const seller = next.status === 'saved' ? next.seller : sellerOf(BIZ);
+    const f = figuresOf(next, BIZ);
+    if (f.result) { next.lines = next.lines.map((l, i) => ({ ...l, ...f.result.lines[i] })); Object.assign(next, { totals: f.result.totals, summary: f.result.summary, tax_mode: f.result.tax_mode }); }
+    let number = existing ? existing.number : '';
+    if (body.save && next.status === 'draft' && !next.deleted) {
+      const problem = saveProblem(next, BIZ);
+      if (problem) next.save_problem = problem;
+      else {
+        const fy = fyOf(next.date);
+        const series = `${next.type === 'invoice' ? 'bill' : 'estimate'}:${fy}`;
+        server.counters[series] = (server.counters[series] || 0) + 1;
+        number = numberOf(next.type, '', fy, server.counters[series]);
+        Object.assign(next, { status: 'saved', number, seller, link_token: `tok${id}`, link_on: true, history: [{ at: '2027-01-01T10:00:00', who: 'Owner', what: `Saved as ${number}` }] });
+        if (next.type === 'invoice' && !next.due_date) next.due_date = next.date;
+        if (next.type === 'quote' && !next.valid_until) next.valid_until = addDays(next.date, 15);
+      }
+    }
+    server.counters.seq += 1;
+    const rec = existing || { kind: 'document', id };
+    Object.assign(rec, { number, body: next, seq: server.counters.seq });
+    server.records.set(key('document', id), rec);
+    return { rec };
+  }
+  function billStep(id, change) {
+    const rec = server.records.get(key('document', id));
+    if (!rec || rec.body.status === 'draft') throw new ApiError('Save it first. It gets its number when online.', { code: 'not_saved', status: 409 });
+    rec.body = { ...rec.body, ...change(rec.body) };
+    rec.seq = ++server.counters.seq;
+    return pub(rec);
+  }
 
   function put(kind, id, body, { number, keepState = false } = {}) {
     const existing = server.records.get(key(kind, id));
@@ -87,6 +129,12 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
           result = { op_id: o.op_id, kind: o.kind, id: o.id, status: 'rejected', message: "Your access doesn't include this. Ask your business owner.", ...(cur ? { record: pub(cur) } : {}) };
         } else if (o.kind === 'stock_move' && applyMove(o.id, o.body)) {
           result = { op_id: o.op_id, kind: o.kind, id: o.id, status: 'rejected', message: applyMove(o.id, o.body) };
+        } else if (o.kind === 'document' && o.body && o.body.doc_version === 2) {
+          const out = putBill(o.id, o.body);
+          const cur = server.records.get(key('document', o.id));
+          result = out.error
+            ? { op_id: o.op_id, kind: o.kind, id: o.id, status: 'rejected', message: out.error, ...(cur ? { record: pub(cur) } : {}) }
+            : { op_id: o.op_id, kind: o.kind, id: o.id, status: 'applied', number: out.rec.number };
         } else {
           const rec = o.kind === 'stock_move' ? { number: '' } : put(o.kind, o.id, o.body);
           result = { op_id: o.op_id, kind: o.kind, id: o.id, status: 'applied', number: rec.number };
@@ -97,6 +145,35 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
       const answer = { cursor: server.counters.seq, more: false, readable: [...network.readable], results, changes: changesSince(since) };
       if (network.loseNext > 0) { network.loseNext -= 1; throw new ApiUnreachable(); } // applied, but the answer never arrived
       return answer;
+    },
+    billCalls: (calls.bills = []),
+    documentAction: async (id, action, extra = {}) => {
+      calls.bills.push({ name: 'documentAction', id, action, extra });
+      if (network.offline) throw new ApiUnreachable();
+      const map = {
+        mark_sent: (b) => ({ status: b.status === 'saved' ? 'sent' : b.status, sent_how: extra.how }),
+        mark_paid: () => ({ status: 'paid', paid_at: extra.paid_on }),
+        cancel: (b) => ({ status: 'cancelled', before_cancel: b.status, cancel_reason: extra.reason || '' }),
+        undo_cancel: (b) => ({ status: b.before_cancel || 'saved' }),
+      };
+      return billStep(id, map[action]);
+    },
+    sendDocument: async (id) => {
+      calls.bills.push({ name: 'sendDocument', id });
+      if (network.offline) throw new ApiUnreachable();
+      const rec = server.records.get(key('document', id));
+      const text = messageText(rec.body, BIZ.name, `https://karyahub-akkiverse.vercel.app/b/${rec.body.link_token}`);
+      const record = billStep(id, (b) => ({ status: b.status === 'saved' ? 'sent' : b.status, sent_how: 'whatsapp' }));
+      return { how: 'link', url: waLink(rec.body.customer.phone, text), text, record };
+    },
+    documentLink: async (id, on) => { calls.bills.push({ name: 'documentLink', id, on }); return billStep(id, () => ({ link_on: on })); },
+    makeBill: async (estimateId, billId) => {
+      calls.bills.push({ name: 'makeBill', estimateId, billId });
+      const est = server.records.get(key('document', estimateId));
+      if (est.body.bill_id) throw new ApiError(`This estimate is already billed as ${est.body.bill_number}.`, { code: 'already_billed', status: 409 });
+      const b = est.body;
+      putBill(billId, { doc_version: 2, type: 'invoice', date: '2027-01-01', customer: b.customer, lines: b.lines, bill_discount: b.bill_discount, place_of_supply: b.place_of_supply, estimate_id: estimateId });
+      return pub(server.records.get(key('document', billId)));
     },
     importDevice: async (payload) => {
       calls.import.push(clone(payload));

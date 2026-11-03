@@ -7,7 +7,7 @@
 export const UNITS = { nos: 'nos', kg: 'kg', metre: 'm', litre: 'litre', set: 'set', roll: 'roll' };
 export const UNIT_NAMES = { nos: 'nos (pieces)', kg: 'kg', metre: 'metre (m)', litre: 'litre', set: 'set', roll: 'roll' };
 export const WHOLE_UNITS = new Set(['nos', 'set', 'roll']);
-export const GST_RATES = [0, 5, 18, 40];
+export const GST_RATES = [0, 0.25, 3, 5, 18, 40]; // 0.25 % and 3 % added by CR-0012 (AC-27.6)
 const UNIT_ALIASES = { m: 'metre', mtr: 'metre', mtrs: 'metre', meter: 'metre', meters: 'metre', metres: 'metre', kgs: 'kg', l: 'litre', ltr: 'litre', ltrs: 'litre', litres: 'litre', liter: 'litre', pcs: 'nos', pc: 'nos', piece: 'nos', pieces: 'nos', no: 'nos', sets: 'set', rolls: 'roll' };
 export const MOVE_LABELS = { opening: 'Opening stock', in: 'Stock in', out: 'Stock out', used: 'Used on job', returned: 'Put back from job', count: 'Count correction' };
 
@@ -53,7 +53,7 @@ export function summary(state) {
   let value = 0;
   for (const i of live) {
     const q = stockOf(state, i);
-    const m = markOf(q, i.low);
+    const m = i.service ? null : markOf(q, i.low);
     if (m && m.kind === 'low') low += 1;
     if (m && (m.kind === 'out' || m.kind === 'short')) out += 1;
     value += Math.max(q, 0) * (i.cost || 0);
@@ -64,7 +64,7 @@ export function listItems(state, { filter = 'all', q = '' } = {}) {
   return (state.items || [])
     .filter((i) => (filter === 'stopped' ? i.stopped : !i.stopped))
     .filter((i) => {
-      const m = markOf(stockOf(state, i), i.low);
+      const m = i.service ? null : markOf(stockOf(state, i), i.low);
       if (filter === 'low') return m && m.kind === 'low';
       if (filter === 'out') return m && (m.kind === 'out' || m.kind === 'short');
       return true;
@@ -186,5 +186,6 @@ export function validateItem(v, state, editingId = null) {
     else opening = o.value;
   }
   if (Object.keys(errors).length) return { errors };
-  return { errors, opening, item: { name, code, unit: v.unit, sale: sale.value, cost: cost.value, hsn, gst: Number(v.gst), low } };
+  const on = (x) => x === true || x === 'on' || x === 'true';
+  return { errors, opening, item: { name, code, unit: v.unit, sale: sale.value, cost: cost.value, hsn, gst: Number(v.gst), low, price_includes_gst: on(v.price_includes_gst), service: on(v.service) } };
 }

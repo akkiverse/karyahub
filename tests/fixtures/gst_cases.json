@@ -1,0 +1,2211 @@
+{
+ "about": "Shared tax cases (CR-0012, AC-27.9). Both tax engines (backend/karyahub/domain/tax.py and src/domain/tax.js) must give exactly these figures. Money is whole paise. Each case has the expected result or the expected error. Add cases here, never in one side only.",
+ "cases": [
+  {
+   "name": "same state, spec example (AC-27.4)",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 2,
+      "rate": 125000,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "percent",
+       "value": 10
+      }
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 250000,
+      "line_discount": 25000,
+      "bill_discount": 0,
+      "taxable": 225000,
+      "gst_rate": "18",
+      "cgst": 20250,
+      "sgst": 20250,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 225000,
+      "cgst": 20250,
+      "sgst": 20250,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 225000,
+     "cgst": 20250,
+     "sgst": 20250,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 265500,
+     "in_words": "Rupees Two Thousand Six Hundred Fifty-Five only"
+    }
+   }
+  },
+  {
+   "name": "other state, spec example as IGST",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "29",
+    "lines": [
+     {
+      "qty": 2,
+      "rate": 125000,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "percent",
+       "value": 10
+      }
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "inter",
+    "place_of_supply": "29",
+    "lines": [
+     {
+      "amount": 250000,
+      "line_discount": 25000,
+      "bill_discount": 0,
+      "taxable": 225000,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 40500
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 225000,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 40500
+     }
+    ],
+    "totals": {
+     "taxable": 225000,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 40500,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 265500,
+     "in_words": "Rupees Two Thousand Six Hundred Fifty-Five only"
+    }
+   }
+  },
+  {
+   "name": "price includes GST, Rs 118 at 18% (AC-27.5)",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 11800,
+      "gst_rate": 18,
+      "price_includes_gst": true
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 11800,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 10000,
+      "gst_rate": "18",
+      "cgst": 900,
+      "sgst": 900,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 10000,
+      "cgst": 900,
+      "sgst": 900,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 10000,
+     "cgst": 900,
+     "sgst": 900,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 11800,
+     "in_words": "Rupees One Hundred Eighteen only"
+    }
+   }
+  },
+  {
+   "name": "price includes GST, Rs 100 at 18%, round off -0.01 (AC-27.5)",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18,
+      "price_includes_gst": true
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 10000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 8475,
+      "gst_rate": "18",
+      "cgst": 763,
+      "sgst": 763,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 8475,
+      "cgst": 763,
+      "sgst": 763,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 8475,
+     "cgst": 763,
+     "sgst": 763,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": -1,
+     "total": 10000,
+     "in_words": "Rupees One Hundred only"
+    }
+   }
+  },
+  {
+   "name": "price includes GST, other state",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "07",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18,
+      "price_includes_gst": true
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "inter",
+    "place_of_supply": "07",
+    "lines": [
+     {
+      "amount": 10000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 8475,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 1526
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 8475,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 1526
+     }
+    ],
+    "totals": {
+     "taxable": 8475,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 1526,
+     "bill_discount": 0,
+     "round_off": -1,
+     "total": 10000,
+     "in_words": "Rupees One Hundred only"
+    }
+   }
+  },
+  {
+   "name": "several rates, same state (AC-27.6)",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 50000,
+      "gst_rate": 0
+     },
+     {
+      "qty": 1,
+      "rate": 650000,
+      "gst_rate": "0.25"
+     },
+     {
+      "qty": 1,
+      "rate": 2500000,
+      "gst_rate": 3
+     },
+     {
+      "qty": 2,
+      "rate": 34900,
+      "gst_rate": 5
+     },
+     {
+      "qty": 1,
+      "rate": 129900,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 4500000,
+      "gst_rate": 40
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 50000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 50000,
+      "gst_rate": "0",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 650000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 650000,
+      "gst_rate": "0.25",
+      "cgst": 813,
+      "sgst": 813,
+      "igst": 0
+     },
+     {
+      "amount": 2500000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 2500000,
+      "gst_rate": "3",
+      "cgst": 37500,
+      "sgst": 37500,
+      "igst": 0
+     },
+     {
+      "amount": 69800,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 69800,
+      "gst_rate": "5",
+      "cgst": 1745,
+      "sgst": 1745,
+      "igst": 0
+     },
+     {
+      "amount": 129900,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 129900,
+      "gst_rate": "18",
+      "cgst": 11691,
+      "sgst": 11691,
+      "igst": 0
+     },
+     {
+      "amount": 4500000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 4500000,
+      "gst_rate": "40",
+      "cgst": 900000,
+      "sgst": 900000,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "0",
+      "taxable": 50000,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "gst_rate": "0.25",
+      "taxable": 650000,
+      "cgst": 813,
+      "sgst": 813,
+      "igst": 0
+     },
+     {
+      "gst_rate": "3",
+      "taxable": 2500000,
+      "cgst": 37500,
+      "sgst": 37500,
+      "igst": 0
+     },
+     {
+      "gst_rate": "5",
+      "taxable": 69800,
+      "cgst": 1745,
+      "sgst": 1745,
+      "igst": 0
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 129900,
+      "cgst": 11691,
+      "sgst": 11691,
+      "igst": 0
+     },
+     {
+      "gst_rate": "40",
+      "taxable": 4500000,
+      "cgst": 900000,
+      "sgst": 900000,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 7899700,
+     "cgst": 951749,
+     "sgst": 951749,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 2,
+     "total": 9803200,
+     "in_words": "Rupees Ninety-Eight Thousand Thirty-Two only"
+    }
+   }
+  },
+  {
+   "name": "several rates, other state (AC-27.6)",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "24",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 50000,
+      "gst_rate": 0
+     },
+     {
+      "qty": 3,
+      "rate": 34900,
+      "gst_rate": 5
+     },
+     {
+      "qty": 1,
+      "rate": 129900,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 129900,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 4500000,
+      "gst_rate": 40
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "inter",
+    "place_of_supply": "24",
+    "lines": [
+     {
+      "amount": 50000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 50000,
+      "gst_rate": "0",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 104700,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 104700,
+      "gst_rate": "5",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 5235
+     },
+     {
+      "amount": 129900,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 129900,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 23382
+     },
+     {
+      "amount": 129900,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 129900,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 23382
+     },
+     {
+      "amount": 4500000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 4500000,
+      "gst_rate": "40",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 1800000
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "0",
+      "taxable": 50000,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "gst_rate": "5",
+      "taxable": 104700,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 5235
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 259800,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 46764
+     },
+     {
+      "gst_rate": "40",
+      "taxable": 4500000,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 1800000
+     }
+    ],
+    "totals": {
+     "taxable": 4914500,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 1851999,
+     "bill_discount": 0,
+     "round_off": 1,
+     "total": 6766500,
+     "in_words": "Rupees Sixty-Seven Thousand Six Hundred Sixty-Five only"
+    }
+   }
+  },
+  {
+   "name": "line discount in rupees",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 189900,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "amount",
+       "value": 9900
+      }
+     },
+     {
+      "qty": 2,
+      "rate": 45000,
+      "gst_rate": 5
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 189900,
+      "line_discount": 9900,
+      "bill_discount": 0,
+      "taxable": 180000,
+      "gst_rate": "18",
+      "cgst": 16200,
+      "sgst": 16200,
+      "igst": 0
+     },
+     {
+      "amount": 90000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 90000,
+      "gst_rate": "5",
+      "cgst": 2250,
+      "sgst": 2250,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 90000,
+      "cgst": 2250,
+      "sgst": 2250,
+      "igst": 0
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 180000,
+      "cgst": 16200,
+      "sgst": 16200,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 270000,
+     "cgst": 18450,
+     "sgst": 18450,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 306900,
+     "in_words": "Rupees Three Thousand Sixty-Nine only"
+    }
+   }
+  },
+  {
+   "name": "bill discount 5% spread over three lines (AC-27.3)",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "bill_discount": {
+     "kind": "percent",
+     "value": 5
+    },
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 120000,
+      "gst_rate": 18
+     },
+     {
+      "qty": 3,
+      "rate": 33300,
+      "gst_rate": 5
+     },
+     {
+      "qty": 1,
+      "rate": 9999,
+      "gst_rate": 0
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 120000,
+      "line_discount": 0,
+      "bill_discount": 6000,
+      "taxable": 114000,
+      "gst_rate": "18",
+      "cgst": 10260,
+      "sgst": 10260,
+      "igst": 0
+     },
+     {
+      "amount": 99900,
+      "line_discount": 0,
+      "bill_discount": 4995,
+      "taxable": 94905,
+      "gst_rate": "5",
+      "cgst": 2373,
+      "sgst": 2373,
+      "igst": 0
+     },
+     {
+      "amount": 9999,
+      "line_discount": 0,
+      "bill_discount": 500,
+      "taxable": 9499,
+      "gst_rate": "0",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "0",
+      "taxable": 9499,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "gst_rate": "5",
+      "taxable": 94905,
+      "cgst": 2373,
+      "sgst": 2373,
+      "igst": 0
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 114000,
+      "cgst": 10260,
+      "sgst": 10260,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 218404,
+     "cgst": 12633,
+     "sgst": 12633,
+     "igst": 0,
+     "bill_discount": 11495,
+     "round_off": 30,
+     "total": 243700,
+     "in_words": "Rupees Two Thousand Four Hundred Thirty-Seven only"
+    }
+   }
+  },
+  {
+   "name": "bill discount Rs 100 over three equal lines, last takes the paisa (AC-27.3)",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "bill_discount": {
+     "kind": "amount",
+     "value": 10000
+    },
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 10000,
+      "line_discount": 0,
+      "bill_discount": 3333,
+      "taxable": 6667,
+      "gst_rate": "18",
+      "cgst": 600,
+      "sgst": 600,
+      "igst": 0
+     },
+     {
+      "amount": 10000,
+      "line_discount": 0,
+      "bill_discount": 3333,
+      "taxable": 6667,
+      "gst_rate": "18",
+      "cgst": 600,
+      "sgst": 600,
+      "igst": 0
+     },
+     {
+      "amount": 10000,
+      "line_discount": 0,
+      "bill_discount": 3334,
+      "taxable": 6666,
+      "gst_rate": "18",
+      "cgst": 600,
+      "sgst": 600,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 20000,
+      "cgst": 1800,
+      "sgst": 1800,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 20000,
+     "cgst": 1800,
+     "sgst": 1800,
+     "igst": 0,
+     "bill_discount": 10000,
+     "round_off": 0,
+     "total": 23600,
+     "in_words": "Rupees Two Hundred Thirty-Six only"
+    }
+   }
+  },
+  {
+   "name": "line discounts and a bill discount together",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "bill_discount": {
+     "kind": "amount",
+     "value": 5050
+    },
+    "lines": [
+     {
+      "qty": 2,
+      "rate": 125000,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "percent",
+       "value": 10
+      }
+     },
+     {
+      "qty": 1,
+      "rate": 80000,
+      "gst_rate": 5,
+      "discount": {
+       "kind": "amount",
+       "value": 5000
+      }
+     },
+     {
+      "qty": 4,
+      "rate": 2500,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 250000,
+      "line_discount": 25000,
+      "bill_discount": 3665,
+      "taxable": 221335,
+      "gst_rate": "18",
+      "cgst": 19920,
+      "sgst": 19920,
+      "igst": 0
+     },
+     {
+      "amount": 80000,
+      "line_discount": 5000,
+      "bill_discount": 1221,
+      "taxable": 73779,
+      "gst_rate": "5",
+      "cgst": 1844,
+      "sgst": 1844,
+      "igst": 0
+     },
+     {
+      "amount": 10000,
+      "line_discount": 0,
+      "bill_discount": 164,
+      "taxable": 9836,
+      "gst_rate": "18",
+      "cgst": 885,
+      "sgst": 885,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 73779,
+      "cgst": 1844,
+      "sgst": 1844,
+      "igst": 0
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 231171,
+      "cgst": 20805,
+      "sgst": 20805,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 304950,
+     "cgst": 22649,
+     "sgst": 22649,
+     "igst": 0,
+     "bill_discount": 5050,
+     "round_off": -48,
+     "total": 350200,
+     "in_words": "Rupees Three Thousand Five Hundred Two only"
+    }
+   }
+  },
+  {
+   "name": "bill discount with MRP lines, other state",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "33",
+    "bill_discount": {
+     "kind": "percent",
+     "value": "7.5"
+    },
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 59900,
+      "gst_rate": 18,
+      "price_includes_gst": true
+     },
+     {
+      "qty": 2,
+      "rate": 11800,
+      "gst_rate": 5,
+      "price_includes_gst": true
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "inter",
+    "place_of_supply": "33",
+    "lines": [
+     {
+      "amount": 59900,
+      "line_discount": 0,
+      "bill_discount": 4492,
+      "taxable": 46956,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 8452
+     },
+     {
+      "amount": 23600,
+      "line_discount": 0,
+      "bill_discount": 1771,
+      "taxable": 20790,
+      "gst_rate": "5",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 1040
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 20790,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 1040
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 46956,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 8452
+     }
+    ],
+    "totals": {
+     "taxable": 67746,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 9492,
+     "bill_discount": 6263,
+     "round_off": -38,
+     "total": 77200,
+     "in_words": "Rupees Seven Hundred Seventy-Two only"
+    }
+   }
+  },
+  {
+   "name": "fractional quantity 1.5 kg",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": "1.5",
+      "rate": 24099,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 36149,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 36149,
+      "gst_rate": "18",
+      "cgst": 3253,
+      "sgst": 3253,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 36149,
+      "cgst": 3253,
+      "sgst": 3253,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 36149,
+     "cgst": 3253,
+     "sgst": 3253,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 45,
+     "total": 42700,
+     "in_words": "Rupees Four Hundred Twenty-Seven only"
+    }
+   }
+  },
+  {
+   "name": "quantity with three decimals rounds half up",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": "0.005",
+      "rate": 100,
+      "gst_rate": 18
+     },
+     {
+      "qty": "0.333",
+      "rate": 100,
+      "gst_rate": 5
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 1,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 1,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 33,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 33,
+      "gst_rate": "5",
+      "cgst": 1,
+      "sgst": 1,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 33,
+      "cgst": 1,
+      "sgst": 1,
+      "igst": 0
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 1,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 34,
+     "cgst": 1,
+     "sgst": 1,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": -36,
+     "total": 0,
+     "in_words": "Rupees Zero only"
+    }
+   }
+  },
+  {
+   "name": "0.25% rate rounding",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 1000,
+      "gst_rate": "0.25"
+     },
+     {
+      "qty": 7,
+      "rate": 1430,
+      "gst_rate": "0.25"
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 1000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 1000,
+      "gst_rate": "0.25",
+      "cgst": 1,
+      "sgst": 1,
+      "igst": 0
+     },
+     {
+      "amount": 10010,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 10010,
+      "gst_rate": "0.25",
+      "cgst": 13,
+      "sgst": 13,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "0.25",
+      "taxable": 11010,
+      "cgst": 14,
+      "sgst": 14,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 11010,
+     "cgst": 14,
+     "sgst": 14,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": -38,
+     "total": 11000,
+     "in_words": "Rupees One Hundred Ten only"
+    }
+   }
+  },
+  {
+   "name": "3% rate, gold",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": "10.5",
+      "rate": 650000,
+      "gst_rate": 3
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 6825000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 6825000,
+      "gst_rate": "3",
+      "cgst": 102375,
+      "sgst": 102375,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "3",
+      "taxable": 6825000,
+      "cgst": 102375,
+      "sgst": 102375,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 6825000,
+     "cgst": 102375,
+     "sgst": 102375,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 50,
+     "total": 7029800,
+     "in_words": "Rupees Seventy Thousand Two Hundred Ninety-Eight only"
+    }
+   }
+  },
+  {
+   "name": "Composition: no tax, MRP not split (AC-27.7)",
+   "bill": {
+    "registration": "composition",
+    "business_state": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 12345,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 10070,
+      "gst_rate": 5,
+      "price_includes_gst": true
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "composition",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 12345,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 12345,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 10070,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 10070,
+      "gst_rate": "5",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "summary": [],
+    "totals": {
+     "taxable": 22415,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": -15,
+     "total": 22400,
+     "in_words": "Rupees Two Hundred Twenty-Four only"
+    }
+   }
+  },
+  {
+   "name": "Composition with discounts (AC-27.7)",
+   "bill": {
+    "registration": "composition",
+    "business_state": "27",
+    "bill_discount": {
+     "kind": "percent",
+     "value": 10
+    },
+    "lines": [
+     {
+      "qty": 3,
+      "rate": 33333,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "percent",
+       "value": "2.5"
+      }
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "composition",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 99999,
+      "line_discount": 2500,
+      "bill_discount": 9750,
+      "taxable": 87749,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "summary": [],
+    "totals": {
+     "taxable": 87749,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 0,
+     "bill_discount": 9750,
+     "round_off": -49,
+     "total": 87700,
+     "in_words": "Rupees Eight Hundred Seventy-Seven only"
+    }
+   }
+  },
+  {
+   "name": "Not registered: no tax (AC-27.7)",
+   "bill": {
+    "registration": "unregistered",
+    "business_state": "",
+    "lines": [
+     {
+      "qty": 2,
+      "rate": 75050,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 1999,
+      "gst_rate": 0
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "none",
+    "place_of_supply": "",
+    "lines": [
+     {
+      "amount": 150100,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 150100,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 1999,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 1999,
+      "gst_rate": "0",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "summary": [],
+    "totals": {
+     "taxable": 152099,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 1,
+     "total": 152100,
+     "in_words": "Rupees One Thousand Five Hundred Twenty-One only"
+    }
+   }
+  },
+  {
+   "name": "a free line at Rs 0",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 0,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 49900,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 0,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 0,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 49900,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 49900,
+      "gst_rate": "18",
+      "cgst": 4491,
+      "sgst": 4491,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 49900,
+      "cgst": 4491,
+      "sgst": 4491,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 49900,
+     "cgst": 4491,
+     "sgst": 4491,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 18,
+     "total": 58900,
+     "in_words": "Rupees Five Hundred Eighty-Nine only"
+    }
+   }
+  },
+  {
+   "name": "100% line discount",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 49900,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "percent",
+       "value": 100
+      }
+     },
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 49900,
+      "line_discount": 49900,
+      "bill_discount": 0,
+      "taxable": 0,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 10000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 10000,
+      "gst_rate": "18",
+      "cgst": 900,
+      "sgst": 900,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 10000,
+      "cgst": 900,
+      "sgst": 900,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 10000,
+     "cgst": 900,
+     "sgst": 900,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 11800,
+     "in_words": "Rupees One Hundred Eighteen only"
+    }
+   }
+  },
+  {
+   "name": "100% bill discount",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "bill_discount": {
+     "kind": "percent",
+     "value": 100
+    },
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 49900,
+      "gst_rate": 18
+     },
+     {
+      "qty": 2,
+      "rate": 10000,
+      "gst_rate": 5
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 49900,
+      "line_discount": 0,
+      "bill_discount": 49900,
+      "taxable": 0,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "amount": 20000,
+      "line_discount": 0,
+      "bill_discount": 20000,
+      "taxable": 0,
+      "gst_rate": "5",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 0,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 0,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 0,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 0,
+     "bill_discount": 69900,
+     "round_off": 0,
+     "total": 0,
+     "in_words": "Rupees Zero only"
+    }
+   }
+  },
+  {
+   "name": "round off upwards",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 8517,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 8517,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 8517,
+      "gst_rate": "18",
+      "cgst": 767,
+      "sgst": 767,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 8517,
+      "cgst": 767,
+      "sgst": 767,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 8517,
+     "cgst": 767,
+     "sgst": 767,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 49,
+     "total": 10100,
+     "in_words": "Rupees One Hundred One only"
+    }
+   }
+  },
+  {
+   "name": "total in lakhs",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 10000000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 10000000,
+      "gst_rate": "18",
+      "cgst": 900000,
+      "sgst": 900000,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 10000000,
+      "cgst": 900000,
+      "sgst": 900000,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 10000000,
+     "cgst": 900000,
+     "sgst": 900000,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 11800000,
+     "in_words": "Rupees One Lakh Eighteen Thousand only"
+    }
+   }
+  },
+  {
+   "name": "total in crores",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "29",
+    "lines": [
+     {
+      "qty": 3,
+      "rate": 50000000,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 1234500,
+      "gst_rate": 5
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "inter",
+    "place_of_supply": "29",
+    "lines": [
+     {
+      "amount": 150000000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 150000000,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 27000000
+     },
+     {
+      "amount": 1234500,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 1234500,
+      "gst_rate": "5",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 61725
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 1234500,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 61725
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 150000000,
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 27000000
+     }
+    ],
+    "totals": {
+     "taxable": 151234500,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 27061725,
+     "bill_discount": 0,
+     "round_off": -25,
+     "total": 178296200,
+     "in_words": "Rupees Seventeen Lakh Eighty-Two Thousand Nine Hundred Sixty-Two only"
+    }
+   }
+  },
+  {
+   "name": "bill discount where the last line has no amount",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "bill_discount": {
+     "kind": "amount",
+     "value": 1001
+    },
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 3333,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 6667,
+      "gst_rate": 5
+     },
+     {
+      "qty": 1,
+      "rate": 0,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 3333,
+      "line_discount": 0,
+      "bill_discount": 333,
+      "taxable": 3000,
+      "gst_rate": "18",
+      "cgst": 270,
+      "sgst": 270,
+      "igst": 0
+     },
+     {
+      "amount": 6667,
+      "line_discount": 0,
+      "bill_discount": 668,
+      "taxable": 5999,
+      "gst_rate": "5",
+      "cgst": 150,
+      "sgst": 150,
+      "igst": 0
+     },
+     {
+      "amount": 0,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 0,
+      "gst_rate": "18",
+      "cgst": 0,
+      "sgst": 0,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 5999,
+      "cgst": 150,
+      "sgst": 150,
+      "igst": 0
+     },
+     {
+      "gst_rate": "18",
+      "taxable": 3000,
+      "cgst": 270,
+      "sgst": 270,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 8999,
+     "cgst": 420,
+     "sgst": 420,
+     "igst": 0,
+     "bill_discount": 1001,
+     "round_off": -39,
+     "total": 9800,
+     "in_words": "Rupees Ninety-Eight only"
+    }
+   }
+  },
+  {
+   "name": "place of supply left empty uses the business's state",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 100000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 100000,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 100000,
+      "gst_rate": "18",
+      "cgst": 9000,
+      "sgst": 9000,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "18",
+      "taxable": 100000,
+      "cgst": 9000,
+      "sgst": 9000,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 100000,
+     "cgst": 9000,
+     "sgst": 9000,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 118000,
+     "in_words": "Rupees One Thousand One Hundred Eighty only"
+    }
+   }
+  },
+  {
+   "name": "quantity and rate typed as text",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": "2.5",
+      "rate": "39900",
+      "gst_rate": "5"
+     }
+    ]
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "amount": 99750,
+      "line_discount": 0,
+      "bill_discount": 0,
+      "taxable": 99750,
+      "gst_rate": "5",
+      "cgst": 2494,
+      "sgst": 2494,
+      "igst": 0
+     }
+    ],
+    "summary": [
+     {
+      "gst_rate": "5",
+      "taxable": 99750,
+      "cgst": 2494,
+      "sgst": 2494,
+      "igst": 0
+     }
+    ],
+    "totals": {
+     "taxable": 99750,
+     "cgst": 2494,
+     "sgst": 2494,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": -38,
+     "total": 104700,
+     "in_words": "Rupees One Thousand Forty-Seven only"
+    }
+   }
+  },
+  {
+   "name": "an empty bill",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": []
+   },
+   "expected": {
+    "tax_mode": "intra",
+    "place_of_supply": "27",
+    "lines": [],
+    "summary": [],
+    "totals": {
+     "taxable": 0,
+     "cgst": 0,
+     "sgst": 0,
+     "igst": 0,
+     "bill_discount": 0,
+     "round_off": 0,
+     "total": 0,
+     "in_words": "Rupees Zero only"
+    }
+   }
+  },
+  {
+   "name": "error: rupee discount above the line",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "amount",
+       "value": 10001
+      }
+     }
+    ]
+   },
+   "error": {
+    "code": "bad_discount",
+    "line": 0
+   }
+  },
+  {
+   "name": "error: discount above 100%",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18
+     },
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18,
+      "discount": {
+       "kind": "percent",
+       "value": "100.01"
+      }
+     }
+    ]
+   },
+   "error": {
+    "code": "bad_discount",
+    "line": 1
+   }
+  },
+  {
+   "name": "error: GST rate 12% no longer exists",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 12
+     }
+    ]
+   },
+   "error": {
+    "code": "bad_gst_rate",
+    "line": 0
+   }
+  },
+  {
+   "name": "error: quantity 0",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": 0,
+      "rate": 10000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "error": {
+    "code": "bad_qty",
+    "line": 0
+   }
+  },
+  {
+   "name": "error: quantity with four decimals",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "lines": [
+     {
+      "qty": "1.0005",
+      "rate": 10000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "error": {
+    "code": "bad_qty",
+    "line": 0
+   }
+  },
+  {
+   "name": "error: bill discount above the bill",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "27",
+    "bill_discount": {
+     "kind": "amount",
+     "value": 20001
+    },
+    "lines": [
+     {
+      "qty": 2,
+      "rate": 10000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "error": {
+    "code": "bad_bill_discount",
+    "line": null
+   }
+  },
+  {
+   "name": "error: unknown place of supply",
+   "bill": {
+    "registration": "regular",
+    "business_state": "27",
+    "place_of_supply": "99",
+    "lines": [
+     {
+      "qty": 1,
+      "rate": 10000,
+      "gst_rate": 18
+     }
+    ]
+   },
+   "error": {
+    "code": "bad_place",
+    "line": null
+   }
+  }
+ ],
+ "gstin": [
+  [
+   "27AAPFU0939F1ZV",
+   true
+  ],
+  [
+   "27aapfu0939f1zv",
+   true
+  ],
+  [
+   "27AAPFU0939F1ZA",
+   false
+  ],
+  [
+   "27AAPFU0939F1Z",
+   false
+  ],
+  [
+   "99AAPFU0939F1ZV",
+   false
+  ],
+  [
+   "27AAPFU0939FZZV",
+   false
+  ]
+ ],
+ "words": [
+  [
+   0,
+   "Zero"
+  ],
+  [
+   7,
+   "Seven"
+  ],
+  [
+   15,
+   "Fifteen"
+  ],
+  [
+   55,
+   "Fifty-Five"
+  ],
+  [
+   100,
+   "One Hundred"
+  ],
+  [
+   2655,
+   "Two Thousand Six Hundred Fifty-Five"
+  ],
+  [
+   100000,
+   "One Lakh"
+  ],
+  [
+   118000,
+   "One Lakh Eighteen Thousand"
+  ],
+  [
+   1050505,
+   "Ten Lakh Fifty Thousand Five Hundred Five"
+  ],
+  [
+   12345678,
+   "One Crore Twenty-Three Lakh Forty-Five Thousand Six Hundred Seventy-Eight"
+  ],
+  [
+   1000000000,
+   "One Hundred Crore"
+  ]
+ ]
+}

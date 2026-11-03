@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from karyahub import access
 from karyahub.accounts import service
 from karyahub.db.engine import db_session
 from karyahub.errors import AppError
@@ -85,6 +86,10 @@ def require(*permissions: str) -> Callable[..., service.Principal]:
     """Dependency: signed in, with at least one of these permissions."""
 
     async def check(p: PrincipalDep) -> service.Principal:
+        if not any(perm in p.permissions for perm in permissions) and all(
+            perm in p.pack_off for perm in permissions
+        ):
+            raise AppError("pack_off", access.PACK_OFF_MESSAGE, 403)
         if not any(perm in p.permissions for perm in permissions):
             raise AppError("forbidden", "Your access doesn't include this. Ask your business owner.", 403)
         return p

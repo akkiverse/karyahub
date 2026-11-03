@@ -22,7 +22,7 @@ describe('US-14 Roles and limited access', () => {
     const id = await approvedJob(t);
     t.go(`#/jobs/${id}`);
     expect(t.$('[data-action="create-doc"]')).toBeNull();
-    expect(t.$('[data-testid="docs-hidden"]').textContent).toBe('Quotes and invoices are made by the office.');
+    expect(t.$('[data-testid="docs-hidden"]').textContent).toBe('Estimates and bills are made by the office.'); // shopkeeper words (CR-0012)
     t.app.store.update((s) => { s.jobs[0].state = 'VERIFIED'; });
     expect(t.$('[data-wf="close"]')).toBeNull();
     expect(t.$('[data-testid="close-hidden"]').textContent).toBe('Verified. The office closes the job.');
@@ -43,7 +43,7 @@ describe('US-14 Roles and limited access', () => {
 
   it('AC-14.3: an office coordinator works with Home, Chat, Jobs, Inventory and Renewals, can make quotes and close jobs, but not Admin or Settings', async () => {
     t = setup({ signedInAs: 'st-coord' });
-    expect(navLabels(t)).toEqual(['Home', 'Chat', 'Jobs', 'Inventory', 'Renewals']); // Inventory added by CR-0011
+    expect(navLabels(t)).toEqual(['Home', 'Bills', 'Chat', 'Jobs', 'Inventory', 'Renewals']); // Inventory added by CR-0011, Bills by CR-0012
     expect(t.$('.account-menu').textContent).not.toContain('Settings');
     const id = await approvedJob(t);
     t.go(`#/jobs/${id}`);

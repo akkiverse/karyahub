@@ -44,6 +44,9 @@ async def ensure_demo(db: AsyncSession, pepper: str | None = None) -> None:
             is_demo=True,
             active=True,
             created_at=now,
+            business_type="service",
+            packs=["field_service"],
+            gst_registration="regular",
         )
     )
     await db.flush()

@@ -323,20 +323,22 @@ describe('US-25 Inventory per business: parts used on a job', () => {
     expect(t.$('input[name="name"]').value).toBe('copper nut');
   });
 
-  it('AC-25.13: the parts a job used become lines on its quote and invoice, after the work lines and still editable', async () => {
+  it('AC-25.13 (changed CR-0012): the parts a job used become lines on its estimate and bill, after the work lines and still editable', async () => {
     t = demo();
     const j = await approvedJob(t, 's-ramesh');
     t.go(`#/jobs/${j.id}`);
     expect(t.app.actions.stock.takePart(j.id, 'it-r32', '1').short).toBe(false);
     expect(t.app.actions.stock.takePart(j.id, 'it-motor', '1').item.name).toBe('Indoor fan motor, 1.5 ton split');
     t.click('[data-action="create-doc"][data-type="invoice"]');
-    await until(() => t.$('.doc-table'));
+    await until(() => t.$('[data-testid="bill-editor"]'));
     const lines = t.app.store.get().documents[0].lines;
     expect(lines.map((l) => l.description)).toEqual(['Gas refill (R32), Voltas 1.5T split AC', 'Service visit', 'R32 refrigerant gas', 'Indoor fan motor, 1.5 ton split']);
-    expect(lines[2]).toEqual({ description: 'R32 refrigerant gas', qty: 1, rate: 950 });
-    expect(lines[3]).toEqual({ description: 'Indoor fan motor, 1.5 ton split', qty: 1, rate: 3200 });
-    t.app.actions.updateDocumentLine(t.app.store.get().documents[0].id, 2, { rate: 1000 });
-    expect(t.app.store.get().documents[0].lines[2].rate).toBe(1000);
+    expect(lines[2]).toMatchObject({ item_id: 'it-r32', qty: 1, rate: 95000, from_job_parts: true });
+    expect(lines[3]).toMatchObject({ item_id: 'it-motor', qty: 1, rate: 320000, from_job_parts: true });
+    const rate = t.$('[data-k="r2"]');
+    rate.value = '1000';
+    rate.dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => t.app.store.get().documents[0].lines[2].rate === 100000);
   });
 
   it('AC-25.13: a part the job already charges for is not added a second time', async () => {
@@ -345,7 +347,7 @@ describe('US-25 Inventory per business: parts used on a job', () => {
     t.app.actions.stock.takePart(j.id, 'it-cap45', '1');
     t.go(`#/jobs/${j.id}`);
     t.click('[data-action="create-doc"][data-type="quote"]');
-    await until(() => t.$('.doc-table'));
+    await until(() => t.$('[data-testid="bill-editor"]'));
     const lines = t.app.store.get().documents[0].lines.map((l) => l.description);
     expect(lines.filter((l) => /capacitor/i.test(l))).toEqual(['Capacitor 45 uF']);
     expect(partLines(t.app.store.get(), t.app.store.get().jobs[0])).toEqual([]);

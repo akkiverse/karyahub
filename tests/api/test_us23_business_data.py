@@ -143,6 +143,8 @@ def test_ac_23_2_every_business_data_table_has_a_row_level_security_policy():
         "users",
         "role_permissions",
         "audit_log",
+        # A bill's public link (CR-0012) is found before the business is known; it holds only a token hash.
+        "doc_links",
     }  # people and the activity log: platform admin flows
     with_business = {t.name for t in Base.metadata.tables.values() if "business_id" in t.columns}
     assert with_business - account_tables == tables == set(rls.TABLES)

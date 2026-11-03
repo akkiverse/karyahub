@@ -17,7 +17,9 @@ export const PERMISSIONS = [
   { id: 'view_jobs', label: 'See jobs', roles: ['owner', 'coordinator', 'technician'] },
   { id: 'verify_work', label: 'Send the customer code and verify work', roles: ['owner', 'coordinator', 'technician'] },
   { id: 'close_jobs', label: 'Close jobs', roles: ['owner', 'coordinator'] },
-  { id: 'create_documents', label: 'Create quotes and invoices', roles: ['owner', 'coordinator'] },
+  { id: 'create_documents', label: 'Make estimates and bills', roles: ['owner', 'coordinator'] },
+  // Cancelling a numbered bill (CR-0012) is the owner's unless they switch it on for a role or a person.
+  { id: 'cancel_bills', label: 'Cancel bills', roles: ['owner'] },
   { id: 'manage_renewals', label: 'See renewals and send reminders', roles: ['owner', 'coordinator'] },
   { id: 'manage_settings', label: 'Change settings and business details', roles: ['owner'] },
   { id: 'manage_team', label: 'Add staff, change roles and PINs (Admin)', roles: ['owner'] },
@@ -41,6 +43,7 @@ export const ROUTE_PERMISSION = {
   home: 'view_dashboard', chat: 'use_chat', jobs: 'view_jobs', job: 'view_jobs', doc: 'create_documents',
   renewals: 'manage_renewals', settings: 'manage_settings', admin: 'manage_team', businesses: 'manage_businesses',
   inventory: 'view_inventory', item: 'view_inventory', 'item-form': 'manage_inventory', 'inventory-import': 'manage_inventory',
+  bills: 'create_documents', estimates: 'create_documents', bill: 'create_documents', 'bill-edit': 'create_documents', 'bill-new': 'create_documents',
 };
 export const canOpen = (me, routeName) => !ROUTE_PERMISSION[routeName] || can(me, ROUTE_PERMISSION[routeName]);
 export const landingFor = (me) => {

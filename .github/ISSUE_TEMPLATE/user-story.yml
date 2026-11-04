@@ -1,0 +1,31 @@
+name: User story
+description: A story with acceptance criteria. Write it in docs/spec/SPEC.md first (docs/process/TRACKING.md).
+title: "US-NN: "
+labels: ["user-story", "status: pipeline"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: As a ..., I want ..., so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: One checkbox per criterion, in the spec's wording, for example "- [ ] AC-50.1 Given ..., when ..., then ...".
+    validations:
+      required: true
+  - type: input
+    id: cr
+    attributes:
+      label: Change request
+      description: The CR in docs/changes/ (for example CR-0018).
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Links, decisions and anything the builder should know. Build approval is recorded here as a comment.

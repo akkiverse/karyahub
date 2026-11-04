@@ -420,6 +420,99 @@ As an owner on a laptop, I want these screens to use the width, so that I see mo
 - **AC-41.4** Given Admin from 1100 px, then the team and the add forms are on the left (5 of 12 columns), the roles and activity log on the right (7). *(added CR-0015)*
 - **AC-41.5** Given Settings from 1100 px, then the forms are on the left (6 of 12), and the live paper stays in view in its own column on the right (6). *(added CR-0015)*
 
+> **Planned, not built (CR-0018, Phase Alpha, v0.12.0).** US-44 to US-49 are approved. Their criteria become named tests when the build lands; until then no test exists for them. Background: [PHASE-ALPHA.md](../product/PHASE-ALPHA.md).
+
+### US-44: See how KaryaHub is doing
+
+As the platform admin, I want one overview, so that I know the state of KaryaHub in a minute.
+
+- **AC-44.1** Given I'm the platform admin, when I sign in, then I land on Overview with the seven tabs. Given any other role, when I open a console address, then I get the no-access page, and the server answers 403. *(added CR-0018)*
+- **AC-44.2** Given real businesses exist, when Overview opens, then it shows businesses active this week of the total, people seen this week, new businesses this month, money recorded this month, and plans ending in 30 days. *(added CR-0018)*
+- **AC-44.3** Given a change made at 23:30 UTC, when graphs are drawn, then it counts on the next India day. *(added CR-0018)*
+- **AC-44.4** Given a day with no activity, when a graph is drawn, then that day shows as 0 rather than being skipped. *(added CR-0018)*
+- **AC-44.5** Given any graph, when I press Show as table, then the same numbers appear in a labelled table. *(added CR-0018)*
+- **AC-44.6** Given sign-ins saved before this release, when the sign-in graph opens, then those days are included. Given the wrong-PIN count, then it starts at release and says so. *(added CR-0018)*
+- **AC-44.7** Given bills, jobs and items made before this release, when their graph opens, then those days are marked as estimates. *(added CR-0018)*
+- **AC-44.8** Given businesses at different steps, when the ladder is shown, then each of the seven steps shows the right count. *(added CR-0018)*
+- **AC-44.9** Given no real business exists, when Overview opens, then it says so and offers Add a business, instead of empty graphs. *(added CR-0018)*
+
+### US-45: Know each business and each person
+
+As the platform admin, I want details of every business and person, so that I can see who is working and who is not.
+
+- **AC-45.1** Given the Businesses tab, when I search or filter by plan, stage, health, trade or state, then the list and its count change, and the filters survive a page reload. *(added CR-0018)*
+- **AC-45.2** Given a business, when I open its page, then it shows summary and health, people, usage, plan, notes, payments and admin actions. *(added CR-0018)*
+- **AC-45.3** Given the People tab, when I filter by business, role, active or off, never signed in, temporary PIN, locked or not seen for 14 days, then the right people and their total are shown. *(added CR-0018)*
+- **AC-45.4** Given a phone syncs, then that person's last seen updates, at most once an hour, and shows in India time. *(added CR-0018)*
+- **AC-45.5** Given fixed dates, when health is worked out, then each state in the rules table appears with its reason. *(added CR-0018)*
+- **AC-45.6** Given a business ticked as test, or the demo, when totals and graphs are counted, then it is left out. Given Include test businesses is on, then a test business is counted. *(added CR-0018)*
+- **AC-45.7** Given a staff member who isn't an owner, when listed, then the phone shows only its last 4 digits. When I press Reveal, then the full number shows and the reveal is logged. *(added CR-0018)*
+- **AC-45.8** Given a turned-off business, when someone signs in with the right PIN, then they see that the business is paused and whom to contact. With a wrong PIN, they see the same message as today. *(added CR-0018)*
+- **AC-45.9** Given filters on Businesses, when I press Export, then I get a CSV of that list without staff phones, and the export is logged. *(added CR-0018)*
+
+### US-46: Be warned, with something to do
+
+As the platform admin, I want a list of what needs me, so that nothing slips.
+
+- **AC-46.1** Given each rule in the warnings table, when its condition is met on fixed dates, then that warning appears, and it does not appear one day earlier. *(added CR-0018)*
+- **AC-46.2** Given a technician who never signed in, then no warning appears for them. *(added CR-0018)*
+- **AC-46.3** Given a warning, then it shows its level, business, reason in plain words, since when, and one working action. *(added CR-0018)*
+- **AC-46.4** Given several warnings, then the most serious come first, and the tab shows how many are open. *(added CR-0018)*
+- **AC-46.5** Given a warning, when I snooze it for 1, 7 or 30 days, then a reason is required, it hides until then, and the snooze is logged. *(added CR-0018)*
+- **AC-46.6** Given the cause is fixed, then the warning disappears by itself. *(added CR-0018)*
+- **AC-46.7** Given any failed sign-in, then time, result and masked number are recorded, and never the PIN. The person sees the same message as today, whether or not the number exists. *(added CR-0018)*
+- **AC-46.8** Given sign-in records older than 13 months, then they are removed. *(added CR-0018)*
+- **AC-46.9** Given the AI server is unreachable, when any console tab opens, then the tab still loads and the warning shows. *(added CR-0018)*
+
+### US-47: Control plans and features
+
+As the platform admin, I want to switch features and limits per plan and per business, so that I can sell tiers and add features later without rebuilding this.
+
+- **AC-47.1** Given a business saved by v0.11.0, when v0.12.0 starts, then it is on Early access with every feature on, and its people see no change. *(added CR-0018)*
+- **AC-47.2** Given one new entry in the feature catalogue, then it appears in Plans and on every business page with no other screen change. *(added CR-0018)*
+- **AC-47.3** Given Plans, when I change a name, price, switch or limit, or add a plan, then it applies at once and is logged. A plan in use can be retired but not deleted. *(added CR-0018)*
+- **AC-47.4** Given a plan and an exception disagree, then the exception wins. Given a feature name the server doesn't know, then it counts as off and is logged. *(added CR-0018)*
+- **AC-47.5** Given core features (bills, items, customers, seeing saved data), then no plan or exception can turn them off. *(added CR-0018)*
+- **AC-47.6** Given an exception, when I save it, then a reason is required. Given its end date passes, then it stops by itself. *(added CR-0018)*
+- **AC-47.7** Given a feature marked Beta, then it is on only for businesses given an exception. *(added CR-0018)*
+- **AC-47.8** Given a feature is off, when its route is called, then the server answers 403 `feature_off` with a plain message, and the screen offers Ask for this. When it's turned back on, then the data is still there. *(added CR-0018)*
+- **AC-47.9** Given AI is off for a business, when someone uses Chat, then the labelled manual path works and nothing typed is lost. *(added CR-0018)*
+- **AC-47.10** Given the plan allows a feature but the owner's pack or a person's permission is off, then that person doesn't get it. Given the plan doesn't allow it, then no owner setting can turn it on. *(added CR-0018)*
+- **AC-47.11** Given a successful AI call, then it counts once for that business and day. A failed call does not count. *(added CR-0018)*
+- **AC-47.12** Given the AI limit is reached, when someone uses AI, then the manual path opens and says why. Given the people limit is reached, then adding a person is refused and says why. *(added CR-0018)*
+- **AC-47.13** Given any plan or limit, when a bill, item or customer change arrives, including one queued offline, then it is never refused because of the plan. *(added CR-0018)*
+- **AC-47.14** Given a plan's end date is within 14 days, then the owner sees a notice. Given it has passed, then 7 days of grace follow, then the business falls to the plan's fallback. Nobody is locked out and no data is lost. *(added CR-0018)*
+- **AC-47.15** Given I'm an owner, when I open Settings, then Your plan shows plan, end date, features and usage. Other roles don't see it. *(added CR-0018)*
+
+### US-48: Run customers and growth
+
+As the platform admin, I want my customers, money and demand in one place, so that I can decide whom to call and what to build.
+
+- **AC-48.1** Given a business, when I set its stage, trade, city or source, then the Growth list and its counts by stage change, and the stage change is logged with its date. *(added CR-0018)*
+- **AC-48.2** Given a note with a follow-up date, when the date passes, then it appears in Attention. *(added CR-0018)*
+- **AC-48.3** Given a note, stage or payment, when an owner calls any owner route or opens History, then none of it appears. *(added CR-0018)*
+- **AC-48.4** Given I record a payment with amount, date, mode, period and note, then money received and the business's page update. Any later change is logged with old and new values. *(added CR-0018)*
+- **AC-48.5** Given plans with monthly or yearly prices, then monthly run rate adds paying businesses, with yearly prices divided by 12, labelled "recorded by hand". *(added CR-0018)*
+- **AC-48.6** Given plans ending in the next 30 days, then Renewals due lists them with the last payment. *(added CR-0018)*
+- **AC-48.7** Given feature use in the last 30 days, then the table shows how many businesses used each feature. *(added CR-0018)*
+- **AC-48.8** Given someone presses Ask for this, then one request per business and feature appears in Growth with who and when, and the person sees it was sent. *(added CR-0018)*
+- **AC-48.9** Given rates I set for AI calls and messages, then each business shows estimated cost beside what it pays, labelled as an estimate. *(added CR-0018)*
+- **AC-48.10** Given an announcement for everyone, one plan or one business with start and end dates, then a banner shows to those people only in that period. Each person can dismiss it once. *(added CR-0018)*
+
+### US-49: Keep the console safe
+
+As the platform admin, I want this much power to be safe, so that one mistake or a stolen PIN does limited harm.
+
+- **AC-49.1** Given System, when it opens, then it shows version, database state and time, row-level security, server mode and AI servers. *(added CR-0018)*
+- **AC-49.2** Given turning off a business, changing a plan or exception, revealing a phone or exporting, then my PIN is asked again. A wrong PIN refuses the action and counts towards lockout. *(added CR-0018)*
+- **AC-49.3** Given any change in the console, then the admin log shows who, when, what, and old and new values, and it can't be edited. *(added CR-0018)*
+- **AC-49.4** Given my plan or feature change on a business, then its owner's History says the KaryaHub team changed it. *(added CR-0018)*
+- **AC-49.5** Given every console route, when a business user or a signed-out visitor calls it, then it is refused. *(added CR-0018)*
+- **AC-49.6** Given any console screen except the rebuild, then it doesn't read the `records` table, and its answer holds no customer name, customer phone or bill amount. *(added CR-0018)*
+- **AC-49.7** Given Rebuild numbers runs, then it reads one business at a time inside that business's wall. Running it twice gives the same numbers. *(added CR-0018)*
+- **AC-49.8** Given a change to row-level security on the business tables, then existing wall tests still pass with the new tables present. *(added CR-0018)*
+- **AC-49.9** Given any console screen, then it works from 360 px to 1440 px, in light and dark, by keyboard, with labelled forms. *(added CR-0018)*
+
 ## Screens and flows
 Sign in first (CR-0003). Then a bottom tab bar and a drawer on phones and a sidebar on desktop, showing only the screens the person's role and packs allow: Home, Bills, Chat, Jobs, Inventory, Renewals (Workspace; on a phone Renewals is in the account menu, CR-0012) and Admin, Settings (Manage). An account menu in the top bar shows the person and role, with Settings, Admin and Sign out.
 

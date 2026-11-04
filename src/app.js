@@ -33,6 +33,8 @@ import { createBills } from './bills-app.js';
 import { applyTheme, setThemePref, toggleTheme, themeToggle, themePref, watchSystemTheme } from './theme.js';
 import { searchBox, searchResults } from './views/search.js';
 import { W } from './words.js';
+import { history, historyRows } from './views/history.js';
+import { historyOnDevice, filterHistory } from './domain/history.js';
 import { dmy } from './domain/inventory.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
@@ -46,6 +48,7 @@ const NAV = [
   ['renewals', 'Renewals', '#/renewals', 'renewals', 'Workspace', false], // on the phone: the account menu, so the bar keeps five places
   ['businesses', 'Businesses', '#/businesses', 'building', 'Platform', true],
   ['admin', 'Admin', '#/admin', 'users', 'Manage', false], // on the phone it is in the account menu, so the tab bar keeps five places
+  ['history', 'History', '#/history', 'clock', 'Manage', false], // CR-0016; on the phone it is in the account menu
   ['settings', 'Settings', '#/settings', 'settings', 'Manage', false],
 ];
 
@@ -74,13 +77,14 @@ export function parseRoute(hash) {
   if (a === 'renewals') return { name: 'renewals', tab: 'renewals' };
   if (a === 'settings') return { name: 'settings', tab: 'settings' };
   if (a === 'admin') return { name: 'admin', tab: 'admin' };
+  if (a === 'history') return { name: 'history', tab: 'history' };
   if (a === 'businesses') return { name: 'businesses', tab: 'businesses' };
   if (a === 'account') return { name: 'account', tab: 'account' };
   return { name: 'home', tab: 'home' };
 }
 const billNew = () => '<section class="page"><h1 id="page-title" tabindex="-1">New</h1></section>';
-const VIEWS = { bills: (p) => billsList({ ...p, kind: 'invoice' }), estimates: (p) => billsList({ ...p, kind: 'quote' }), bill: billView, 'bill-edit': billEditor, 'bill-new': billNew, home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account, inventory, item: itemPage, 'item-form': itemForm, 'inventory-import': inventoryImport, 'inventory-fields': fieldsScreen };
-const TITLES = { bills: 'Bills', estimates: 'Estimates', bill: 'Bill', 'bill-edit': 'Bill', 'bill-new': 'New', setup: 'Your business', home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in', inventory: 'Inventory', item: 'Item', 'item-form': 'Item', 'inventory-import': 'Import items', 'inventory-fields': 'Item details' };
+const VIEWS = { bills: (p) => billsList({ ...p, kind: 'invoice' }), estimates: (p) => billsList({ ...p, kind: 'quote' }), bill: billView, 'bill-edit': billEditor, 'bill-new': billNew, home, chat, jobs, job, doc: documentView, renewals, settings, admin, history, businesses, account, inventory, item: itemPage, 'item-form': itemForm, 'inventory-import': inventoryImport, 'inventory-fields': fieldsScreen };
+const TITLES = { bills: 'Bills', estimates: 'Estimates', bill: 'Bill', 'bill-edit': 'Bill', 'bill-new': 'New', setup: 'Your business', home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', history: 'History', businesses: 'Businesses', account: 'My account', signin: 'Sign in', inventory: 'Inventory', item: 'Item', 'item-form': 'Item', 'inventory-import': 'Import items', 'inventory-fields': 'Item details' };
 
 const PERMISSION_LABELS = PERMISSIONS;
 // The one + New button (AC-26.5) sits on the main screens, not where a bottom bar or form needs the corner.
@@ -159,6 +163,7 @@ export function mountApp(root, options = {}) {
     ui.profile = {};
     ui.inv = { dismissed: {} };
     ui.meta = null;
+    ui.history = {};
     if (me && me.signed_in && me.business && !me.business.is_demo && !me.user.must_change_pin) sync.start(me.business);
     else sync.stop();
   }
@@ -178,7 +183,7 @@ export function mountApp(root, options = {}) {
     sync.stop();
     session.end();
     store.close();
-    ui.admin = {}; ui.businesses = {}; ui.profile = {}; ui.account = {}; ui.inv = { dismissed: {} }; ui.meta = null;
+    ui.admin = {}; ui.businesses = {}; ui.profile = {}; ui.account = {}; ui.inv = { dismissed: {} }; ui.meta = null; ui.history = {}; ui.homeTeam = 0;
     ui.auth = { notice };
     await loadAuthState();
     if (alive) render();
@@ -220,6 +225,7 @@ export function mountApp(root, options = {}) {
     if (route.name === 'home' && can(me, 'manage_team') && typeof api.team === 'function') loadHomeTeam(); // the checklist's "Add your team"
     if (route.name === 'job') loadPlan(route.params.id);
     if (route.name === 'admin' && can(me, 'manage_team') && !ui.admin.data) loadAdmin();
+    if (route.name === 'history' && can(me, 'view_history')) loadHistory();
     if (route.name === 'businesses' && can(me, 'manage_businesses') && !ui.businesses.list) loadBusinesses();
   }
   // Opening Chat asks the server to load the AI models now, so the first message doesn't wait for them (CR-0010).
@@ -236,6 +242,35 @@ export function mountApp(root, options = {}) {
       const count = (await api.team()).members.length;
       if (count !== ui.homeTeam) { ui.homeTeam = count; if (alive && route.name === 'home') render(); }
     } catch { /* offline: the checklist just doesn't tick it yet */ }
+  }
+  // History (CR-0016): a real business asks the server, page by page; the demo reads what is on the device.
+  let historyAsked = 0;
+  const historyDay = () => { const st = store.get(); return st.settings.is_demo ? today() : deviceToday(); };
+  function paintHistory() {
+    const slot = root.querySelector('[data-slot="hist-results"]');
+    if (slot) slot.innerHTML = historyRows(ui.history, { demo: Boolean(store.get().settings.is_demo), today: historyDay() });
+  }
+  async function loadHistory({ older = false, full = true } = {}) {
+    const h = ui.history = { ...(ui.history || {}), loading: true, error: '' };
+    const st = store.get();
+    if (st.settings.is_demo) {
+      const all = historyOnDevice(st);
+      ui.history = { ...h, loading: false, entries: filterHistory(all, h), more: false, people: [...new Set(all.map((x) => x.who))].sort() };
+      if (alive && route.name === 'history') { if (full) render(); else paintHistory(); }
+      return;
+    }
+    const asked = ++historyAsked;
+    paintHistory();
+    const last = older && h.entries && h.entries.length ? h.entries[h.entries.length - 1].id : null;
+    try {
+      const res = await api.history({ group: h.group, who: h.who, q: h.q, before: last });
+      if (asked !== historyAsked) return; // a newer search took over
+      ui.history = { ...ui.history, loading: false, entries: older ? [...(h.entries || []), ...res.entries] : res.entries, more: res.more, people: res.people };
+    } catch (err) {
+      if (asked !== historyAsked) return;
+      ui.history = { ...ui.history, loading: false, error: msg(err) };
+    }
+    if (alive && route.name === 'history') { if (full) render(); else paintHistory(); }
   }
   async function loadAdmin(extra = {}) {
     if (extra.credentials && extra.credentials.length) ui.focusNext = '[data-testid="admin-credentials"]';
@@ -323,6 +358,7 @@ export function mountApp(root, options = {}) {
               ${can(me, 'manage_renewals') ? `<a href="#/renewals" class="menu-item menu-phone">${icon('renewals', { size: 18 })} Renewals</a>` : ''}
               ${can(me, 'manage_settings') ? `<a href="#/settings" class="menu-item">${icon('settings', { size: 18 })} Settings</a>` : ''}
               ${can(me, 'manage_team') ? `<a href="#/admin" class="menu-item">${icon('users', { size: 18 })} Admin</a>` : ''}
+              ${can(me, 'view_history') ? `<a href="#/history" class="menu-item menu-phone">${icon('clock', { size: 18 })} ${W.historyTitle}</a>` : ''}
               <button type="button" class="menu-item" data-action="sign-out">${icon('logout', { size: 18 })} Sign out</button>
             </div>
           </details>
@@ -443,7 +479,7 @@ export function mountApp(root, options = {}) {
   let renderWhenDone = false;
   const typing = () => {
     const a = root.ownerDocument.activeElement;
-    return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && (a.closest('form') || a.matches('[data-inv-search], [data-pick-search], [data-global-search]')));
+    return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && (a.closest('form') || a.matches('[data-inv-search], [data-pick-search], [data-global-search], [data-hist-search]')));
   };
   applyUnits(store.get().units);
   const unsub = store.subscribe((st, meta) => {
@@ -484,6 +520,9 @@ export function mountApp(root, options = {}) {
     if (a === 'toggle-theme') { toggleTheme(win); paintTheme(); root.querySelector('[data-slot="theme-toggle"]')?.focus(); return; }
     if (a === 'toggle-nav') { setNav(!ui.navOpen); return; }
     if (a === 'close-nav') { setNav(false); return; }
+    if (a === 'hist-group') { ui.history = { ...ui.history, group: el.dataset.group, entries: [] }; render(); loadHistory(); return; }
+    if (a === 'hist-more') { loadHistory({ older: true, full: false }); return; }
+    if (a === 'hist-reload') { loadHistory(); return; }
     if (a === 'home-view') {
       ui.homeView = el.dataset.view === 'kanban' ? 'kanban' : 'table';
       remember('kh-home-view', ui.homeView);
@@ -1053,6 +1092,7 @@ export function mountApp(root, options = {}) {
     const a = el.dataset.action;
     if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0]); return; }
     if (bills.onChange(e)) return;
+    if (el.matches('[data-hist-who]')) { ui.history = { ...ui.history, who: el.value }; loadHistory({ full: false }); return; }
     if (el.matches('[data-inv-filter]')) { ui.inv.f = { ...(ui.inv.f || {}), [el.dataset.invFilter]: el.value }; paintInv(); return; }
     if (el.matches('[data-sheet-unit], [data-cut-pick]') && ui.inv.sheet) {
       const form = root.querySelector('form[data-form="inv-sheet"]');
@@ -1106,10 +1146,17 @@ export function mountApp(root, options = {}) {
       } catch (err) { ui.admin = { ...ui.admin, notice: { text: msg(err), error: true } }; await loadAdmin(); }
     }
   }
+  let historyTyping = null;
   function onInput(e) {
     const t = e.target;
     rememberItemForm(t);
     if (t.matches('[data-global-search]')) { ui.gs = t.value; paintSearch(); return; }
+    if (t.matches('[data-hist-search]')) {
+      ui.history = { ...ui.history, q: t.value };
+      clearTimeout(historyTyping);
+      historyTyping = setTimeout(() => { if (alive) loadHistory({ full: false }); }, store.get().settings.is_demo ? 0 : 250);
+      return;
+    }
     if (bills.onInput(e)) return;
     if (t.id === 'composer-input') ui.draft = t.value;
     else if (t.matches('[data-inv-search]')) { ui.inv.q = t.value; paintInv(); }
@@ -1166,6 +1213,6 @@ export function mountApp(root, options = {}) {
   return {
     store, actions, session, ui, navigate, render, ready,
     sync,
-    unmount() { alive = false; stopWatchingTheme(); bills.stop(); if (timerTick) win.clearInterval(timerTick); sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
+    unmount() { alive = false; clearTimeout(historyTyping); stopWatchingTheme(); bills.stop(); if (timerTick) win.clearInterval(timerTick); sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
   };
 }

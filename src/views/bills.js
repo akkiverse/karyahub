@@ -1,7 +1,7 @@
 // Bills and estimates (CR-0012): the list, the editor, the bill view and the printed paper.
 // Every screen word comes from words.js (rule 9). Money is paise until it is shown.
 import { icon } from '../ui/icons.js';
-import { escapeHtml as e, rupees, rupeesExact } from '../format.js';
+import { escapeHtml as e, rupees, rupeesExact, localStamp } from '../format.js';
 import { W } from '../words.js';
 import { STATES, stateLabel, GST_RATES } from '../domain/tax.js';
 import {
@@ -297,7 +297,7 @@ export function billView({ state, ui, me, params, today }) {
     ${v.cancelling ? `<form class="panel no-print" data-form="bill-cancel" data-doc="${e(doc.id)}"><label class="field"><span>${W.cancelReason}</span><input name="reason" maxlength="200"></label><div class="actions"><button type="submit" class="btn btn-primary danger">${W.cancelBill}</button><button type="button" class="btn btn-ghost" data-action="bill-cancel-close">Keep it</button></div></form>` : ''}
     <div class="actions bill-actions no-print" data-testid="bill-actions">${actions.join('')}${more.length ? `<details class="more-actions" ${v.cancelling || v.moreOpen ? 'open' : ''}><summary class="btn btn-ghost">${W.more}</summary><div class="more-list">${more.join('')}</div></details>` : ''}</div>
     ${billPaper(doc, { business: me.business, settings: state.settings, sample: demo || doc.sample })}
-    ${(doc.history || []).length ? `<details class="panel no-print"><summary>${W.history}</summary><ul class="history">${doc.history.map((h) => `<li><span>${e(h.what)}</span><span class="muted small">${e(h.who)} · ${e(String(h.at).replace('T', ' ').slice(0, 16))}</span></li>`).join('')}</ul></details>` : ''}
+    ${(doc.history || []).length ? `<details class="panel no-print bill-history" open data-testid="bill-history"><summary>${W.history}</summary><ul class="history">${[...doc.history].reverse().map((h) => `<li><span>${e(h.what)}</span><span class="small"><strong data-testid="history-who">${e(h.who)}</strong> <span class="muted">· ${e(localStamp(h.at, demo))}</span></span></li>`).join('')}</ul></details>` : ''}
   </section>`;
 }
 const win = () => globalThis;

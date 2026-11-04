@@ -400,6 +400,16 @@ As an owner, I want Home to open on a clear banner and my latest bills in the fo
 - **AC-42.4** Given the Table and Kanban Board switch, then the board has the columns To bill (with Field service), Draft, Unpaid, Overdue and Paid, each with its count and ₹ total, and cards that open the bill or job; this device remembers the choice. The board shows work; it doesn't change a status. *(added CR-0015)*
 - **AC-42.5** Given the Get Started Checklist, then it ticks Add your team when the business has more than one person and Business and GSTIN details when they are filled in, counts them, links the rest, and goes away once all are done. Connect WhatsApp ticks when K6 connects a number. *(added CR-0015)*
 
+### US-43: History: who did what
+As an owner, I want every change logged with the name of who made it, so that I can see what happened and ask the right person.
+- **AC-43.1** Given anyone adds, changes or stops an item, moves stock (in, out, count, cut, sold or returned on a bill, used on or put back from a job), or saves, changes, sends, cancels or marks a bill paid, then it is logged with their name and shows in History. *(added CR-0016)*
+- **AC-43.2** Given an item, then its History also shows who added it, who changed what ("sale price ₹350 to ₹400"; cost figures are not shown) and who stopped using it, among its stock moves; each line says "By <name>" on a line of its own, with the time; an item added with opening stock is one line, here and in History; only the server writes these lines. *(added CR-0016)*
+- **AC-43.3** Given a saved bill, then its history is open on its page, newest first, with who and when; customers added or changed, renewal reminders, jobs recorded and job steps are in History too. *(added CR-0016)*
+- **AC-43.4** Given History, then I can filter by Items and stock, Bills, Jobs and customers, Team and sign-in or Settings, by person, and by words, and show older lines. *(added CR-0016)*
+- **AC-43.5** Given the permission "See the history (who did what)", then the owner has it, others don't unless the owner switches it on for a role or a person; without it History isn't in the menu and the server answers 403. *(added CR-0016)*
+- **AC-43.6** Given two businesses, then each sees only its own History. *(added CR-0016)*
+- **AC-43.7** Given a time from the server, then it shows on the device's own clock, in History, on bills and in Admin. *(added CR-0016)*
+
 ### US-41: Bills, Inventory, Team and Settings at full width
 As an owner on a laptop, I want these screens to use the width, so that I see more and scroll less.
 - **AC-41.1** Given 760 px or more, then the bills table shows number and date, customer and GSTIN (or Unregistered), source (WhatsApp voice, photo or text from its job, or Counter), taxable with tax, total and status; search also finds a GSTIN. *(added CR-0015)*

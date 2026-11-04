@@ -146,3 +146,9 @@ The founder's design system. Tokens are in the first lines of `src/styles.css`; 
 - **Sign in:** a gradient panel with the white K badge, headline and three darker glass points; the card on the theme's canvas; the theme button top right.
 - **Phone first still holds:** no sideways scroll at 360 px; targets in the top bar and tab bar and + New are at least 44 px; every list keeps its own search.
 
+## Additions in CR-0016 (History)
+- **History** is in the sidebar under Manage (clock icon) and in the account menu on a phone. Tools in one panel: search, a person menu, chips for the five kinds. Then one panel with day headings (Today, Yesterday, 4 Nov 2026) and rows: avatar, the person's name in bold, what they did under it, the time at the right in mono. Show older at the end. Typing redraws only the list, so the cursor stays.
+- **Item page:** the item's own lines (Item added, Changed: ..., Stopped using) are in the same list as stock moves. Each row has its date and time, the title, then a line of its own with a small initials mark and "By <name>" (the name in the text colour, after the founder's first look found it too quiet), then any note. Item added and its opening stock are one row, here and in History.
+- **Bill page:** History is open, newest first, with the name in bold.
+- **States:** loading, nothing yet, nothing matches, could not reach the server with Try again.
+

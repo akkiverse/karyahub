@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-04 · **Branch:** `cr/0015-deep-ocean-teal` (CR-0015) · **Result:** 576 of 576 tests passing (283 server + 1 Postgres-only test skipped without its database, 293 web), covering all 232 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-04 · **Branch:** `cr/0016-history-who-did-what` (CR-0016, on CR-0015) · **Result:** 594 of 594 tests passing (290 server + 1 Postgres-only test skipped without its database, 304 web), covering all 239 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
@@ -12,6 +12,8 @@ Three suites:
 Some criteria have a test on each side (for example AC-7.2 and AC-23.1: the web app calls the API, and the server does the work). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
 Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see the spec); their old on-device tests were replaced by the tests for AC-18 to AC-22.
+
+**CR-0016** added 7 server tests (`test_us43_history.py`) and 11 web tests (`us43-history.test.js`), and changed three older tests on purpose: one more row in the role table (`us15-admin.test.js`, AC-19.1) and History in the menu lists (`us26-bills.test.js`, AC-26.2, AC-26.3).
 
 **CR-0015** added 33 web tests (`us38-deep-ocean.test.js`), changed two older tests on purpose for the new banner (AC-1.1, AC-22.2), and changed no server code. A real browser (Chrome) ran every main screen at 1440 px and 375 px in both themes, with no script errors and no sideways scrolling, and a further pass at 360 px on an emulated touch phone. Scripts also drove the theme switch, System following the device, the theme being set before the body appears, the drawer, Ctrl + K search, the − and + buttons and their history, Remind and Create GST quote on Home, and the print view from the dark theme (paper alone, on white). Not run in a real browser: a real business's data against Postgres (no server change), and a real phone.
 
@@ -460,6 +462,13 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-42.3 | `tests/us38-deep-ocean.test.js` › AC-42.3: bills and jobs without a bill show in the table… | Pass |
 | AC-42.4 | `tests/us38-deep-ocean.test.js` › AC-42.4: the switch shows a Kanban board by status… | Pass |
 | AC-42.5 | `tests/us38-deep-ocean.test.js` › AC-42.5: the checklist ticks what is really done… | Pass |
+| AC-43.1 | `tests/us43-history.test.js` › AC-43.1; `tests/api/test_us43_history.py::test_ac_43_1_item_stock_and_bill_changes_are_logged_with_the_persons_name` | Pass |
+| AC-43.2 | `tests/us43-history.test.js` › AC-43.2 (4); `test_ac_43_2_an_items_own_history_says_what_changed_and_who_changed_it`, `test_ac_43_2_a_phone_cannot_write_or_wipe_an_items_history` | Pass |
+| AC-43.3 | `tests/us43-history.test.js` › AC-43.3; `test_ac_43_3_customers_and_jobs_are_logged_too` | Pass |
+| AC-43.4 | `tests/us43-history.test.js` › AC-43.4 (3); `test_ac_43_4_filters_by_kind_person_and_words_and_pages_back` | Pass |
+| AC-43.5 | `tests/us43-history.test.js` › AC-43.5; `test_ac_43_5_only_those_allowed_see_history_and_the_owner_can_allow_it` | Pass |
+| AC-43.6 | `test_ac_43_6_each_business_sees_only_its_own_history` | Pass |
+| AC-43.7 | `tests/us43-history.test.js` › AC-43.7 | Pass |
 
 ## Design checklist
 | Check | Result |

@@ -352,7 +352,9 @@ async def sync(
                     rec = await bill_book.apply(item_id, op["body"], current)
                 else:
                     body = _clean_body(kind, item_id, op.get("body"))
+                    before = dict(current.body) if current is not None else None
                     rec = await _store(db, business_id, kind, item_id, body, current, take_seq())
+                    audits.extend(_what_changed(kind, rec, before))
                 existing[(kind, item_id)] = rec
                 result.update(status="applied", number=rec.number)
             except AppError as exc:
@@ -401,6 +403,33 @@ async def sync(
             await accounts.audit(db, business_id, p.user.name, action, text)
     await db.commit()
     return {"cursor": cursor, "more": more, "readable": kinds, "results": results, "changes": changes}
+
+
+def _what_changed(kind: str, rec: Record, before: dict[str, Any] | None) -> list[tuple[str, str]]:
+    """The History lines for customers and jobs (CR-0016). Bills, items and stock write their own."""
+    body = rec.body
+    name = str(body.get("name") or "").strip()
+    if kind == "customer":
+        if before is None:
+            return [("customer_added", f"Added customer {name}")]
+        said = []
+        if body.get("reminded_at") and body.get("reminded_at") != before.get("reminded_at"):
+            said.append(("reminder", f"Renewal reminder for {name}"))
+        if any(body.get(k) != before.get(k) for k in ("name", "phone", "address", "area", "gstin")):
+            said.append(("customer_changed", f"Changed customer {name}"))
+        return said
+    if kind == "job" and before is None:
+        return [("job_added", f"Recorded job {rec.number} for {body.get('customer_name') or 'a customer'}")]
+    return []
+
+
+async def log_job_step(
+    db: AsyncSession, business_id: str, p: accounts.Principal, number: str, what: str
+) -> None:
+    """A job's step in the History (CR-0016); the job has already been written."""
+    await db.flush()
+    await rls.unscope(db)  # the activity log is not a business-data table
+    await accounts.audit(db, business_id, p.user.name, "job_step", f"Job {number}: {what}"[:400])
 
 
 # ---------- proof of work: the server loads and saves the job ----------

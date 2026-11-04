@@ -344,6 +344,10 @@ def create_app() -> FastAPI:
                 result.event.model_dump() if result.event else None,
                 saved_otp,
             )
+            if result.event:
+                await data_service.log_job_step(
+                    db, tenant.id, who, stored.number, result.event.detail or result.event.action
+                )
             await db.commit()
         elif stored is not None:
             await db.rollback()

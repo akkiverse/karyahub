@@ -40,3 +40,30 @@ export const duration = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(
 export function escapeHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+// Times from the server have no zone and are UTC; a real business sees them on the clock of its own device (CR-0016).
+// The demo's are stamped on the device with its fixed date, so they stand as written.
+const asDate = (at, demo) => {
+  const text = String(at || '');
+  if (!text) return null;
+  const zoned = /(Z|[+-]\d\d:\d\d)$/.test(text);
+  const d = new Date(zoned || demo ? text : `${text}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const pad = (n) => String(n).padStart(2, '0');
+export const localClock = (at, demo = false) => { const d = asDate(at, demo); return d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : ''; };
+const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** Today, Yesterday or 4 Nov 2026, for the person's own calendar. */
+export function localDay(at, demo = false, today = '') {
+  const d = asDate(at, demo);
+  if (!d) return '';
+  const day = isoDay(d);
+  if (today && day === today) return 'Today';
+  if (today && Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`) === 86400000) return 'Yesterday';
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+/** The date in the app's dd-mm-yyyy, on the person's own calendar. */
+export const localDmy = (at, demo = false) => { const d = asDate(at, demo); return d ? `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}` : ''; };
+export const localStamp = (at, demo = false) => { const d = asDate(at, demo); return d ? `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}` : ''; };
+

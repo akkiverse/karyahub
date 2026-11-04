@@ -6,6 +6,8 @@
 import { today, deviceNow, deviceToday } from '../clock.js';
 import { can } from './access.js';
 import { isSynced, uid } from '../ids.js';
+import { W } from '../words.js';
+import { itemChanges } from './inventory.js';
 import { UNITS, parseQty, parseRupees, isoFromDmy, qtyText, stockOf, partsOnJob, validateItem, unitsOf, r3 } from './inventory.js';
 
 export const DENIED = "Your access doesn't include this. Ask your business owner.";
@@ -60,6 +62,11 @@ export function createStockActions({ store, currentUser = () => null }) {
     return move;
   }
 
+  // A line on the item's own history (CR-0016). The server writes its own when the change reaches it; this shows it at once.
+  const itemLine = (s, found, what) => {
+    const at = isSynced(s) ? `${new Date().toISOString().slice(0, 19)}Z` : stamp(s);
+    found.history = [...(found.history || []), { at, who: who(), what }].slice(-30);
+  };
   function saveItem(values, id = null) {
     const no = denied('manage_inventory');
     if (no) return no;
@@ -82,11 +89,14 @@ export function createStockActions({ store, currentUser = () => null }) {
         const found = s.items.find((i) => i.id === id);
         // Each unit keeps the quantity the item holds for it; the server owns it (CR-0014).
         item.sells = (item.sells || []).map((x) => ({ ...x, qty: ((found.sells || []).find((o) => o.unit === x.unit) || {}).qty || 0 }));
+        const said = itemChanges(found, item);
         Object.assign(found, item);
+        itemLine(s, found, said ? `${W.itemChanged}: ${said}` : W.itemChanged);
         return;
       }
       savedId = `it-${uid()}`;
       s.items.push({ id: savedId, qty: 0, stopped: false, ...item, sells: (item.sells || []).map((x) => ({ ...x, qty: 0 })) });
+      itemLine(s, s.items[s.items.length - 1], W.itemAdded);
       if (opening > 0) pushMove(s, { item_id: savedId, kind: 'opening', qty: opening });
       for (const o of openings) pushMove(s, { item_id: savedId, kind: 'opening', qty: o.qty, unit: o.unit });
     });
@@ -97,7 +107,7 @@ export function createStockActions({ store, currentUser = () => null }) {
     const no = denied('manage_inventory');
     if (no) return no;
     if (!store.get().items.some((i) => i.id === id)) return { error: "That item isn't in your inventory." };
-    store.update((s) => { s.items.find((i) => i.id === id).stopped = Boolean(stopped); });
+    store.update((s) => { const found = s.items.find((i) => i.id === id); found.stopped = Boolean(stopped); itemLine(s, found, stopped ? W.itemStopped : W.itemStarted); });
     return { ok: true };
   }
 

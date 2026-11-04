@@ -1,13 +1,16 @@
 import { icon } from '../ui/icons.js';
-import { escapeHtml, prettyPhone } from '../format.js';
+import { escapeHtml, prettyPhone, localStamp } from '../format.js';
+import { W } from '../words.js';
 import { roleName, initials } from '../domain/access.js';
 
+// Server times are UTC: show them on the device's own clock (CR-0016). A date with no time stays that date.
 const when = (stamp) => {
   if (!stamp) return 'Never';
   const [d, t] = String(stamp).split('T');
+  if (t) return localStamp(stamp);
   const [y, m, day] = d.split('-').map(Number);
   const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1] || '';
-  return `${day} ${month} ${y}${t ? `, ${t.slice(0, 5)}` : ''}`;
+  return `${day} ${month} ${y}`;
 };
 
 export const CSV_TEMPLATE = 'name,phone,role,pin\nAsha Menon,9876500001,technician,\nBala Iyer,9876500002,coordinator,\n';
@@ -124,7 +127,7 @@ export function admin({ ui, me }) {
     </section>
 
     <section class="panel" aria-labelledby="log-title">
-      <div class="panel-head"><h2 class="panel-title" id="log-title">Activity log</h2><span class="muted small">Latest 15</span></div>
+      <div class="panel-head"><h2 class="panel-title" id="log-title">Activity log</h2>${(me.permissions || []).includes('view_history') ? `<a class="link-arrow small" href="#/history" data-testid="full-history">${W.historyAllLink} ${icon('arrowRight', { size: 14 })}</a>` : '<span class="muted small">Latest 15</span>'}</div>
       ${(a.audit || []).length ? `<ol class="log" data-testid="access-log">${a.audit.slice(0, 15).map((l) => `<li><span class="log-when muted small">${escapeHtml(when(l.at))}</span><span><strong>${escapeHtml(l.who)}</strong> ${escapeHtml(l.text ? l.text.charAt(0).toLowerCase() + l.text.slice(1) : l.action)}</span></li>`).join('')}</ol>` : '<p class="muted">No sign-ins or team changes yet.</p>'}
     </section>
       </div>

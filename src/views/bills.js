@@ -5,7 +5,7 @@ import { escapeHtml as e, rupees, rupeesExact, localStamp } from '../format.js';
 import { W } from '../words.js';
 import { STATES, stateLabel, GST_RATES } from '../domain/tax.js';
 import {
-  billList, CHIPS, docWord, figuresOf, isBill, isV2, lookOf, numberText, saveProblem, sellerOf, statusOf, STATUS_WORDS, totalOf, LAYOUTS, COLOURS, unitText,
+  billList, CHIPS, docWord, figuresOf, isBill, isV2, lookOf, numberText, saveProblem, sellerOf, statusOf, STATUS_WORDS, totalOf, LAYOUTS, LOGO_POSITIONS, COLOURS, unitText,
 } from '../domain/bills.js';
 import { unitsOf } from '../domain/inventory.js';
 import { SAMPLES } from '../data/demo.js';
@@ -222,15 +222,18 @@ export function billPaper(doc, { business, settings = {}, sample = false, look =
   const bank = lk.bank || {};
   const cancelled = doc.status === 'cancelled';
   const place = doc.place_of_supply || c.state_code || seller.state_code;
+  const logoImg = business && business.logo_version ? `<img class="doc-logo" data-testid="doc-logo-img" alt="" src="/api/v1/business/logo?v=${e(business.logo_version)}">` : '';
+  const logoAt = lk.layout === 'receipt_80' ? 'center' : (LOGO_POSITIONS.some(([v]) => v === lk.logo_position) ? lk.logo_position : 'left'); // the receipt always centres it (CR-0019)
   const ocean = String(lk.colour).toUpperCase() === COLOURS[0]; // the default colour prints as the brand gradient (CR-0015)
   return `<article class="doc bill-paper layout-${e(lk.layout)} ${ocean ? 'is-ocean' : ''}" style="--bill-accent:${e(lk.colour)}" data-testid="bill-paper" aria-label="${e(heading)} ${e(doc.number || '')}">
     ${sample ? `<div class="watermark" data-testid="sample-mark">${W.sample}</div>` : ''}
     ${cancelled ? `<div class="stamp" data-testid="cancelled-stamp" aria-hidden="true"><span>CANCELLED</span></div><p class="notice notice-error" role="status">${W.cancelled}</p>` : ''}
+    ${logoAt === 'center' ? `<div class="doc-logo-row" data-testid="logo-centre">${logoImg}</div>` : ''}
     <header class="doc-head"><div>
-      ${business && business.logo_version ? `<img class="doc-logo" alt="" src="/api/v1/business/logo?v=${e(business.logo_version)}">` : ''}
+      ${logoAt === 'left' ? logoImg : ''}
       <p class="doc-biz">${e(seller.name)}</p>${seller.address ? `<p class="muted">${e(seller.address)}</p>` : ''}
       ${seller.gstin ? `<p class="muted">GSTIN <span data-testid="seller-gstin">${e(seller.gstin)}</span></p>` : ''}${seller.phone ? `<p class="muted">${e(seller.phone)}</p>` : ''}
-    </div><div class="doc-meta"><h2 class="doc-heading" data-testid="bill-heading">${e(heading)}</h2><p><strong data-testid="bill-number">${e(doc.number || numberText(doc))}</strong></p>
+    </div><div class="doc-meta">${logoAt === 'right' ? `<div class="doc-logo-right" data-testid="logo-right">${logoImg}</div>` : ''}<h2 class="doc-heading" data-testid="bill-heading">${e(heading)}</h2><p><strong data-testid="bill-number">${e(doc.number || numberText(doc))}</strong></p>
       <p class="muted">${W.billDate} ${ddmmyyyy(doc.date)}</p>${isBill(doc) && doc.due_date ? `<p class="muted">${doc.due_date === doc.date ? W.dueOnReceipt : `${W.dueDate} ${ddmmyyyy(doc.due_date)}`}</p>` : ''}${!isBill(doc) && doc.valid_until ? `<p class="muted">${W.validUntil} ${ddmmyyyy(doc.valid_until)}</p>` : ''}</div></header>
     ${seller.registration === 'composition' && isBill(doc) ? '<p class="muted small" data-testid="composition-line">Composition taxable person, not eligible to collect tax on supplies</p>' : ''}
     <section class="doc-to"><p class="label">Bill to</p><p><strong data-testid="bill-customer">${e(c.name || W.walkIn)}</strong></p>${c.address ? `<p class="muted">${e(c.address)}</p>` : ''}${c.gstin ? `<p class="muted">GSTIN ${e(c.gstin)}</p>` : ''}
@@ -350,6 +353,16 @@ export function setupScreen({ me, ui }) {
   </section>`;
 }
 
+/** The logo, beside the signature in Bill look (CR-0019): add, replace, remove, and where it goes. */
+function logoBlock(b, lk) {
+  const has = Boolean(b.logo_version);
+  const at = LOGO_POSITIONS.some(([v]) => v === lk.logo_position) ? lk.logo_position : 'left';
+  return `<div class="logo-field" data-testid="logo-field"><span class="logo-label">${W.logo}</span>${has ? `<img class="logo-preview" data-testid="logo-preview" alt="${W.logo}" src="/api/v1/business/logo?v=${e(b.logo_version)}">` : `<span class="muted small" data-testid="logo-hint">${W.noLogo}</span>`}
+    <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${has ? W.replaceLogo : W.addLogo}<input class="sr-only" type="file" name="logo" accept="image/png,image/jpeg,image/webp" data-action="pick-logo"></label>${has ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-logo">${W.removeLogo}</button>` : ''}</div>
+  </div>
+  ${has ? `<fieldset class="setting" data-testid="logo-position"><legend>${W.logoWhere}</legend>${LOGO_POSITIONS.map(([v, label]) => `<label class="radio"><input type="radio" name="logo_position" value="${v}" data-look-live ${at === v ? 'checked' : ''}> ${label}</label>`).join('')}<small class="muted">${W.logoReceiptNote}</small></fieldset>` : ''}`;
+}
+
 export function lookPanel({ me, ui }) {
   const b = me.business || {};
   const lk = { ...lookOf(b), ...((ui.lookForm && ui.lookForm.draft) || {}) };
@@ -371,6 +384,7 @@ export function lookPanel({ me, ui }) {
       <label class="field"><span>${W.prefix}</span><input name="prefix" maxlength="6" value="${e(lk.prefix)}" data-look-live autocapitalize="characters" ${dis}><small class="muted">${W.prefixHint}</small></label>
       <label class="field"><span>${W.dueDays}</span><input name="due_days" type="number" min="0" max="365" value="${e(lk.due_days)}" ${dis}><small class="muted">${W.dueDaysHint}</small></label>
       <label class="field"><span>${W.validDays}</span><input name="estimate_valid_days" type="number" min="1" max="365" value="${e(lk.estimate_valid_days)}" ${dis}></label>
+      ${locked ? '' : logoBlock(b, lk)}
       ${locked ? '' : `<div class="logo-field"><span class="logo-label">${W.signature}</span>${b.signature_version ? `<img class="logo-preview" alt="${W.signature}" src="/api/v1/business/signature?v=${e(b.signature_version)}">` : ''}
         <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${b.signature_version ? W.replaceSignature : W.addSignature}<input class="sr-only" type="file" accept="image/png,image/jpeg" data-action="pick-signature"></label>${b.signature_version ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-signature">${W.removeSignature}</button>` : ''}</div></div>
         <button type="submit" class="btn btn-primary">${icon('check', { size: 18 })} ${W.saveLook}</button>`}

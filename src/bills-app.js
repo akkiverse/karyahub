@@ -356,6 +356,13 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
         render();
         return true;
       }
+      case 'bill-remove-logo': {
+        const draft = lookDraft();
+        try { session.set({ ...session.get(), business: await api.removeLogo() }); ui.lookForm = { draft, notice: { text: W.logoRemoved } }; } catch (err) { ui.lookForm = { draft, notice: { text: msg(err), error: true } }; }
+        ui.focusNext = '[data-testid="look-notice"]';
+        render();
+        return true;
+      }
       case 'bill-remove-signature':
         try { session.set({ ...session.get(), business: await api.removeSignature() }); ui.lookForm = { notice: { text: W.lookSaved } }; } catch (err) { ui.lookForm = { notice: { text: msg(err), error: true } }; }
         render();
@@ -488,7 +495,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     const f = new FormData(form);
     const n = (k) => (f.get(k) === '' || f.get(k) === null ? undefined : Number(f.get(k)));
     return {
-      layout: f.get('layout'), colour: f.get('colour'), phone: f.get('phone') || '', upi_id: f.get('upi_id') || '', terms: f.get('terms') || '',
+      layout: f.get('layout'), ...(f.get('logo_position') ? { logo_position: f.get('logo_position') } : {}), colour: f.get('colour'), phone: f.get('phone') || '', upi_id: f.get('upi_id') || '', terms: f.get('terms') || '',
       prefix: f.get('prefix') || '', due_days: n('due_days'), estimate_valid_days: n('estimate_valid_days'),
       bank: { account_name: f.get('account_name') || '', account_number: f.get('account_number') || '', ifsc: f.get('ifsc') || '' },
     };
@@ -505,6 +512,21 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
       lines: [{ description: 'AC service, split 1.5 ton', qty: 1, unit: 'nos', rate: 89900, gst_rate: '18' }, { description: 'Copper pipe', qty: '2.5', unit: 'metre', rate: 25000, gst_rate: '18' }],
     };
     slot.innerHTML = billPaper(sample, { business: business(), settings: store.get().settings, sample: true, look: lk });
+  }
+  /** What is typed in the Bill look form but not saved yet, so adding a logo doesn't wipe it. */
+  function lookDraft() {
+    const form = root.querySelector('[data-form="bill-look"]');
+    return form ? lookFields(form) : undefined;
+  }
+  async function pickLogo(file, toDataUrl) {
+    if (!file) return;
+    const draft = lookDraft();
+    try {
+      session.set({ ...session.get(), business: await api.saveLogo(await toDataUrl(file)) });
+      ui.lookForm = { draft, notice: { text: W.logoSaved } };
+    } catch (err) { ui.lookForm = { draft, notice: { text: err && err.message ? msg(err) : W.logoBad, error: true } }; }
+    ui.focusNext = '[data-testid="look-notice"]';
+    render();
   }
   async function pickSignature(file) {
     if (!file) return;
@@ -531,5 +553,5 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     return null;
   }
 
-  return { onClick, onInput, onChange, onSubmit, load, fromJob, pickSignature, stop: () => timers.forEach(clearTimeout) };
+  return { onClick, onInput, onChange, onSubmit, load, fromJob, pickSignature, pickLogo, stop: () => timers.forEach(clearTimeout) };
 }

@@ -247,7 +247,9 @@ class NewBusinessRequest(BaseModel):
     name: str = Field(max_length=80)
     address: str = Field("", max_length=200)
     gstin: str = Field("", max_length=15)
-    state_code: str = Field("27", max_length=2)
+    # The admin picks a state by name and the server sets the code (CR-0019). A bare code still works.
+    state: str | None = Field(None, max_length=60)
+    state_code: str | None = Field(None, max_length=2)
     owner_name: str = Field(max_length=60)
     owner_phone: str = Field(max_length=20)
     owner_pin: str | None = Field(None, max_length=12)
@@ -271,7 +273,7 @@ async def new_business(req: NewBusinessRequest, p: PlatformAdmin, db: DbDep, set
         "name": req.name,
         "address": req.address,
         "gstin": req.gstin.strip().upper(),
-        "state_code": req.state_code,
+        "state_code": service.resolve_state(req.state, req.state_code),
     }
     business, owner, pin = await service.create_business(
         db, settings, p, fields, req.owner_name, req.owner_phone, req.owner_pin

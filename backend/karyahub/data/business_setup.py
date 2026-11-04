@@ -30,10 +30,12 @@ PACKS = {"field_service": "Field service", "trading": "Trading", "shop_counter":
 READY_PACKS = ("field_service",)  # the others say "Coming soon" (AC-26.1)
 REGISTRATION_WORDS = {"regular": "Regular", "composition": "Composition", "unregistered": "Not registered"}
 LAYOUTS = ("a4_classic", "a4_modern", "receipt_80")
+LOGO_POSITIONS = ("left", "center", "right")  # CR-0019: where the logo goes; the receipt always centres it
 # Six brand colours that keep white text and thin accents readable (WCAG AA against white).
 COLOURS = ("#0F766E", "#1D4ED8", "#4338CA", "#9F1239", "#15803D", "#334155")
 DEFAULT_LOOK: dict[str, Any] = {
     "layout": "a4_classic",
+    "logo_position": "left",  # before CR-0019 the logo was always top left
     "colour": "#0F766E",
     "phone": "",
     "bank": {"account_name": "", "account_number": "", "ifsc": ""},
@@ -126,6 +128,10 @@ def _clean_look(raw: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
     look = {**current, **{k: v for k, v in raw.items() if k in DEFAULT_LOOK and v is not None}}
     if look["layout"] not in LAYOUTS:
         raise AppError("validation_error", "Pick a layout: A4 classic, A4 modern or small receipt.", 422)
+    if look["logo_position"] not in LOGO_POSITIONS:
+        raise AppError(
+            "validation_error", "Pick where the logo goes: top left, top centre or top right.", 422
+        )
     look["colour"] = str(look["colour"]).upper()
     if look["colour"] not in COLOURS:
         raise AppError("validation_error", "Pick one of the six colours.", 422)
@@ -178,6 +184,8 @@ async def put_look(db: AsyncSession, p: accounts.Principal, raw: dict[str, Any])
     changed = [k for k in DEFAULT_LOOK if before.get(k) != look.get(k)]
     if changed:
         detail = "Changed the bill look"
+        if "logo_position" in changed:
+            detail += f"; the logo now goes at the top {look['logo_position']}".replace("center", "centre")
         if "prefix" in changed:
             detail += f"; numbers from the next bill look like {sample_number(look['prefix'])}"
         await accounts.audit(db, business.id, p.user.name, "bill_look", detail)

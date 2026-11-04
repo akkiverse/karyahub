@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fpdf import FPDF
+from PIL import Image
 
 from karyahub.data import bills
 from karyahub.domain import tax
@@ -22,6 +23,14 @@ COMPOSITION_LINE = "Composition taxable person, not eligible to collect tax on s
 
 def _pct(rate: str) -> str:
     return f"{rate}%"
+
+
+def _logo_position(look: dict[str, Any]) -> str:
+    """Where the logo goes (CR-0019). A business that never chose keeps it top left; the receipt centres it."""
+    if look.get("layout") == "receipt_80":
+        return "center"
+    position = look.get("logo_position", "left")
+    return position if position in ("left", "center", "right") else "left"
 
 
 def model(body: dict[str, Any], business_name: str, look: dict[str, Any]) -> dict[str, Any]:
@@ -119,6 +128,7 @@ def model(body: dict[str, Any], business_name: str, look: dict[str, Any]) -> dic
         "cancelled": body.get("status") == "cancelled",
         "paid": body.get("status") == "paid",
         "layout": look.get("layout", "a4_classic"),
+        "logo_position": _logo_position(look),
         "colour": look.get("colour", "#0F766E"),
     }
 
@@ -148,6 +158,7 @@ th{font-size:12px;color:var(--muted);font-weight:600}.num{text-align:right;white
 .stamp{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .stamp span{transform:rotate(-24deg);font-size:64px;font-weight:800;letter-spacing:6px;color:rgba(185,28,28,.35);border:6px solid rgba(185,28,28,.35);padding:4px 18px;border-radius:12px}
 .logo{max-height:56px;max-width:160px}.notice{text-align:center;margin-top:40px}
+.logo-row{display:flex;justify-content:center;margin-bottom:10px}.logo-right{display:flex;justify-content:flex-end;margin-bottom:6px}
 @media print{body{background:#fff}.bar{display:none}.paper{border:0}}
 """
 
@@ -181,7 +192,11 @@ def page_html(
         return escape(text, quote=False).replace('"', "&quot;")
 
     s, c = m["seller"], m["customer"]
-    logo_html = f'<img class="logo" alt="" src="{_data_url(logo)}">' if logo else ""
+    logo_img = f'<img class="logo" alt="" src="{_data_url(logo)}">' if logo else ""
+    logo_at = m["logo_position"]
+    logo_html = logo_img if logo_at == "left" else ""  # left: above the name, as it always was
+    logo_row = f'<div class="logo-row">{logo_img}</div>' if logo and logo_at == "center" else ""
+    logo_meta = f'<div class="logo-right">{logo_img}</div>' if logo and logo_at == "right" else ""
     cols = (
         ["#", "Item"]
         + (["HSN/SAC"] if m["show_hsn"] else [])
@@ -247,9 +262,9 @@ def page_html(
 <a class="btn" href="{e(pdf_href)}" download>Download PDF</a></div>
 <article class="paper" aria-label="{e(m["heading"])} {e(m["number"])}">{stamp}
 {'<p role="status"><strong>This bill is cancelled.</strong></p>' if m["cancelled"] else ""}
-<header class="head"><div>{logo_html}<p><strong>{e(s["name"])}</strong></p><p class="muted">{e(s["address"])}</p>
+{logo_row}<header class="head"><div>{logo_html}<p><strong>{e(s["name"])}</strong></p><p class="muted">{e(s["address"])}</p>
 {f"<p>GSTIN {e(s['gstin'])}</p>" if s["gstin"] else ""}{f'<p class="muted">{e(s["phone"])}</p>' if s["phone"] else ""}</div>
-<div><h1>{e(m["heading"])}</h1><p><strong>{e(m["number"])}</strong></p>{dates}</div></header>
+<div>{logo_meta}<h1>{e(m["heading"])}</h1><p><strong>{e(m["number"])}</strong></p>{dates}</div></header>
 {f'<p class="muted">{COMPOSITION_LINE}</p>' if m["composition"] else ""}
 <section class="to"><p class="muted">Bill to</p><p><strong>{e(c["name"])}</strong></p>
 {f"<p>{e(c['address'])}</p>" if c["address"] else ""}{f"<p>GSTIN {e(c['gstin'])}</p>" if c["gstin"] else ""}
@@ -279,12 +294,41 @@ class _Pdf(FPDF):
         self.c_margin = 1
 
 
-def _image(pdf: FPDF, image: tuple[str, bytes] | None, x: float, y: float, h: float) -> None:
+def _image(pdf: FPDF, image: tuple[str, bytes] | None, x: float, y: float, h: float, w: float = 0) -> None:
     if image:
         try:
-            pdf.image(io.BytesIO(image[1]), x=x, y=y, h=h)
+            pdf.image(io.BytesIO(image[1]), x=x, y=y, h=h, **({"w": w} if w else {}))
         except Exception:  # a picture fpdf2 can't read is left out rather than losing the bill
             return
+
+
+def logo_size(image: tuple[str, bytes] | None, max_h: float, max_w: float) -> tuple[float, float] | None:
+    """The logo's width and height in mm: its own proportions, at most ``max_h`` high and ``max_w`` wide (CR-0019).
+
+    None when there is no logo or the picture can't be read, so the bill is made without it.
+    """
+    if not image:
+        return None
+    try:
+        with Image.open(io.BytesIO(image[1])) as picture:
+            px_w, px_h = picture.size
+    except Exception:
+        return None
+    if px_w <= 0 or px_h <= 0:
+        return None
+    scale = min(max_h / px_h, max_w / px_w)
+    return round(px_w * scale, 2), round(px_h * scale, 2)
+
+
+def logo_place(
+    position: str, w: float, h: float, *, left: float, right: float, top: float, page_w: float
+) -> tuple[float, float]:
+    """Where the logo's top-left corner goes: against the left margin, centred on the page, or against the right."""
+    if position == "right":
+        return right - w, top
+    if position == "center":
+        return (page_w - w) / 2, top
+    return left, top
 
 
 def _cancelled_stamp(pdf: FPDF, w: float, h: float) -> None:
@@ -301,7 +345,7 @@ def pdf_bytes(
     m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple[str, bytes] | None
 ) -> bytes:
     if m["layout"] == "receipt_80":
-        return _receipt(m, signature)
+        return _receipt(m, logo, signature)
     pdf = _Pdf(format="A4")
     pdf.set_auto_page_break(True, margin=15)
     pdf.set_margins(12, 12, 12)
@@ -310,11 +354,25 @@ def pdf_bytes(
     if m["layout"] == "a4_modern":
         pdf.set_fill_color(*accent)
         pdf.rect(0, 0, 210, 4, style="F")
+        pdf.set_fill_color(
+            255, 255, 255
+        )  # the bar's colour must not stay the fill: tables would be painted with it
     s, c = m["seller"], m["customer"]
     top = pdf.get_y()
-    if logo:
-        _image(pdf, logo, 12, top, 14)
-        pdf.set_y(top + 16)
+    left_top = right_top = top  # where the name block and the heading block start
+    box = logo_size(logo, 14, 45)
+    if box:
+        w, h = box
+        x, y = logo_place(m["logo_position"], w, h, left=12, right=198, top=top, page_w=210)
+        _image(pdf, logo, x, y, h, w)
+        below = top + h + 2
+        if m["logo_position"] == "left":  # above the name, as it always was
+            left_top = below
+        elif m["logo_position"] == "center":  # a row of its own: both blocks start under it
+            left_top = right_top = below
+        else:  # right: above the bill heading
+            right_top = below
+    pdf.set_y(left_top)
     pdf.set_font("Noto", "B", 13)
     pdf.cell(110, 6, s["name"], new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Noto", size=9)
@@ -322,7 +380,7 @@ def pdf_bytes(
         if text:
             pdf.multi_cell(110, 4.5, text, new_x="LMARGIN", new_y="NEXT")
     left_end = pdf.get_y()
-    pdf.set_xy(130, top)
+    pdf.set_xy(130, right_top)
     pdf.set_text_color(*accent)
     pdf.set_font("Noto", "B", 16)
     pdf.cell(68, 8, m["heading"], align="R", new_x="LEFT", new_y="NEXT")
@@ -447,8 +505,15 @@ def _headings(accent: tuple[int, int, int]) -> Any:
     return FontFace(emphasis="BOLD", color=accent)
 
 
-def _receipt(m: dict[str, Any], signature: tuple[str, bytes] | None) -> bytes:
-    height = 120 + 9 * len(m["rows"]) + 5 * len(m["total_rows"]) + 5 * len(m["summary"])
+def _receipt(m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple[str, bytes] | None) -> bytes:
+    box = logo_size(logo, 12, 40)
+    height = (
+        120
+        + 9 * len(m["rows"])
+        + 5 * len(m["total_rows"])
+        + 5 * len(m["summary"])
+        + (box[1] + 3 if box else 0)
+    )
     pdf = _Pdf(format=(80, height))
     pdf.set_auto_page_break(False)
     pdf.set_margins(4, 4, 4)
@@ -461,6 +526,10 @@ def _receipt(m: dict[str, Any], signature: tuple[str, bytes] | None) -> bytes:
             pdf.set_font("Noto", "B" if bold else "", size)
             pdf.multi_cell(w, 3.8, text, align=align, new_x="LMARGIN", new_y="NEXT")
 
+    if box:  # the receipt's column is centred, so is the logo (CR-0019: it was left out of this PDF before)
+        x, y = logo_place("center", box[0], box[1], left=4, right=76, top=pdf.get_y(), page_w=80)
+        _image(pdf, logo, x, y, box[1], box[0])
+        pdf.set_y(y + box[1] + 2)
     line(s["name"], bold=True, size=10)
     line(s["address"])
     line(f"GSTIN {s['gstin']}" if s["gstin"] else "")

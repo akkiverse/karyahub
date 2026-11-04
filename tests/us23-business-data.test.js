@@ -195,7 +195,7 @@ describe('US-23 Business data on the server', () => {
     expect(t.app.store.get().jobs).toHaveLength(1);
   });
 
-  it('AC-23.11: the owner adds a logo in Settings, it shows on documents, and can be removed', async () => {
+  it('AC-23.11 (moved to Bill look, CR-0019): the owner adds a logo in Settings, it shows on documents, and can be removed', async () => {
     const api = fakeApi();
     const logoImage = vi.fn(async () => PNG_URL);
     t = open({ api, hash: '#/settings', logoImage });
@@ -207,12 +207,12 @@ describe('US-23 Business data on the server', () => {
     expect(logoImage).toHaveBeenCalled();
     expect(api.server.logo).toBe(PNG_URL);
     expect(t.$('[data-testid="logo-preview"]').getAttribute('src')).toBe('/api/v1/business/logo?v=abc123def456');
-    expect(t.$('[data-testid="profile-notice"]').textContent).toContain('logo now shows on your quotes');
+    expect(t.$('[data-testid="look-notice"]').textContent).toContain('logo now shows on your estimates and bills');
     t.app.store.update((s) => { s.documents.unshift({ id: 'd-y', number: 'QT-2027-0001', job_id: 'j', type: 'quote', customer: { name: 'Ramesh Sharma', phone: '9822200010', area: '' }, lines: [], subtotal: 0, cgst: 0, sgst: 0, total: 0, roundOff: 0, invalid: 0, date: '2027-01-01' }); }, { remote: true });
     t.go('#/doc/d-y');
     expect(t.$('[data-testid="doc-logo"]').getAttribute('src')).toContain('/api/v1/business/logo?v=abc123def456');
     t.go('#/settings');
-    t.$('[data-action="remove-logo"]').click();
+    t.$('[data-action="bill-remove-logo"]').click();
     await until(() => t.$('[data-testid="logo-field"]')?.textContent.includes('No logo yet'));
     expect(api.server.logo).toBe('');
   });

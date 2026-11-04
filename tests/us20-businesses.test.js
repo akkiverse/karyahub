@@ -34,7 +34,7 @@ describe('US-20 Businesses (platform admin screens, CR-0005)', () => {
     expect(t.$('[data-testid="issued-pin"]').textContent).toBe('305917');
     expect(t.$('[data-testid="biz-credentials"]').textContent).toContain('Ravi Kale');
     expect(t.$$('[data-testid="business-list"] .member')).toHaveLength(3);
-    expect(calls('createBusiness')[0].args[0]).toMatchObject({ name: 'Cool Breeze', owner_name: 'Ravi Kale', state_code: '27' });
+    expect(calls('createBusiness')[0].args[0]).toMatchObject({ name: 'Cool Breeze', owner_name: 'Ravi Kale', state: 'Maharashtra' });
     t.click('[data-action="dismiss-issued"]');
     expect(t.$('[data-testid="biz-credentials"]')).toBeNull();
   });

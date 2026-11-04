@@ -224,7 +224,7 @@ As an owner I want my firm's customers, jobs, quotes, invoices and chat kept on 
 - **AC-23.8** Given I sign in to a real business, then the data on screen comes from the server (the phone keeps only a copy); the first time, what the phone already held is moved with a notice saying how many items, nothing is moved twice, and the demo business never syncs and stays on the device. *(added CR-0009)*
 - **AC-23.9** Given there is no signal, then I can still approve jobs, make quotes and invoices and write in Chat; the changes are saved on the phone first and queued, the screen says how many are waiting, and when the signal returns they are sent once each, in order, even if the app was closed and reopened in between. *(added CR-0009)*
 - **AC-23.10** Given the server answers late, fails or is unreachable, then the queue is kept and tried again with growing waits, nothing typed is lost, and a change the server rejects is shown with its reason instead of being retried forever. *(added CR-0009)*
-- **AC-23.11** Given I'm the owner, then Settings lets me change the business name, address and GSTIN (saved on the server) and add, replace or remove a logo (PNG, JPEG or WebP, up to 200 KB); the logo shows in Settings and on quotes and invoices for my business's people only, is not served to other businesses or to anyone signed out, and each change is in the activity log. *(added CR-0009)*
+- **AC-23.11** Given I'm the owner, then Settings lets me change the business name, address and GSTIN (saved on the server) and add, replace or remove a logo (PNG, JPEG or WebP, up to 200 KB); the logo shows in Settings and on quotes and invoices for my business's people only, is not served to other businesses or to anyone signed out, and each change is in the activity log. *(added CR-0009)* *(changed CR-0019: the logo now sits in Settings → Bill look beside the signature, see AC-50.1)*
 - **AC-23.12** Given the demo business, then the server refuses to sync or import for it (its data stays on the device), so visitors never see each other's demo work. *(added CR-0009)*
 
 ### US-24: Chat works and AI is smooth
@@ -419,6 +419,24 @@ As an owner on a laptop, I want these screens to use the width, so that I see mo
 - **AC-41.3** Given I manage inventory, then each stocked item's row has − and + beside its quantity with the low level under it; each press is an ordinary stock move of one main unit, in the item's history; − is off with nothing in stock; without the permission, or for a service or stopped item, there are no buttons. *(added CR-0015)*
 - **AC-41.4** Given Admin from 1100 px, then the team and the add forms are on the left (5 of 12 columns), the roles and activity log on the right (7). *(added CR-0015)*
 - **AC-41.5** Given Settings from 1100 px, then the forms are on the left (6 of 12), and the live paper stays in view in its own column on the right (6). *(added CR-0015)*
+
+### US-50: The logo, and where it goes on a bill
+As a business owner, I want to add my logo next to my signature in Settings and choose where it goes on my bills, so that my estimates and bills look like mine, on the screen, the link and the PDF.
+- **AC-50.1** Given I may change settings, then the logo (add, replace, remove; the same picture rules as AC-23.11) sits in Settings → Bill look beside the signature, and no longer under Business details. Adding or removing it keeps what I have typed in the form but not saved. *(added CR-0019)*
+- **AC-50.2** Given a logo exists, then Bill look asks "Where should the logo go?" with Top left (above the business name), Top centre and Top right; the live paper preview moves the logo as I choose, and Save bill look keeps it. *(added CR-0019)*
+- **AC-50.3** Given no logo exists, then the question is not shown and a hint says to add a logo first. *(added CR-0019)*
+- **AC-50.4** Given a bill or estimate on the screen or its public link, then the logo is in the chosen place: left is above the business name, as it always was; centre is a centred row above the header; right is above the bill heading at the right edge. On A4 modern the logo sits on a white chip so a dark logo stays readable on the coloured header. *(added CR-0019)*
+- **AC-50.5** Given the PDF of an A4 classic or A4 modern bill, then the logo is in the chosen place, keeps its own proportions (at most 14 mm high and 45 mm wide), nothing is printed over it, and the PDF stays under 300 KB (AC-30.4). *(added CR-0019)*
+- **AC-50.6** Given the small receipt (80 mm), then the logo is always centred at the top, whatever was chosen, on the screen, the link and now also the PDF (it was left out of the receipt PDF before). *(added CR-0019)*
+- **AC-50.7** Given a business that saved its look before this change, then its logo stays top left and its bills do not change. Given a position other than left, centre or right, then the server answers 422; the change is logged in History. *(added CR-0019)*
+- **AC-50.8** Given the PDF of an A4 modern bill, then only the thin bar at the top of the page is painted in the brand colour; the item table and tax summary are on white with brand-coloured headings (they were painted solid before). *(added CR-0019, a fix)*
+
+### US-51: Pick the state by name when adding a business
+As the platform admin, I want to pick the state by name when I add a business, and have KaryaHub set the state code itself, so that I never have to know or type a GST state code.
+- **AC-51.1** Given Businesses → Add a business, then the form asks for "State" as a list of state and union territory names (no code box, no digits), with Maharashtra chosen first, and it keeps the chosen state after a refused attempt. *(added CR-0019)*
+- **AC-51.2** Given I pick a state, when the business is created, then the server sets the state code from the name (Karnataka gives 29) and returns it; the business's bills use it as their own state. *(added CR-0019)*
+- **AC-51.3** Given a state name that is not on the list, then the server answers 422 "Pick a state from the list." and no business is made. *(added CR-0019)*
+- **AC-51.4** Given an older request that sends only a state code, then it still works when the code is on the list and is refused (422) when it is not; given a name and a code, the name wins; given neither, the state is Maharashtra (27) as before. *(added CR-0019)*
 
 > **Planned, not built (CR-0018, Phase Alpha, v0.12.0).** US-44 to US-49 are approved. Their criteria become named tests when the build lands; until then no test exists for them. Background: [PHASE-ALPHA.md](../product/PHASE-ALPHA.md).
 

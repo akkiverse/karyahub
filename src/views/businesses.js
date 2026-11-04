@@ -1,5 +1,9 @@
 import { icon } from '../ui/icons.js';
 import { escapeHtml, prettyPhone } from '../format.js';
+import { STATES } from '../domain/tax.js';
+
+const STATE_NAMES = Object.values(STATES).sort((a, b) => a.localeCompare(b));
+const DEFAULT_STATE = 'Maharashtra';
 
 function field(name, label, value, extra = '') {
   return `<label class="field"><span>${label}</span><input name="${name}" value="${escapeHtml(value || '')}" ${extra}></label>`;
@@ -42,7 +46,7 @@ export function businesses({ ui }) {
           ${field('name', 'Business name', form.name, 'autocomplete="off"')}
           ${field('address', 'Address (optional)', form.address, 'autocomplete="off"')}
           ${field('gstin', 'GSTIN (optional)', form.gstin, 'autocomplete="off" maxlength="15"')}
-          ${field('state_code', 'State code', form.state_code || '27', 'inputmode="numeric" maxlength="2"')}
+          <label class="field"><span>State</span><select name="state" data-testid="biz-state">${STATE_NAMES.map((n) => `<option value="${escapeHtml(n)}" ${(form.state || DEFAULT_STATE) === n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>
         </div>
         <h3 class="section-title">First owner</h3>
         <div class="form-grid">

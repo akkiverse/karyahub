@@ -5,7 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **Your logo, beside the signature, with its place on the bill.** In Settings → Bill look the owner adds the logo and chooses where it goes: top left, top centre or top right. The preview, the bill page, the link and the PDF follow the choice; the small receipt always centres it and its PDF now shows the logo. Businesses that never chose keep it top left. See [CR-0019](docs/changes/CR-0019-setup-logo-and-state.md).
+- **Add a business asks for the state by name.** The platform admin picks a state from a list and KaryaHub sets the GST state code itself.
+
+### Changed
+- The logo moved from Business details to Bill look. `POST /api/v1/platform/businesses` accepts `state` (a name); a bare `state_code` still works when it is on the list.
+
 ### Fixed
+- **A4 modern PDFs** no longer paint the item table and tax summary solid in the brand colour (it made the table hard to read).
 - **Add a business** on Businesses no longer opens "You don't have access to Home" for the platform admin; it takes you to the form. Links to a place on the same page, like Skip to content, also stay on the page. See [CR-0017](docs/changes/CR-0017-add-business-link.md).
 
 ## [0.11.0] - 2026-11-04

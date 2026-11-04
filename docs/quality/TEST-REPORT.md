@@ -237,7 +237,7 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-23.8 | `tests/us23-business-data.test.js` › AC-23.7 and AC-23.8: what was on this phone before is moved to the server once, with a notice, and not again | Pass |
 | AC-23.9 | `tests/us23-business-data.test.js` › AC-23.9: changes made with no signal are kept on the phone, counted on screen, and sent once when it returns, even after the app was closed | Pass |
 | AC-23.10 | `tests/us23-business-data.test.js` › AC-23.10: a server fault keeps the queue and tries again; a refused change is shown with its reason and the server version is put back | Pass |
-| AC-23.11 | `tests/us23-business-data.test.js` › AC-23.11: the owner adds a logo in Settings, it shows on documents, and can be removed | Pass |
+| AC-23.11 | `tests/us23-business-data.test.js` › AC-23.11 (moved to Bill look, CR-0019): the owner adds a logo in Settings, it shows on documents, and can be removed | Pass |
 | AC-23.11 | `tests/us23-business-data.test.js` › AC-23.11: the demo business has no logo controls | Pass |
 | AC-23.11 | `tests/api/test_us23_business_data.py::test_ac_23_11_the_owner_adds_a_logo_and_only_that_business_can_see_it` (PNG, JPEG or WebP up to 200 KB; served to the business's people only; each change is logged.) | Pass |
 | AC-23.11 | `tests/api/test_us23_business_data.py::test_ac_23_11_a_logo_must_be_a_small_real_picture` (wrong type, broken text, a different file type inside, too big, or a link are all refused.) | Pass |
@@ -471,6 +471,18 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-43.5 | `tests/us43-history.test.js` › AC-43.5; `test_ac_43_5_only_those_allowed_see_history_and_the_owner_can_allow_it` | Pass |
 | AC-43.6 | `test_ac_43_6_each_business_sees_only_its_own_history` | Pass |
 | AC-43.7 | `tests/us43-history.test.js` › AC-43.7 | Pass |
+| AC-50.1 | `tests/us50-logo-placement.test.js` › AC-50.1: the logo sits in Bill look beside the signature, not under Business details | Pass |
+| AC-50.2 | `tests/us50-logo-placement.test.js` › AC-50.2: the owner is asked where the logo goes, the preview moves it, and Save keeps it; adding a logo keeps what was typed | Pass |
+| AC-50.3 | `tests/us50-logo-placement.test.js` › AC-50.3: with no logo there is no placement question, only a hint | Pass |
+| AC-50.4 | `tests/us50-logo-placement.test.js` › AC-50.4 (paper: left, centre, right; A4 modern chip); `tests/api/test_us50_logo_placement.py::test_ac_50_4_the_bill_page_puts_the_logo_where_the_look_says` | Pass |
+| AC-50.5 | `tests/api/test_us50_logo_placement.py::test_ac_50_5_the_pdf_puts_the_logo_where_the_look_says` (position measured in the PDF; name or heading starts below it), `::test_ac_50_5_a_very_wide_or_tall_logo_is_kept_inside_its_box` | Pass |
+| AC-50.6 | `tests/us50-logo-placement.test.js` › AC-50.6 (screen); `tests/api/test_us50_logo_placement.py::test_ac_50_6_the_receipt_pdf_centres_the_logo_at_the_top` | Pass |
+| AC-50.7 | `tests/us50-logo-placement.test.js` › AC-50.7; `tests/api/test_us50_logo_placement.py::test_ac_50_7_an_old_look_keeps_the_logo_top_left_and_a_bad_value_is_refused` | Pass |
+| AC-50.8 | `tests/api/test_us50_logo_placement.py::test_ac_30_4_a4_modern_pdf_paints_only_its_top_bar_in_the_brand_colour` (fails without the fix) | Pass |
+| AC-51.1 | `tests/us50-logo-placement.test.js` › AC-51.1 (names only, no code box, Maharashtra first), AC-51.2 (state kept after a refusal) | Pass |
+| AC-51.2 | `tests/us50-logo-placement.test.js` › AC-51.2: the chosen state name is sent, and no code is; `tests/api/test_us50_logo_placement.py::test_ac_51_2_the_server_sets_the_state_code_from_the_state_name` | Pass |
+| AC-51.3 | `tests/api/test_us50_logo_placement.py::test_ac_51_3_a_state_that_is_not_on_the_list_is_refused` | Pass |
+| AC-51.4 | `tests/api/test_us50_logo_placement.py::test_ac_51_4_a_bare_code_still_works_when_listed_and_neither_means_maharashtra` | Pass |
 
 ## Design checklist
 | Check | Result |

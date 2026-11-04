@@ -10,9 +10,10 @@ import { unitsOf } from './inventory.js';
 export const DOC_VERSION = 2;
 export const BIG_BILL = 5_000_000; // ₹50,000 in paise (AC-27.8)
 export const DEFAULT_LOOK = {
-  layout: 'a4_classic', colour: '#0F766E', phone: '', bank: { account_name: '', account_number: '', ifsc: '' },
+  layout: 'a4_classic', logo_position: 'left', colour: '#0F766E', phone: '', bank: { account_name: '', account_number: '', ifsc: '' },
   upi_id: '', terms: '', prefix: '', due_days: 0, estimate_valid_days: 15,
 };
+export const LOGO_POSITIONS = [['left', W.logoLeft], ['center', W.logoCentre], ['right', W.logoRight]];
 export const COLOURS = ['#0F766E', '#1D4ED8', '#4338CA', '#9F1239', '#15803D', '#334155'];
 export const LAYOUTS = [['a4_classic', W.layoutClassic], ['a4_modern', W.layoutModern], ['receipt_80', W.layoutReceipt]];
 

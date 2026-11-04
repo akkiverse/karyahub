@@ -664,6 +664,11 @@ summary.demo-accounts-title { cursor: pointer; min-height: 44px; display: flex; 
 .logo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .logo-actions label:focus-within { outline: 3px solid var(--c-focus); outline-offset: 2px; }
 .doc-logo { max-width: 120px; max-height: 64px; object-fit: contain; display: block; margin-bottom: 6px; }
+/* Where the logo goes (CR-0019): left is inside the name block (above), centre is a row of its own, right sits above the heading. */
+.doc-logo-row { display: flex; justify-content: center; margin-bottom: 10px; }
+.doc-logo-right { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.doc-logo-row .doc-logo, .doc-logo-right .doc-logo { margin-bottom: 0; }
+.bill-paper.layout-a4_modern .doc-head .doc-logo { background: #FFFFFF; border-radius: 8px; padding: 4px; }
 
 /* ---- Inventory (CR-0011): list, item, history, sheets, CSV import, parts used on a job ---- */
 .inv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

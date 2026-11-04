@@ -4,6 +4,7 @@
 import { compute, TaxInputError, gstinOk, STATES } from './tax.js';
 import { uid } from '../ids.js';
 import { W } from '../words.js';
+import { billName } from './fields.js';
 
 export const DOC_VERSION = 2;
 export const BIG_BILL = 5_000_000; // ₹50,000 in paise (AC-27.8)
@@ -116,9 +117,11 @@ export function lastPrice(documents, customer, itemId) {
   }
   return null;
 }
-export function lineFromItem(item, price = null) {
+/** A bill line from an item. With the on-device copy, the item's on-bill details join its name and a unit of the business's own prints by its name (CR-0013). */
+export function lineFromItem(item, price = null, state = null) {
+  const own = state && (state.units || []).find((u) => u.id === item.unit);
   return {
-    item_id: item.id, description: item.name, hsn: item.hsn || '', qty: 1, unit: item.unit, rate: price ?? item.sale ?? 0,
+    item_id: item.id, description: state ? billName(state, item) : item.name, hsn: item.hsn || '', qty: 1, unit: own ? own.name : item.unit, rate: price ?? item.sale ?? 0,
     gst_rate: String(item.gst ?? 18), price_includes_gst: Boolean(item.price_includes_gst), discount: null,
     from_job_parts: false, last_price: price !== null,
   };

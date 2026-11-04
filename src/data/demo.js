@@ -110,7 +110,7 @@ export const WELCOME_MESSAGE = {
   body: `Namaste! I'm KaryaHub, CoolCare AC Services' job assistant. ${WELCOME_TEXT}`,
 };
 
-export const DATA_VERSION = 5; // 4: staff and the access log moved to the server (CR-0005); 5: inventory (CR-0011)
+export const DATA_VERSION = 6; // 4: staff and the access log moved to the server (CR-0005); 5: inventory (CR-0011); 6: item fields, lists and units (CR-0013)
 
 // Sample inventory for the demo business only. Prices are in paise. It stays on the device and never syncs.
 const item = (id, code, name, unit, qty, low, sale, cost, hsn, gst = 18) => ({ id, code, name, unit, qty, low, sale: sale * 100, cost: cost == null ? null : cost * 100, hsn: hsn || '', gst, stopped: false });
@@ -145,6 +145,9 @@ export function demoState() {
     messages: [{ ...WELCOME_MESSAGE }],
     items: DEMO_ITEMS.map((i) => ({ ...i })),
     stock_moves: demoMoves(),
+    item_fields: [],
+    list_entries: [],
+    units: [],
     seq: { ...SEQ },
   };
 }
@@ -163,6 +166,9 @@ export function emptyState(business) {
     messages: [welcomeMessage(business.name)],
     items: [],
     stock_moves: [],
+    item_fields: [],
+    list_entries: [],
+    units: [],
     seq: { ...SEQ },
   };
 }

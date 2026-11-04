@@ -553,7 +553,7 @@ describe('US-25 Inventory per business: data saved by earlier versions', () => {
   it('AC-25.19: data saved by v0.6.0 (version 4) loads with no items, keeps its jobs, and nothing is put into stock from their parts text', () => {
     const v4 = { version: 4, settings: { business_name: 'Shree Cool AC', is_demo: false, mode: 'server', theme: 'system' }, customers: [], jobs: [{ id: 'j1', customer_name: 'A', parts: 'R32 gas 1 kg', lines: [], state: 'WORK_DONE' }], documents: [], messages: [], seq: {} };
     const s = migrate(v4);
-    expect(s.version).toBe(5);
+    expect(s.version).toBe(6);
     expect(s.items).toEqual([]);
     expect(s.stock_moves).toEqual([]);
     expect(s.jobs[0].parts).toBe('R32 gas 1 kg');

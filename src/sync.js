@@ -10,8 +10,9 @@ import { nowStamp } from './clock.js';
 import { uid } from './ids.js';
 
 const LEGACY_KINDS = [['customer', 'customers'], ['job', 'jobs'], ['document', 'documents'], ['message', 'messages']];
-// Inventory (CR-0011): items, and stock moves that are never changed once made.
-const KINDS = [...LEGACY_KINDS, ['item', 'items'], ['stock_move', 'stock_moves']];
+// Inventory (CR-0011): items, and stock moves that are never changed once made. The business's own item fields, list
+// entries and units (CR-0013) come first, so a change that creates an entry reaches the server before the item that points to it.
+const KINDS = [...LEGACY_KINDS, ['item_field', 'item_fields'], ['list_entry', 'list_entries'], ['unit', 'units'], ['item', 'items'], ['stock_move', 'stock_moves']];
 const COLLECTION = Object.fromEntries(KINDS);
 const MAX_OPS = 100;
 const LOCAL_ONLY = new Set(['m-welcome']); // the greeting every device draws for itself

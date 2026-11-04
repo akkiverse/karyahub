@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **Your own item details, lists and units.** See [CR-0013](docs/changes/CR-0013-own-fields-and-units.md) and [ADR-0017](docs/adr/0017-own-item-fields-lists-and-units-as-records.md).
+- **Item details** (Inventory → Item details): the owner adds details such as Brand, Material type, Size or Colour (text, number or pick-list; needed, show in the list, filter, print on bills), renames and stops them; a starter set for the kind of business is one tap; up to 15 in use.
+- **Lists:** staff who manage inventory add brands and the like on that screen or by typing a new one on the item form; renaming an entry changes every item; a name added twice (two phones, no signal) is kept once.
+- **Units of your own** (Coil, Box, Dozen), with a whole-number rule each, made on the Item details screen or on the item form ("New unit…").
+- The inventory list shows the chosen details, searches by any detail and filters by a brand; the item page lists all details; details marked "print on bills" join the bill line's name.
+- **CSV with your own columns:** the template follows your details; Check names the entries and units the file would add, the columns it won't import and a likely typo; files of more than 500 rows are sent in parts.
+- A plain warning when the phone is nearly full or refuses to keep a save.
+
+### Changed
+- A unit like "box" in a CSV file is added to your units instead of refusing the row; a unit that is a number is still a problem.
+- On-device data version 6 (details, entries and units start empty; nothing is lost).
+
+### Fixed
+- The checkboxes "Price includes GST" and "Service, no stock" on the item form could not be seen.
+
 ## [0.8.0] - 2026-11-04
 
 ### Added

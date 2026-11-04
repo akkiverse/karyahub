@@ -772,3 +772,24 @@ summary.demo-accounts-title { cursor: pointer; min-height: 44px; display: flex; 
 .more-list { display: grid; gap: 6px; margin-top: 8px; padding: 8px; border: 1px solid var(--c-line); border-radius: 12px; background: var(--c-surface); }
 .more-list .btn { justify-content: flex-start; }
 .page-head .segs { justify-self: start; width: max-content; }
+
+/* Item details, lists and units (CR-0013) */
+.check-line { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 600; cursor: pointer; }
+.check-line input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--c-brand); }
+.check-row { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 4px 0 12px; }
+.field-form { display: grid; gap: 10px; }
+.field-form h3 { margin: 0; font-size: 1rem; }
+tr.is-stopped td { opacity: 0.65; }
+.entries { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 8px 12px; border: 1px solid var(--c-line); border-radius: 10px; min-height: 44px; }
+.entry.is-stopped { opacity: 0.7; }
+.entry-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.entry-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+.entry-form input:not([type="checkbox"]) { flex: 1 1 160px; min-width: 0; }
+.inline-add { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.inline-add .field { flex: 1 1 200px; margin: 0; }
+.starters { display: grid; justify-items: start; gap: 8px; margin-top: 12px; }
+.new-unit { grid-column: 1 / -1; display: grid; gap: 8px; }
+.inv-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.inv-filters:empty { display: none; }
+.inv-filter select { min-height: 44px; border: 1px solid var(--c-line); border-radius: 8px; padding: 0 10px; background: var(--c-surface); color: var(--c-ink); font: inherit; font-weight: 500; max-width: 100%; }

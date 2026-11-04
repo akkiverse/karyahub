@@ -10,6 +10,7 @@ import { FALLBACK_NOTE } from '../adapters/server.js';
 import { can, ACTION_PERMISSION, roleShort } from './access.js';
 import { isSynced, uid } from '../ids.js';
 import { createStockActions } from './stock.js';
+import { createFieldActions } from './field-actions.js';
 import { partLines } from './inventory.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -329,6 +330,7 @@ export function createActions({ store, getAdapters, stepDelay, api, currentUser 
 
   // Inventory: items, stock moves and parts taken for a job (CR-0011).
   const stock = createStockActions({ store, currentUser });
+  const fields = createFieldActions({ store, currentUser });
 
-  return { stock, send, retry, stop, approve, createDocument, updateDocumentLine, sendReminder, transition, amcPlan, setSetting, reset: () => store.reset(), isBusy: () => busy };
+  return { stock, fields, send, retry, stop, approve, createDocument, updateDocumentLine, sendReminder, transition, amcPlan, setSetting, reset: () => store.reset(), isBusy: () => busy };
 }

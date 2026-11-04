@@ -6,6 +6,7 @@
 // Jobs, documents, chat and reminders are untouched.
 // v4 -> v5 (CR-0011): inventory. Nothing is made up from old jobs' parts text: a business starts with no items,
 // and the demo business gets its sample stock the next time it is reset.
+// v5 -> v6 (CR-0013): item fields, list entries and units start empty.
 
 const DEMO_TEAM_PLACEHOLDER = [];
 
@@ -43,5 +44,9 @@ export function migrate(saved) {
   if (s.version === 4) {
     s = { ...s, version: 5, items: s.items || [], stock_moves: s.stock_moves || [] };
   }
-  return s.version === 5 ? s : null;
+  if (s.version === 5) {
+    // v5 -> v6 (CR-0013): a business's own item fields, list entries and units. Items made before have no details.
+    s = { ...s, version: 6, item_fields: s.item_fields || [], list_entries: s.list_entries || [], units: s.units || [] };
+  }
+  return s.version === 6 ? s : null;
 }

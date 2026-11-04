@@ -7,14 +7,27 @@ import { isSynced } from '../ids.js';
 import { deviceToday, today } from '../clock.js';
 import {
   UNITS, UNIT_NAMES, GST_RATES, MOVE_LABELS, qtyText, signedText, stockOf, markOf, markText, summary, listItems, historyOf,
-  matches, nameOf, parseQty, dmy, r3,
+  matches, nameOf, parseQty, dmy, r3, pickableUnits,
 } from '../domain/inventory.js';
+import { activeFields, pickable, detailsLine, detailOf } from '../domain/fields.js';
 
 const e = escapeHtml;
 const price = (paise) => (paise == null ? '—' : paise % 100 === 0 ? rupees(paise / 100) : rupeesExact(paise / 100));
 const SAMPLE_NOTE = 'Sample stock for the demo. It stays on this device.';
 export const CSV_COLUMNS = ['code', 'name', 'unit', 'sale_price', 'cost_price', 'hsn', 'gst_rate', 'low_stock_at', 'opening_stock'];
-export const CSV_TEMPLATE = `${CSV_COLUMNS.join(',')}\nCAP-35,Capacitor 35 µF,nos,380,170,8532,18,5,10\n`;
+/** The business's own template (CR-0013): code, name, then a column for each of its item details, then the rest. */
+export function csvColumns(state) {
+  return ['code', 'name', ...activeFields(state).map((f) => f.name), ...CSV_COLUMNS.slice(2)];
+}
+const csvCell = (t) => (/[",\n]/.test(t) ? `"${String(t).replace(/"/g, '""')}"` : String(t));
+export function csvTemplate(state) {
+  const fields = activeFields(state);
+  const sample = fields.map((f) => (f.type === 'list' ? (pickable(state, f.id)[0] || { name: 'Example' }).name : f.type === 'number' ? '1' : 'Example'));
+  const head = csvColumns(state).map(csvCell).join(',');
+  const row = ['CAP-35', 'Capacitor 35 µF', ...sample.map(csvCell), 'nos', '380', '170', '8532', '18', '5', '10'].join(',');
+  return `${head}\n${row}\n`;
+}
+export const CSV_TEMPLATE = csvTemplate({ item_fields: [] });
 
 function markHtml(state, item) {
   if (item.service) return `<span class="mark mark-service" data-testid="mark">${W.service}</span>`; // CR-0012: never counted
@@ -42,9 +55,15 @@ export function chipsHtml(state, ui) {
   const chip = (k, label, n) => `<button type="button" class="chip ${f === k ? 'is-on' : ''}" aria-pressed="${f === k}" data-action="inv-filter" data-filter="${k}">${label} <span class="muted">${n}</span></button>`;
   return chip('all', 'All', c.all) + chip('low', 'Low', c.low) + chip('out', 'Out', c.out) + chip('stopped', 'Stopped', c.stopped);
 }
+/** A pick for each pick-list the owner marked as a filter (CR-0013). */
+export function filtersHtml(state, ui) {
+  const picked = (ui.inv && ui.inv.f) || {};
+  return activeFields(state).filter((f) => f.type === 'list' && f.in_filter).map((f) => `<label class="inv-filter"><span class="sr-label">${e(f.name)}</span><select data-inv-filter="${e(f.id)}" aria-label="${e(f.name)}"><option value="">All ${e(f.name.toLowerCase())}s</option>${pickable(state, f.id).map((x) => `<option value="${e(x.id)}" ${picked[f.id] === x.id ? 'selected' : ''}>${e(x.name)}</option>`).join('')}</select></label>`).join('');
+}
 export function resultsHtml(state, ui, allow) {
   const inv = ui.inv || {};
-  const rows = listItems(state, { filter: inv.filter || 'all', q: inv.q || '' });
+  const rows = listItems(state, { filter: inv.filter || 'all', q: inv.q || '', f: inv.f || {} });
+  const shown = activeFields(state).filter((f) => f.in_list);
   const manage = allow('manage_inventory');
   if (!rows.length) {
     const q = String(inv.q || '').trim();
@@ -52,10 +71,10 @@ export function resultsHtml(state, ui, allow) {
     return `<div class="empty" data-testid="inv-empty">${icon('search', { size: 28 })}<p>${e(text)}</p>${manage ? `<button type="button" class="btn btn-secondary" data-action="inv-add" data-name="${e(q)}">${icon('plus', { size: 18 })} Add ${q ? `“${e(q)}”` : 'an item'}</button>` : ''}</div>`;
   }
   const href = (i) => `#/inventory/item/${encodeURIComponent(i.id)}`;
-  const cards = rows.map((i) => `<li class="row-card inv-card" data-item="${e(i.id)}"><a href="${href(i)}"><span class="row-main"><strong>${e(i.name)}</strong><span class="code">${e(i.code || 'No code')} · ${UNITS[i.unit]}${i.stopped ? ' · stopped' : ''}</span></span><span class="inv-card-side">${qtyHtml(state, i)}${markHtml(state, i)}</span></a></li>`).join('');
+  const cards = rows.map((i) => `<li class="row-card inv-card" data-item="${e(i.id)}"><a href="${href(i)}"><span class="row-main"><strong>${e(i.name)}</strong><span class="code">${e(i.code || 'No code')} · ${UNITS[i.unit]}${i.stopped ? ' · stopped' : ''}</span>${shown.length && detailsLine(state, i, 'in_list') ? `<span class="muted small" data-testid="card-details">${e(detailsLine(state, i, 'in_list'))}</span>` : ''}</span><span class="inv-card-side">${qtyHtml(state, i)}${markHtml(state, i)}</span></a></li>`).join('');
   const table = `<div class="panel inv-table-wrap"><div class="table-wrap"><table class="table">
-    <thead><tr><th scope="col">Item</th><th scope="col">Code</th><th scope="col" class="num">In stock</th><th scope="col" class="num">Low at</th><th scope="col" class="num">Sale price</th>${manage ? '<th scope="col" class="num">Cost price</th>' : ''}<th scope="col">Mark</th></tr></thead>
-    <tbody>${rows.map((i) => `<tr data-href="${href(i)}" data-item="${e(i.id)}"><td><a class="row-name" href="${href(i)}">${e(i.name)}</a></td><td class="code">${e(i.code || '—')}</td><td class="num">${qtyHtml(state, i)}</td><td class="num">${i.low == null ? '—' : e(qtyText(i.low, i.unit))}</td><td class="num">${price(i.sale)}<span class="muted small"> /${UNITS[i.unit]}</span></td>${manage ? `<td class="num">${price(i.cost)}</td>` : ''}<td>${markHtml(state, i)}</td></tr>`).join('')}</tbody>
+    <thead><tr><th scope="col">Item</th><th scope="col">Code</th>${shown.map((f) => `<th scope="col">${e(f.name)}</th>`).join('')}<th scope="col" class="num">In stock</th><th scope="col" class="num">Low at</th><th scope="col" class="num">Sale price</th>${manage ? '<th scope="col" class="num">Cost price</th>' : ''}<th scope="col">Mark</th></tr></thead>
+    <tbody>${rows.map((i) => `<tr data-href="${href(i)}" data-item="${e(i.id)}"><td><a class="row-name" href="${href(i)}">${e(i.name)}</a></td><td class="code">${e(i.code || '—')}</td>${shown.map((f) => `<td>${e(detailOf(state, i, f) || '—')}</td>`).join('')}<td class="num">${qtyHtml(state, i)}</td><td class="num">${i.low == null ? '—' : e(qtyText(i.low, i.unit))}</td><td class="num">${price(i.sale)}<span class="muted small"> /${UNITS[i.unit]}</span></td>${manage ? `<td class="num">${price(i.cost)}</td>` : ''}<td>${markHtml(state, i)}</td></tr>`).join('')}</tbody>
   </table></div></div>`;
   return `<ul class="inv-cards" data-testid="inv-list">${cards}</ul>${table}<p class="muted small">${rows.length} item${rows.length === 1 ? '' : 's'} shown. Search works on this phone's copy, with or without signal.</p>`;
 }
@@ -68,7 +87,7 @@ export function inventory({ state, ui, allow }) {
     ${noticeHtml(ui, 'inventory')}
     <div class="page-head-row">
       <header class="page-head"><h1 id="page-title" tabindex="-1">Inventory</h1><p class="muted">${demo ? SAMPLE_NOTE : "Parts in your store. Parts for a job are taken on the job's screen."}</p></header>
-      ${manage ? `<div class="actions">${demo ? '' : `<a class="btn btn-ghost" href="#/inventory/import">${icon('upload', { size: 18 })} Import CSV</a>`}<a class="btn btn-primary" href="#/inventory/new">${icon('plus', { size: 18 })} Add item</a></div>` : ''}
+      ${manage ? `<div class="actions"><a class="btn btn-ghost" href="#/inventory/fields">${icon('settings', { size: 18 })} Item details</a>${demo ? '' : `<a class="btn btn-ghost" href="#/inventory/import">${icon('upload', { size: 18 })} Import CSV</a>`}<a class="btn btn-primary" href="#/inventory/new">${icon('plus', { size: 18 })} Add item</a></div>` : ''}
     </div>
     <ul class="kpis inv-kpis" data-testid="inv-kpis">
       <li class="kpi"><span class="kpi-label">${icon('box', { size: 16 })} Items</span><span class="kpi-value" data-testid="kpi-items">${c.all}</span><span class="kpi-sub muted">in use</span></li>
@@ -80,6 +99,7 @@ export function inventory({ state, ui, allow }) {
     <div class="inv-tools">
       <div class="inv-search">${icon('search', { size: 18 })}<label class="sr-label" for="inv-q">Search inventory by name or code</label><input id="inv-q" type="search" placeholder="Search name or code, e.g. cap 45" value="${e((ui.inv && ui.inv.q) || '')}" autocomplete="off" data-inv-search></div>
       <div class="chips" role="group" aria-label="Show" data-slot="inv-chips">${chipsHtml(state, ui)}</div>
+      <div class="inv-filters" data-slot="inv-filters">${filtersHtml(state, ui)}</div>
     </div>
     <div data-slot="inv-results">${resultsHtml(state, ui, allow)}</div>
   </section>`;
@@ -99,7 +119,8 @@ export function itemPage({ state, ui, params, allow }) {
     ${noticeHtml(ui, `item:${it.id}`)}
     <div class="page-head-row">
       <div class="item-head"><h1 id="page-title" tabindex="-1">${e(it.name)} ${markHtml(state, it)}</h1>
-        <p class="muted">${e(it.code || 'No code')} · ${UNIT_NAMES[it.unit]} · HSN ${e(it.hsn || '—')} · GST ${it.gst} %${it.stopped ? ' · <strong>Stopped</strong>' : ''}</p></div>
+        <p class="muted">${e(it.code || 'No code')} · ${UNIT_NAMES[it.unit]} · HSN ${e(it.hsn || '—')} · GST ${it.gst} %${it.stopped ? ' · <strong>Stopped</strong>' : ''}</p>
+        ${detailsLine(state, it) ? `<p class="muted" data-testid="item-details">${e(detailsLine(state, it))}</p>` : ''}</div>
       ${manage ? `<div class="actions">
         ${it.stopped ? '' : `<button type="button" class="btn btn-primary" data-action="inv-sheet" data-type="in">${icon('plus', { size: 18 })} Stock in</button>
         <button type="button" class="btn btn-secondary" data-action="inv-sheet" data-type="out">${icon('minus', { size: 18 })} Stock out</button>
@@ -128,13 +149,23 @@ export function itemPage({ state, ui, params, allow }) {
 }
 
 // ---------- the add and edit form ----------
-export function itemForm({ state, ui, params }) {
+/** One of the business's own details on the item form: text, a number, or a list to pick from (or type a new one). */
+function detailInput(state, f, v, errors, manage) {
+  const k = `attr:${f.id}`;
+  const label = `${e(f.name)}${f.required ? '' : ' <span class="field-hint">optional</span>'}`;
+  if (f.type === 'list') {
+    return `<label class="field">${label}<input name="${k}" list="dl-${e(f.id)}" value="${e(v[k] ?? '')}" ${inv(errors, k)} autocomplete="off" data-testid="detail-${e(f.id)}"><datalist id="dl-${e(f.id)}">${pickable(state, f.id).map((x) => `<option value="${e(x.name)}"></option>`).join('')}</datalist><span class="field-hint">${manage ? 'Pick one, or type a new one to add it to the list' : 'Pick one from the list'}</span>${fieldErr(errors, k)}</label>`;
+  }
+  return `<label class="field">${label}<input name="${k}" value="${e(v[k] ?? '')}" ${f.type === 'number' ? 'inputmode="decimal"' : ''} ${inv(errors, k)} autocomplete="off" data-testid="detail-${e(f.id)}">${fieldErr(errors, k)}</label>`;
+}
+export function itemForm({ state, ui, params, allow }) {
+  const manage = allow ? allow('manage_inventory') : true;
   const it = params.id ? (state.items || []).find((i) => i.id === params.id) : null;
   if (params.id && !it) return `<section class="page"><a class="back" href="#/inventory">${icon('arrowLeft', { size: 18 })} Inventory</a><h1 id="page-title" tabindex="-1">Item not found</h1><div class="empty"><p>This item isn't in your inventory.</p></div></section>`;
   const key = params.id || 'new';
   const f = ui.inv && ui.inv.form && ui.inv.form.key === key ? ui.inv.form : null;
   const v = (f && f.values) || (it
-    ? { name: it.name, code: it.code || '', unit: it.unit, sale: it.sale / 100, cost: it.cost == null ? '' : it.cost / 100, hsn: it.hsn || '', gst: String(it.gst), low: it.low ?? '', price_includes_gst: Boolean(it.price_includes_gst), service: Boolean(it.service) }
+    ? { name: it.name, code: it.code || '', unit: it.unit, sale: it.sale / 100, cost: it.cost == null ? '' : it.cost / 100, hsn: it.hsn || '', gst: String(it.gst), low: it.low ?? '', price_includes_gst: Boolean(it.price_includes_gst), service: Boolean(it.service), ...Object.fromEntries(activeFields(state).map((x) => [`attr:${x.id}`, detailOf(state, it, x)])) }
     : { unit: 'nos', gst: '18', name: (ui.inv && ui.inv.prefill) || '' });
   const errors = (f && f.errors) || {};
   const input = (k, label, hint = '', extra = '') => `<label class="field">${label}${hint ? ` <span class="field-hint">${hint}</span>` : ''}<input name="${k}" value="${e(v[k] ?? '')}" ${inv(errors, k)} ${extra} autocomplete="off">${fieldErr(errors, k)}</label>`;
@@ -146,13 +177,15 @@ export function itemForm({ state, ui, params }) {
       <div class="form-grid">
         ${input('name', 'Name', '', 'data-autofocus placeholder="for example Capacitor 35 µF"')}
         ${input('code', 'Code', 'optional, unique in your business', 'placeholder="for example CAP-35"')}
-        <label class="field">Unit<select name="unit" ${inv(errors, 'unit')}>${Object.keys(UNITS).map((u) => `<option value="${u}" ${v.unit === u ? 'selected' : ''}>${UNIT_NAMES[u]}</option>`).join('')}</select>${fieldErr(errors, 'unit')}</label>
+        <label class="field">Unit<select name="unit" data-unit-select ${inv(errors, 'unit')}>${pickableUnits(state, it && it.unit).map((u) => `<option value="${e(u.id)}" ${v.unit === u.id ? 'selected' : ''}>${e(u.name)}</option>`).join('')}${manage ? `<option value="__new__" ${v.unit === '__new__' ? 'selected' : ''}>New unit…</option>` : ''}</select>${fieldErr(errors, 'unit')}</label>
+        <div class="field new-unit" data-slot="new-unit" ${v.unit === '__new__' ? '' : 'hidden'}>${input('new_unit', 'Name of the new unit', 'up to 12 letters, for example Coil', 'maxlength="12"')}<label class="check-line"><input type="checkbox" name="new_unit_whole" ${v.new_unit_whole ? 'checked' : ''}> Whole numbers only</label></div>
         ${input('sale', 'Sale price (₹)', 'per unit, used on estimates and bills', 'inputmode="decimal"')}
         ${input('cost', 'Cost price (₹)', 'optional; only people who manage inventory see it', 'inputmode="decimal"')}
+        ${activeFields(state).map((x) => detailInput(state, x, v, errors, manage)).join('')}
         ${input('hsn', 'HSN code', 'optional, 4, 6 or 8 digits', 'inputmode="numeric"')}
         <label class="field">GST rate<select name="gst" ${inv(errors, 'gst')}>${GST_RATES.map((g) => `<option value="${g}" ${String(v.gst) === String(g) ? 'selected' : ''}>${g} %</option>`).join('')}</select>${fieldErr(errors, 'gst')}</label>
-        <label class="check"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}> ${W.priceIncludesGst} <span class="muted small">(MRP)</span></label>
-        <label class="check"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}> ${W.service} <span class="muted small">(for example Gas refill)</span></label>
+        <label class="check-line"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}> ${W.priceIncludesGst} <span class="muted small">(MRP)</span></label>
+        <label class="check-line"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}> ${W.service} <span class="muted small">(for example Gas refill)</span></label>
         ${input('low', 'Low-stock level', 'optional; marked Low at or below this', 'inputmode="decimal"')}
         ${it ? '' : input('opening', 'Opening stock', 'optional; what is on the shelf today', 'inputmode="decimal"')}
       </div>
@@ -162,6 +195,21 @@ export function itemForm({ state, ui, params }) {
 }
 
 // ---------- the CSV import ----------
+/** What this file will add to the lists, columns nobody asked for, and names that may be typos. */
+function addsHtml(c) {
+  const adds = c.adds || {};
+  const lists = adds.lists || [];
+  const units = adds.units || [];
+  const unknown = c.unknown || [];
+  const typos = (c.rows || []).filter((r) => r.status !== 'problem').flatMap((r) => r.notes.filter((x) => /did you mean/.test(x)).map((x) => `Row ${r.row}: ${x}`));
+  const bits = [];
+  if (units.length || lists.length) {
+    bits.push(`<p class="notice" data-testid="csv-adds">${icon('plus', { size: 18 })}<span><strong>Will be added to your lists:</strong> ${[...units.length ? [`units: ${units.map(e).join(', ')}`] : [], ...lists.map((l) => `${e(l.field)}: ${l.values.map(e).join(', ')}`)].join('; ')}.</span></p>`);
+  }
+  if (typos.length) bits.push(`<div class="notice notice-error" role="alert" style="display:block" data-testid="csv-typos"><strong>Check these spellings before you import</strong><ul>${typos.map((x) => `<li>${e(x)}.</li>`).join('')}</ul></div>`);
+  if (unknown.length) bits.push(`<p class="notice" data-testid="csv-unknown">${icon('alert', { size: 18 })}<span><strong>Not imported:</strong> ${unknown.map((x) => `<code>${e(x)}</code>`).join(', ')}. To keep a column, add it as a detail in <a href="#/inventory/fields">Item details</a> and check the file again.</span></p>`);
+  return bits.join('');
+}
 export function inventoryImport({ state, ui }) {
   const c = ui.inv && ui.inv.csv;
   const rows = c && c.rows;
@@ -171,12 +219,12 @@ export function inventoryImport({ state, ui }) {
   const result = ui.inv && ui.inv.csvResult;
   return `<section class="page page-wide" aria-labelledby="page-title">
     <a class="back" href="#/inventory">${icon('arrowLeft', { size: 18 })} Inventory</a>
-    <header class="page-head"><h1 id="page-title" tabindex="-1">Import items from a CSV file</h1><p class="muted">Make the file in Excel or Google Sheets and save it as CSV. Up to 500 rows at a time.</p></header>
+    <header class="page-head"><h1 id="page-title" tabindex="-1">Import items from a CSV file</h1><p class="muted">Make the file in Excel or Google Sheets and save it as CSV. A big file is checked and imported in parts of 500 rows.</p></header>
     ${result ? `<p class="notice" role="status" data-testid="csv-result">${icon('check', { size: 18 })}<span>${result}</span></p>` : ''}
     <p class="notice">${icon('server', { size: 18 })}<span>Importing needs a signal, because each code is checked against your whole business.</span></p>
     <div class="panel">
       <ol class="start-steps">
-        <li class="start-step"><span class="step-num">1</span><div><h3>Download the template</h3><p class="muted">Columns: ${CSV_COLUMNS.map((x) => `<code>${x}</code>`).join(', ')}. Only <code>name</code> is needed; prices are in rupees.</p><button type="button" class="btn btn-ghost btn-small" data-action="inv-template">${icon('download', { size: 18 })} Download template</button></div></li>
+        <li class="start-step"><span class="step-num">1</span><div><h3>Download the template</h3><p class="muted">Columns: ${csvColumns(state).map((x) => `<code>${e(x)}</code>`).join(', ')}. Only <code>name</code> is needed; prices are in rupees. ${activeFields(state).length ? 'Your own details are columns too, named as in <a href="#/inventory/fields">Item details</a>.' : 'Add your own columns, such as Brand, in <a href="#/inventory/fields">Item details</a> first.'}</p><button type="button" class="btn btn-ghost btn-small" data-action="inv-template">${icon('download', { size: 18 })} Download template</button></div></li>
         <li class="start-step"><span class="step-num">2</span><div><h3>Choose your file</h3><p class="muted">KaryaHub checks every row before anything is saved.</p>
           <div class="actions"><label class="btn btn-secondary file-pick">${icon('upload', { size: 18 })} Choose a CSV file<input type="file" accept=".csv,text/csv" data-action="pick-inv-csv"></label></div></div></li>
         <li class="start-step"><span class="step-num">3</span><div><h3>Check, then import</h3><p class="muted">Rows with a problem are skipped; fix them in the file and import it again. A code that is already in your inventory updates that item. Importing the same file twice changes nothing.</p></div></li>
@@ -192,10 +240,11 @@ export function inventoryImport({ state, ui }) {
         <li class="kpi"><span class="kpi-label">Updates</span><span class="kpi-value" data-testid="csv-update">${n('update')}</span>${n('same') ? `<span class="kpi-sub muted">${n('same')} already up to date</span>` : ''}</li>
         <li class="kpi"><span class="kpi-label">Problems</span><span class="kpi-value ${n('problem') ? 'is-out' : ''}" data-testid="csv-problem">${n('problem')}</span><span class="kpi-sub muted">skipped</span></li>
       </ul>
+      ${addsHtml(c)}
       ${n('problem') ? `<div class="import-errors notice notice-error" role="alert" style="display:block" data-testid="csv-problems"><strong>Rows with a problem</strong><ul>${rows.filter((r) => r.status === 'problem').map((r) => `<li>Row ${r.row}: ${e(r.problems.join('; '))}.</li>`).join('')}</ul></div>` : ''}
       <div class="table-wrap"><table class="table import-table">
-        <thead><tr><th scope="col">Row</th><th scope="col">Result</th><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Unit</th><th scope="col" class="num">Sale ₹</th><th scope="col" class="num">Opening</th><th scope="col">Why</th></tr></thead>
-        <tbody>${rows.map((r) => `<tr><td class="num">${r.row}</td><td>${tag[r.status]}</td><td class="code">${e(r.code || '—')}</td><td>${e(r.name || '—')}</td><td>${e(r.unit)}</td><td class="num">${e(r.sale_price)}</td><td class="num">${e(r.opening_stock)}</td><td class="why ${r.problems.length ? '' : 'is-note'}">${e((r.problems.length ? r.problems : r.notes).join('; '))}</td></tr>`).join('')}</tbody>
+        <thead><tr><th scope="col">Row</th><th scope="col">Result</th><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Unit</th>${rows.some((r) => r.details) ? '<th scope="col">Details</th>' : ''}<th scope="col" class="num">Sale ₹</th><th scope="col" class="num">Opening</th><th scope="col">Why</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr><td class="num">${r.row}</td><td>${tag[r.status]}</td><td class="code">${e(r.code || '—')}</td><td>${e(r.name || '—')}</td><td>${e(r.unit)}</td>${rows.some((x) => x.details) ? `<td class="small">${e(r.details || '')}</td>` : ''}<td class="num">${e(r.sale_price)}</td><td class="num">${e(r.opening_stock)}</td><td class="why ${r.problems.length ? '' : 'is-note'}">${e((r.problems.length ? r.problems : r.notes).join('; '))}</td></tr>`).join('')}</tbody>
       </table></div>
       <div class="actions"><button type="button" class="btn btn-primary" data-action="inv-do-import" ${good && !c.saving ? '' : 'disabled'}>${c.saving ? 'Importing…' : good ? `Import ${good} good row${good === 1 ? '' : 's'}` : 'Nothing to import'}</button><button type="button" class="btn btn-ghost" data-action="inv-clear-csv">Choose another file</button></div>
     </div>` : ''}

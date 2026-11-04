@@ -206,6 +206,8 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: after a refused attempt the button comes back and keeps what was typed | Pass |
 | AC-22.10 | `tests/us20-businesses.test.js` › AC-22.10: Reset PIN and Turn off can only be pressed once at a time | Pass |
 | AC-22.11 | `tests/us23-business-data.test.js` › AC-22.11: the Add a person button at the top of Admin stays on Admin and puts the cursor in the form | Pass |
+| AC-22.12 | `tests/us20-businesses.test.js` › AC-22.12: Add a business at the top stays on Businesses and puts the cursor in the form | Pass |
+| AC-22.12 | `tests/us20-businesses.test.js` › AC-22.12: Skip to content stays on the same page and moves to the main area | Pass |
 | AC-23.1 | `tests/us23-business-data.test.js` › AC-23.1: a job approved in Chat is saved on the server, numbered by it, and shown as New until then | Pass |
 | AC-23.1 | `tests/api/test_us23_business_data.py::test_ac_23_1_another_phone_of_the_same_business_gets_what_was_saved` (customers, jobs, documents and chat saved by one phone reach another phone of the business.) | Pass |
 | AC-23.2 | `tests/api/test_us23_business_data.py::test_ac_23_2_one_business_cannot_read_or_change_anothers_records` (a pull never includes the other business, and reusing an id makes a separate record.) | Pass |

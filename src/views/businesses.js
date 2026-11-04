@@ -13,7 +13,7 @@ export function businesses({ ui }) {
   return `<section class="page page-wide">
     <header class="page-head page-head-row">
       <div><h1 id="page-title" tabindex="-1">Businesses</h1><p class="muted">Each business has its own people, jobs and stock. You create it and its first owner; the owner runs the rest.</p></div>
-      <a class="btn btn-secondary" href="#biz-add">${icon('building', { size: 18 })} Add a business</a>
+      <button type="button" class="btn btn-secondary" data-action="goto-add-business" data-testid="add-business-top">${icon('building', { size: 18 })} Add a business</button>
     </header>
     ${b.notice ? `<p class="notice ${b.notice.error ? 'notice-error' : ''}" role="${b.notice.error ? 'alert' : 'status'}" data-testid="biz-notice">${escapeHtml(b.notice.text)}</p>` : ''}
     ${b.issued ? `<section class="panel panel-credentials" data-testid="biz-credentials" aria-labelledby="biz-cred">

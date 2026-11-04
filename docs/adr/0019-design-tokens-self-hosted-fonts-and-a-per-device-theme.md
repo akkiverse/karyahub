@@ -24,6 +24,7 @@ The founder set out a design system as CSS variables, three Google Fonts, and a 
 | Theme in the store | Already there | Stored per business and read after the app loads, so a wrong-theme flash |
 
 ## Consequences
+- The gradient's middle stop is `#0369A1`, not the first brief's `#0EA5E9`: the founder chose it on 4 Nov for readable white text.
 - Easier: one place to change a colour; a new screen gets both themes for free.
 - Harder: `styles.css` now has an older part overridden by a later part. Clean the old rules up when a screen is next rebuilt; check the last layer first when a style seems to have no effect.
 - Watch: `backdrop-filter` is off below 760 px and a fixed background is off on touch screens, to keep phones smooth. The server's public bill page and PDF are separate and don't follow this look.

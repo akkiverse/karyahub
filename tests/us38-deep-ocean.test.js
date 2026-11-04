@@ -5,6 +5,8 @@ import { setup, sendSample, until } from './helpers.js';
 import { billRows } from '../src/views/bills.js';
 import { billFigures, gstThisMonth } from '../src/domain/bills.js';
 import { THEME_KEY, themePref, resolveTheme } from '../src/theme.js';
+import { fakeApi } from './fake-api.js';
+import { PEOPLE, meFor } from './fake-accounts.js';
 
 const css = readFileSync('src/styles.css', 'utf8');
 const html = readFileSync('index.html', 'utf8');
@@ -78,7 +80,7 @@ describe('US-38 Aurora Dark and Clean Light', () => {
   });
 
   it('AC-38.5: the exact design tokens of both themes are in the stylesheet', () => {
-    for (const token of ['--kh-bg: #060814', '--kh-bg: #F8FAFC', '--kh-primary-grad: linear-gradient(135deg, #0F766E 0%, #0EA5E9 50%, #2563EB 100%)', '--kh-primary: #0D9488', '--kh-primary: #0F766E', '--kh-primary-accent: #0EA5E9', '--kh-primary-accent: #0284C7', '--kh-card-radius: 16px', '--kh-text-muted: #94A3B8', '--kh-text-muted: #64748B',
+    for (const token of ['--kh-bg: #060814', '--kh-bg: #F8FAFC', '--kh-primary-grad: linear-gradient(135deg, #0F766E 0%, #0369A1 50%, #2563EB 100%)', '--kh-primary: #0D9488', '--kh-primary: #0F766E', '--kh-primary-accent: #0EA5E9', '--kh-primary-accent: #0284C7', '--kh-card-radius: 16px', '--kh-text-muted: #94A3B8', '--kh-text-muted: #64748B',
       '--kh-ok: #34D399', '--kh-ok: #047857', '--kh-warn: #FBBF24', '--kh-warn: #B45309', '--kh-bad: #FB7185', '--kh-bad: #BE123C']) expect(css).toContain(token);
     expect(css).not.toMatch(/prefers-color-scheme/); // the theme comes only from data-theme
   });
@@ -162,7 +164,7 @@ describe('US-39 The shell', () => {
 });
 
 describe('US-40 Home', () => {
-  it('AC-40.1: three figures come from saved bills: billed today, unpaid, and overdue in rupees with how many', () => {
+  it('AC-40.1: four figures come from the data: billed today, unpaid balance, overdue in rupees with how many, and stock value', () => {
     t = setup();
     addDocs([bill(), bill({ date: '2026-12-01', due_date: '2026-12-10', number: '26-27/0002' }), bill({ status: 'paid', number: '26-27/0003' }), bill({ status: 'draft', number: '' })]);
     t.app.render();
@@ -171,27 +173,49 @@ describe('US-40 Home', () => {
     expect(kpi('unpaid')).toBe('₹2,360');
     expect(kpi('overdue-amount')).toBe('₹1,180');
     expect(kpi('overdue')).toBe('1');
+    expect(kpi('stock-value')).toBe('₹29,392');
+    expect(t.$('[data-testid="home-bills"]').textContent).toContain('3 items low in stock');
     expect(billFigures([], '2027-01-01')).toMatchObject({ billedToday: 0, overdueAmount: 0, madeToday: 0, unpaidCount: 0 });
   });
 
-  it('AC-40.2: the field stream shows each technician message with what was read; an approved job makes a GST quote in one tap', async () => {
+  it('AC-40.1: without inventory permission there is no stock value', () => {
+    t = setup();
+    t.app.session.set({ ...t.app.session.get(), permissions: t.app.session.get().permissions.filter((p) => p !== 'manage_inventory') });
+    t.app.render();
+    expect(t.$('[data-kpi="stock-value"]')).toBeNull();
+  });
+
+  it('AC-40.2: the field feed shows each technician message with what was read; an approved job makes a bill or a GST quote in one tap', async () => {
     t = setup();
     expect(t.$('[data-testid="stream-empty"]')).toBeTruthy();
     await sendSample(t, 's-ramesh');
     t.go('#/');
     expect(t.$('[data-testid="stream-row"]').textContent).toContain('Voice note');
     expect(t.$('[data-testid="stream-status"]').textContent).toMatch(/check it/);
-    expect(t.$('[data-testid="stream-quote"]')).toBeNull();
+    expect(t.$('[data-testid="stream-bill"]')).toBeNull();
     t.go('#/chat');
     t.click('[data-action="approve"]');
     t.go('#/');
     expect(t.$('[data-testid="stream-status"]').textContent).toBe('Job created');
+    expect(t.$('[data-testid="stream-bill"]').textContent).toContain('Generate Bill from Note');
     t.click('[data-testid="stream-quote"]');
     await until(() => t.$('[data-testid="bill-editor"]'));
     expect(t.$('[data-testid="bill-customer"]').textContent).toContain('Ramesh');
+    expect(t.$('h1').textContent).toContain('estimate');
     t.go('#/');
     expect(t.$('[data-testid="stream-quote"]')).toBeNull(); // the quote exists now: it opens, it isn't made twice
     expect(t.$('[data-testid="stream-row"]').textContent).toContain('Open quote');
+  });
+
+  it('AC-40.2: Generate Bill from Note opens a bill with the job on it', async () => {
+    t = setup();
+    await sendSample(t, 's-ramesh');
+    t.click('[data-action="approve"]');
+    t.go('#/');
+    t.click('[data-testid="stream-bill"]');
+    await until(() => t.$('[data-testid="bill-editor"]'));
+    expect(t.$('h1').textContent).toContain('bill');
+    expect(t.app.store.get().documents[0].job_id).toBeTruthy();
   });
 
   it('AC-40.3: the renewals list gives customer, equipment, urgency and value, and Remind opens the same preview as Renewals', async () => {
@@ -222,6 +246,93 @@ describe('US-40 Home', () => {
     expect(t.$('[data-testid="gst-card"]')).toBeNull();
     expect(t.$('[data-testid="money-at-stake"]')).toBeNull();
     expect(t.$('[data-kpi="unpaid"]')).toBeNull();
+  });
+});
+
+describe('US-42 The Home dashboard', () => {
+  const headline = 'Bill, track stock, and manage field jobs all in one place.';
+  const real = () => ({ ...meFor(PEOPLE['st-owner']), business: { id: 'b1', name: 'Shree Cool', is_demo: false, packs: ['field_service'], state_code: '20', gst_registration: 'regular' } });
+
+  it('AC-42.1: the banner shows the headline, the next AMC, the reminder dots and three steps, on a real business too', () => {
+    t = setup({ me: real(), api: fakeApi() });
+    expect(t.$('h1').textContent).toBe(headline);
+    expect(t.$('[data-testid="hero-new-bill"]').getAttribute('href')).toBe('#/bills/new');
+    expect(t.$$('.hero-steps li')).toHaveLength(3);
+    expect(t.$('[data-testid="see-how"]')).toBeNull();
+  });
+
+  it('AC-42.1: with Field service off the banner says nothing about jobs or WhatsApp', () => {
+    const me = real();
+    me.business.packs = [];
+    me.permissions = me.permissions.filter((p) => !['use_chat', 'view_jobs', 'manage_renewals', 'verify_work', 'close_jobs', 'use_parts'].includes(p));
+    t = setup({ me, api: fakeApi() });
+    const hero = t.$('[data-testid="home-hero"]').textContent;
+    expect(hero).toContain('Bill and track stock');
+    expect(hero).not.toMatch(/WhatsApp|field jobs|AMC/);
+    expect(t.$('.hero-steps')).toBeNull();
+  });
+
+  it('AC-42.2: Hide banner is remembered on this device, and the banner can come back', () => {
+    t = setup();
+    t.click('[data-testid="hero-hide"]');
+    expect(t.$('[data-testid="home-hero"]')).toBeNull();
+    expect(localStorage.getItem('kh-home-hero')).toBe('hidden');
+    expect(t.$('h1').textContent).toBe('Home');
+    t.go('#/bills');
+    t.go('#/');
+    expect(t.$('[data-testid="home-hero"]')).toBeNull();
+    t.click('[data-testid="hero-show"]');
+    expect(t.$('[data-testid="home-hero"]')).toBeTruthy();
+  });
+
+  it('AC-42.3: bills and jobs without a bill show in the table, newest first, with phone, items, amount, status and Share', async () => {
+    t = setup();
+    expect(t.$('[data-testid="recent-empty"]')).toBeTruthy();
+    await sendSample(t, 's-ramesh');
+    t.click('[data-action="approve"]');
+    t.go('#/');
+    addDocs([bill()]);
+    t.app.render();
+    const rows = t.$$('[data-testid="recent-table"] tbody tr');
+    expect(rows).toHaveLength(2);
+    const billRow = rows.find((r) => r.textContent.includes('Mehta Clinic'));
+    expect(billRow.textContent).toContain('AC service');
+    expect(billRow.textContent).toContain('₹1,180');
+    expect(billRow.querySelector('[data-testid="recent-share"]')).toBeTruthy();
+    const jobRow = rows.find((r) => r.textContent.includes('Ramesh'));
+    expect(jobRow.textContent).toContain('To bill');
+    t.click(jobRow.querySelector('[data-testid="recent-bill"]'));
+    await until(() => t.$('[data-testid="bill-editor"]'));
+  });
+
+  it('AC-42.4: the switch shows a Kanban board by status, is remembered, and the banner button does the same', async () => {
+    t = setup();
+    addDocs([bill({ number: '26-27/0001' }), bill({ number: '26-27/0002', status: 'paid' }), bill({ number: '26-27/0003', date: '2026-12-01', due_date: '2026-12-10' }), bill({ number: '', status: 'draft' }), bill({ number: '26-27/0004', status: 'cancelled' })]);
+    t.app.render();
+    expect(t.$('[data-testid="hero-view"]').textContent).toContain('Switch to Kanban Board View');
+    t.click('[data-testid="recent-switch"] [data-view="kanban"]');
+    expect(t.$('[data-testid="recent-table"]')).toBeNull();
+    const col = (k) => t.$$(`[data-column="${k}"] [data-testid="kan-card"]`).length;
+    expect([col('draft'), col('unpaid'), col('overdue'), col('paid')]).toEqual([1, 1, 1, 1]);
+    expect(t.$('[data-column="unpaid"] .kan-sum').textContent).toBe('₹1,180');
+    expect(t.$('[data-column="paid"] [data-testid="kan-card"]').getAttribute('href')).toContain('#/bills/');
+    expect(localStorage.getItem('kh-home-view')).toBe('kanban');
+    t.go('#/bills');
+    t.go('#/');
+    expect(t.$('[data-testid="recent-board"]')).toBeTruthy();
+    expect(t.$('[data-testid="hero-view"]').textContent).toContain('Switch to Table View');
+    t.click('[data-testid="hero-view"]');
+    expect(t.$('[data-testid="recent-table"]')).toBeTruthy();
+  });
+
+  it('AC-42.5: the checklist ticks what is really done, and counts it', async () => {
+    const api = fakeApi();
+    t = setup({ api });
+    await until(() => t.$('[data-testid="check-count"]')?.textContent === '2 of 3 done');
+    const items = t.$$('.check-item');
+    expect(items.map((x) => x.dataset.done)).toEqual(['true', 'true', 'false']);
+    expect(items[2].textContent).toContain('Connect WhatsApp Cloud API');
+    expect(items[2].querySelector('a').getAttribute('href')).toBe('#/settings');
   });
 });
 

@@ -9,7 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **The Deep Ocean Teal look.** See [CR-0015](docs/changes/CR-0015-deep-ocean-teal.md) and [ADR-0019](docs/adr/0019-design-tokens-self-hosted-fonts-and-a-per-device-theme.md).
 - **Aurora Dark and Clean Light:** a Sun or Moon button in the top bar and on sign-in, and Dark, Light, System in Settings. Dark is the default; a light or dark choice you already made is kept.
 - **Search in the top bar** (Ctrl or Cmd + K): bills, estimates, items and jobs on this device, only what you may open.
-- **Home:** three money figures; the WhatsApp field stream with one-tap Create GST quote; AMC renewals due with Remind; GST this month.
+- **Home:** a banner you can hide; four money figures; Recent Bills & Job Sheets as a **Table or Kanban Board**; a Get Started Checklist with real ticks; the WhatsApp Field Feed with Generate Bill from Note; AMC renewals due with Remind; GST this month.
 - **Bills:** source, GSTIN and tax in the table, Send on WhatsApp and PDF on each row, and search by GSTIN.
 - **Inventory:** − and + for stock in the table, each one an ordinary move in the item's history; an SKU badge, GST and an In stock status.
 

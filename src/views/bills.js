@@ -409,13 +409,14 @@ export function newMenu(me, open) {
 }
 
 /** Home's bill figures (Screens and flows): billed today, unpaid total, overdue count. */
-export function homeBills(fig, demo) {
+export function homeBills(fig, demo, stock = null) {
   return `<section class="today" aria-labelledby="bills-today-title" data-testid="home-bills">
     <h2 class="sr-only" id="bills-today-title">${W.bills}${demo ? ` (${W.sample})` : ''}</h2>
     <ul class="kpis kpis-home">
       <li class="kpi kpi-home"><span class="kpi-badge tone-ok" aria-hidden="true">${icon('file', { size: 20 })}</span><span class="kpi-label">${W.billedToday}</span><span class="kpi-value money" data-kpi="billed-today">${rw(fig.billedToday)}</span><a class="kpi-sub" href="#/bills">${W.billsMadeToday(fig.madeToday)}</a></li>
-      <li class="kpi kpi-home"><span class="kpi-badge tone-warn" aria-hidden="true">${icon('trend', { size: 20 })}</span><span class="kpi-label">${W.unpaidReceivables}</span><span class="kpi-value is-soon" data-kpi="unpaid">${rw(fig.unpaid)}</span><span class="kpi-sub muted">${W.awaitingPayment(fig.unpaidCount)}</span></li>
-      <li class="kpi kpi-home"><span class="kpi-badge tone-bad" aria-hidden="true">${icon('alert', { size: 20 })}</span><span class="kpi-label">${W.overdueAction}</span><span class="kpi-value ${fig.overdue ? 'is-lapsed' : ''}" data-kpi="overdue-amount">${rw(fig.overdueAmount)}</span><span class="kpi-sub muted">${fig.overdue ? `<span data-kpi="overdue">${fig.overdue}</span> ${W.billsToChase(fig.overdue).replace(/^\d+ /, '')}` : `<span data-kpi="overdue" hidden>0</span>${W.nothingOverdue}`}</span></li>
+      <li class="kpi kpi-home"><span class="kpi-badge tone-warn" aria-hidden="true">${icon('trend', { size: 20 })}</span><span class="kpi-label">${W.unpaidBalance}</span><span class="kpi-value is-soon" data-kpi="unpaid">${rw(fig.unpaid)}</span><span class="kpi-sub muted">${W.awaitingPayment(fig.unpaidCount)}</span></li>
+      <li class="kpi kpi-home"><span class="kpi-badge tone-bad" aria-hidden="true">${icon('alert', { size: 20 })}</span><span class="kpi-label">${W.overdueTitle}</span><span class="kpi-value ${fig.overdue ? 'is-lapsed' : ''}" data-kpi="overdue-amount">${rw(fig.overdueAmount)}</span><span class="kpi-sub muted">${fig.overdue ? `<span data-kpi="overdue">${fig.overdue}</span> ${W.followUps(fig.overdue)}` : `<span data-kpi="overdue" hidden>0</span>${W.nothingOverdue}`}</span></li>
+      ${stock ? `<li class="kpi kpi-home"><span class="kpi-badge tone-info" aria-hidden="true">${icon('box', { size: 20 })}</span><span class="kpi-label">${W.stockValuation}</span><span class="kpi-value is-info" data-kpi="stock-value">${rw(stock.value)}</span><a class="kpi-sub" href="#/inventory">${W.itemsLow(stock.low)}</a></li>` : ''}
     </ul>
   </section>`;
 }

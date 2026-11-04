@@ -38,7 +38,7 @@ Test IDs below are used as automated test names. Web app tests (Vitest) run with
 
 ### US-1: Problem story
 As a presenter I want an opening screen that explains the problem so that the owner sees their own pain before the product.
-- **AC-1.1** Given the app opens, then the Home screen shows the headline "Never miss an AMC renewal again" and three problem cards: lapsed renewals, re-typing job sheets, and no view of field work. *(added CR-0001)*
+- **AC-1.1** Given the demo business, then Home shows the banner headline "Bill, track stock, and manage field jobs all in one place." and three problem cards: lapsed renewals, re-typing job sheets, and no view of field work. *(added CR-0001, changed CR-0015)*
 - **AC-1.2** Given the demo data, then Home shows "Money at stake in the next 90 days" equal to the sum of AMC values of demo customers expiring within 90 days. *(added CR-0001)*
 - **AC-1.3** Given Home, when I press "See how it works", then the Chat screen opens. *(added CR-0001)*
 
@@ -198,7 +198,7 @@ As someone who forgot their PIN I want to set a new one with a code, so that I'm
 ### US-22: Sign-in, Admin and business screens
 As any signed-in person I want clear screens for signing in, my account, my team and my business, so that KaryaHub looks and works like a finished product. *(added CR-0005)*
 - **AC-22.1** Given nobody is signed in, then any address shows "Sign in to KaryaHub" with a mobile number and a PIN (hidden), "Forgot your PIN?", and no business name; the demo accounts sit under "Explore a demo business" and tapping one fills the number and PIN. *(added CR-0005)*
-- **AC-22.2** Given a real business, then no screen carries demo wording: no Demo pill, no "Sample data", no watermark or "dummy" tags, no sample-message chips, no Reset demo or mode switches; Home shows a "Get started" panel instead of the sales story; and Settings has the business details form. The demo business keeps all of these. *(added CR-0005)*
+- **AC-22.2** Given a real business, then no screen carries demo wording: no Demo pill, no "Sample data", no watermark or "dummy" tags, no sample-message chips, no Reset demo or mode switches; Home shows the banner (AC-42.1) and the Get Started Checklist instead of the problem cards (changed CR-0015); and Settings has the business details form. The demo business keeps all of these. *(added CR-0005)*
 - **AC-22.3** Given the server's permissions for the signed-in person, then the navigation, the screens that open, the no-access page and the start page follow them; a person with no access at all lands on My account with a plain explanation. *(added CR-0005)*
 - **AC-22.4** Given I'm the platform admin, then Businesses shows each business with people, owners and status, a form to create one with its owner, the temporary PIN once, turn off and on, and reset an owner's PIN. *(added CR-0005)*
 - **AC-22.5** Given I manage a team, then Admin shows counts by role, the team with role, status and per-person access, an Add a person form, a CSV import with row-by-row problems, the role table with switches, any new PINs once (with a CSV download) and the activity log; in the demo business every control is switched off with a plain note. *(added CR-0005)*
@@ -386,11 +386,19 @@ As anyone signed in, I want the same frame on every screen, so that I always kno
 
 ### US-40: Home
 As an owner, I want the money, the field work and the renewals on one screen, so that I can act without opening anything else.
-- **AC-40.1** Given I may make bills, then three figures come from saved bills: Billed today, Unpaid receivables, and Overdue with its rupees and how many. *(added CR-0015)*
-- **AC-40.2** Given technician messages, then the field stream shows the latest four with who, kind, time and what was read; a job waiting for a check links to Chat; an approved job offers Create GST quote, which opens the estimate with the job's lines, and then Open quote. *(added CR-0015)*
+- **AC-40.1** Given I may make bills, then four figures show: Billed today, Unpaid balance, Overdue with its rupees and how many, and, if I manage inventory, Stock valuation with how many items are low. Overdue means past its due date. *(added CR-0015)*
+- **AC-40.2** Given technician messages, then the WhatsApp Field Feed shows the latest four with who, kind, time and what was read; a job waiting for a check links to Chat; an approved job offers Generate Bill from Note and Or make a GST quote, each opening the editor with the job's lines, and then Open bill or Open quote. *(added CR-0015)*
 - **AC-40.3** Given I may see renewals, then the list shows the next five with customer, equipment, urgency and ₹ value, and Remind opens the same preview as on Renewals; no message is sent. *(added CR-0015)*
 - **AC-40.4** Given I may make bills, then GST this month adds the taxable value, CGST, SGST, IGST and total of this month's saved bills only, with Make a bill. *(added CR-0015)*
 - **AC-40.5** Given a technician, then Home shows no money. *(added CR-0015)*
+
+### US-42: The Home dashboard
+As an owner, I want Home to open on a clear banner and my latest bills in the form I prefer, so that I see the day's work in one look.
+- **AC-42.1** Given Home, then a banner shows the headline, Create GST Bill Now, Switch to Kanban Board View, the next AMC job, the next four renewals as dots (green when reminded), a note, and three steps, for real and demo businesses alike. With Field service off it says nothing about jobs, WhatsApp or AMC. *(added CR-0015)*
+- **AC-42.2** Given Hide banner, then the banner goes, this device remembers it, and Show banner brings it back. *(added CR-0015)*
+- **AC-42.3** Given I may make bills, then Recent Bills & Job Sheets lists the latest six, bills and jobs with no bill yet, with number and date, customer and phone, job or items, amount, status, and Share or Make bill; cards on a phone. *(added CR-0015)*
+- **AC-42.4** Given the Table and Kanban Board switch, then the board has the columns To bill (with Field service), Draft, Unpaid, Overdue and Paid, each with its count and ₹ total, and cards that open the bill or job; this device remembers the choice. The board shows work; it doesn't change a status. *(added CR-0015)*
+- **AC-42.5** Given the Get Started Checklist, then it ticks Add your team when the business has more than one person and Business and GSTIN details when they are filled in, counts them, links the rest, and goes away once all are done. Connect WhatsApp ticks when K6 connects a number. *(added CR-0015)*
 
 ### US-41: Bills, Inventory, Team and Settings at full width
 As an owner on a laptop, I want these screens to use the width, so that I see more and scroll less.

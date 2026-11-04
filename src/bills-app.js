@@ -324,7 +324,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
       }
       case 'bill-send':
         await send(id);
-        if (el.matches('.row-act')) {
+        if (el.matches('.row-act, .row-send')) {
           // Sent from a row of the list (CR-0015): the answer shows on the list, for as long as an undo would.
           const notice = ui.billView.notice;
           ui.billView = {};

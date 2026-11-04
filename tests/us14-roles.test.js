@@ -113,7 +113,8 @@ describe('US-14 Roles and limited access', () => {
     t = setup({ me: real, hash: '#/' });
     expect(t.$('[data-testid="get-started"]').textContent).toContain('Add your team');
     expect(t.$('[data-testid="problem-cards"]')).toBeNull(); // no sales page for a firm that already signed up
-    expect(t.$('h1').textContent).toBe('Home');
+    expect(t.$('h1').textContent).toContain('Bill, track stock'); // the banner, changed CR-0015
+    expect(t.$('[data-testid="see-how"]')).toBeNull();
     expect(t.$('[data-testid="today-kpis"]').textContent).not.toContain('Sample data');
     t.go('#/chat');
     expect(t.$('.demo-pill')).toBeNull();

@@ -137,7 +137,10 @@ export function mountApp(root, options = {}) {
     onIdle: () => { if (route.name === 'chat') render(); },
   });
   const logoImage = options.logoImage || resizeLogo;
+  const remembered = (key) => { try { return win.localStorage.getItem(key); } catch { return null; } };
+  const remember = (key, value) => { try { win.localStorage.setItem(key, value); } catch { /* it still works for this visit */ } };
   const ui = {
+    homeView: remembered('kh-home-view') === 'kanban' ? 'kanban' : 'table', heroHidden: remembered('kh-home-hero') === 'hidden', homeTeam: 0,
     boot: 'loading', auth: {}, authState: null, admin: {}, businesses: {}, account: {}, profile: {},
     streaming: {}, warmedAt: 0, inv: { dismissed: {} }, fields: {},
     renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
@@ -214,6 +217,7 @@ export function mountApp(root, options = {}) {
     }
     bills.load(route);
     if (route.name === 'chat') warmAi(me);
+    if (route.name === 'home' && can(me, 'manage_team') && typeof api.team === 'function') loadHomeTeam(); // the checklist's "Add your team"
     if (route.name === 'job') loadPlan(route.params.id);
     if (route.name === 'admin' && can(me, 'manage_team') && !ui.admin.data) loadAdmin();
     if (route.name === 'businesses' && can(me, 'manage_businesses') && !ui.businesses.list) loadBusinesses();
@@ -226,6 +230,12 @@ export function mountApp(root, options = {}) {
     if (ui.warmedAt && Date.now() - ui.warmedAt < WARM_EVERY_MS) return;
     ui.warmedAt = Date.now();
     api.warmAi().catch(() => { ui.warmedAt = 0; });
+  }
+  async function loadHomeTeam() {
+    try {
+      const count = (await api.team()).members.length;
+      if (count !== ui.homeTeam) { ui.homeTeam = count; if (alive && route.name === 'home') render(); }
+    } catch { /* offline: the checklist just doesn't tick it yet */ }
   }
   async function loadAdmin(extra = {}) {
     if (extra.credentials && extra.credentials.length) ui.focusNext = '[data-testid="admin-credentials"]';
@@ -474,6 +484,21 @@ export function mountApp(root, options = {}) {
     if (a === 'toggle-theme') { toggleTheme(win); paintTheme(); root.querySelector('[data-slot="theme-toggle"]')?.focus(); return; }
     if (a === 'toggle-nav') { setNav(!ui.navOpen); return; }
     if (a === 'close-nav') { setNav(false); return; }
+    if (a === 'home-view') {
+      ui.homeView = el.dataset.view === 'kanban' ? 'kanban' : 'table';
+      remember('kh-home-view', ui.homeView);
+      render();
+      if (el.dataset.scroll) root.querySelector('#home-recent')?.scrollIntoView?.({ block: 'start', behavior: win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      root.querySelector(`#home-recent [data-view="${ui.homeView}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    if (a === 'home-hero') {
+      ui.heroHidden = el.dataset.hide === 'true';
+      remember('kh-home-hero', ui.heroHidden ? 'hidden' : 'shown');
+      render();
+      root.querySelector(ui.heroHidden ? '[data-testid="hero-show"]' : '[data-testid="hero-hide"]')?.focus({ preventScroll: true });
+      return;
+    }
     if (a.startsWith('inv-')) { await onInventoryAction(a, el); return; }
     if (a.startsWith('bill-') && (await bills.onClick(a, el))) return;
     if (a === 'dismiss-sync-notice') { sync.dismissNotice(); return; }

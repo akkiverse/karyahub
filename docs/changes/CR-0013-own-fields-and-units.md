@@ -1,10 +1,10 @@
 # CR-0013: Your own item details, lists and units (part 1 of the item changes)
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder, 4 Nov 2026. Trial owners will add their items first, and a real sheet (electric wire sold by the coil) failed on the unit "COIL" and had no place for brand or material. Design approved the same day ("All looks good"; answers: the person may change the metres when cutting, safety limits 50 units per item and 15 fields per business, cost price per unit). TASKS K5c.
 - **Date:** 2026-11-04
 - **Kind:** Feature (minor version)
-- **Release:** v0.9.0 (planned)
+- **Release:** v0.9.0
 - **Branch:** `cr/0013-own-fields-and-units`
 - **Pull request:** [#17](https://github.com/akkiverse/karyahub/pull/17)
 - **References:** [Design for approval](https://claude.ai/artifact/2LErXeWJXtGswTV8uhbdEm), [ADR-0017](../adr/0017-own-item-fields-lists-and-units-as-records.md)

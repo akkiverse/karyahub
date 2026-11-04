@@ -17,6 +17,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Importing a CSV file over an existing item no longer turns a service item into a stocked one or drops "price includes GST".
 - Choosing "cut from" or a unit on the item form shows its boxes at once.
 
+## [0.9.0] - 2026-11-04
+
 ### Added
 - **Your own item details, lists and units.** See [CR-0013](docs/changes/CR-0013-own-fields-and-units.md) and [ADR-0017](docs/adr/0017-own-item-fields-lists-and-units-as-records.md).
 - **Item details** (Inventory → Item details): the owner adds details such as Brand, Material type, Size or Colour (text, number or pick-list; needed, show in the list, filter, print on bills), renames and stops them; a starter set for the kind of business is one tap; up to 15 in use.
@@ -173,6 +175,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.9.0]: https://github.com/akkiverse/karyahub/pull/17
 [0.8.0]: https://github.com/akkiverse/karyahub/pull/15
 [0.7.0]: https://github.com/akkiverse/karyahub/pull/13
 [0.6.0]: https://github.com/akkiverse/karyahub/pull/11

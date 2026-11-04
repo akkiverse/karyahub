@@ -793,3 +793,6 @@ tr.is-stopped td { opacity: 0.65; }
 .inv-filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .inv-filters:empty { display: none; }
 .inv-filter select { min-height: 44px; border: 1px solid var(--c-line); border-radius: 8px; padding: 0 10px; background: var(--c-surface); color: var(--c-ink); font: inherit; font-weight: 500; max-width: 100%; }
+
+/* An element with the hidden attribute is hidden, whatever display its class gives it (CR-0013: the new-unit box stayed open). */
+[hidden] { display: none !important; }

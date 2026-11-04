@@ -9,13 +9,14 @@ Changes can be made two ways. Both follow the same spec-driven rules, so the doc
 3. **Record why.** Every change gets a change request in [docs/changes/](docs/changes/) using the template. Significant technical choices also get an ADR in [docs/adr/](docs/adr/).
 4. **Keep the trail.** Add an entry to [CHANGELOG.md](CHANGELOG.md) under `Unreleased`, and update [docs/quality/TEST-REPORT.md](docs/quality/TEST-REPORT.md).
 5. **Green before merge.** CI runs Ruff and `pytest` for the server, and `npm test` and `npm run build` for the web app, on every push and pull request.
+6. **Track it on GitHub.** Every user story is a GitHub issue (title `US-NN: ...`) created before any code, every pull request names its issues (`Closes #N` or `Refs #N`), and every release is a tag, a GitHub Release and a closed milestone. See [docs/process/TRACKING.md](docs/process/TRACKING.md) for the labels, the definitions of ready and done, and what is automatic.
 
 ## Making a change by hand
 
-1. Create a branch: `git checkout -b change/<short-name>`.
+1. Make sure the change has an issue (a story or a bug), then create a branch: `git checkout -b cr/NNNN-<short-name>`.
 2. Copy `docs/changes/CR-template.md` to `docs/changes/CR-<next number>-<short-name>.md` and fill in *Why* and *What*.
 3. Update the spec and tests, then the code.
-4. Open a pull request. The template lists what to check. Vercel posts a preview link.
+4. Open a pull request that names its issues. The template lists what to check. Vercel posts a preview link.
 5. Merge when CI is green and the preview looks right.
 
 **Short on time?** You can also just commit code. Before the Idea Studio Engineer does any new work here, it reconciles: it reads every commit made without it since its last change and writes the missing change request, changelog entry and spec updates for you. Clear commit messages make that record better.

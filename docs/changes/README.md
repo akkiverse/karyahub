@@ -4,6 +4,7 @@ Every change to KaryaHub is recorded here: what changed, why, and how it affecte
 
 | CR | Change | Why (short) | Status | Release |
 |---|---|---|---|---|
+| [CR-0018](CR-0018-platform-console.md) | Phase Alpha: the platform admin console (Overview, Businesses, People, Attention, Plans, Growth, System), plans and feature switches, usage counts and warnings | Founder, 4 Nov 2026: details of every business, a dashboard with graphs, features switched per business, warnings; see how customers work and sign in | Approved, not built | v0.12.0 |
 | [CR-0017](CR-0017-add-business-link.md) | Add a business button stays on Businesses (it used to open a no-access page for the platform admin); in-page links like Skip to content stay on the page | Founder saw "You don't have access to Home" after pressing Add a business | In progress | |
 | [CR-0016](CR-0016-history-who-did-what.md) | History: every change with who and when, filters by kind and person, who changed what on an item, more actions logged, times on the device's clock | Founder wants every change logged and shown with the person's name | Released | v0.11.0 |
 | [CR-0015](CR-0015-deep-ocean-teal.md) | The Deep Ocean Teal look: Aurora Dark and Clean Light, a new shell with search, and new layouts for Home, Bills, Inventory, Team, Settings and Sign in | Founder asked for a redesign with a live theme switch, keeping all logic | Released | v0.11.0 |

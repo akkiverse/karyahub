@@ -1,0 +1,28 @@
+name: Bug
+description: Something in KaryaHub does not work as the spec says.
+title: "Bug: "
+labels: ["bug", "status: pipeline"]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: Include the screen, who was signed in (role) and what you pressed. Do not paste PINs, keys or customer details.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown by /api/health, or the preview link.
+  - type: textarea
+    id: criterion
+    attributes:
+      label: Spec criterion it breaks (if known)
+      description: For example AC-22.11. A fix adds a test named with that ID.

@@ -1,0 +1,63 @@
+name: Issue status
+
+# Keeps issue labels and milestones in step with pull requests and releases (docs/process/TRACKING.md).
+#   pull request opened or ready  -> issues it names get "status: in review"
+#   pull request back to draft    -> "status: in progress"
+#   pull request merged           -> "status: merged" for issues it closes, "status: in progress" for issues it only refs
+#   release published            -> the milestone named like the tag is closed
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  labels:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const text = `${pr.title}\n${pr.body || ''}`;
+            const numbers = [...new Set([...text.matchAll(/#(\d+)/g)].map((m) => Number(m[1])))];
+            const STATUS = ['status: pipeline', 'status: in progress', 'status: in review', 'status: merged'];
+            const closing = (n) => new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s*#${n}\\b`, 'i').test(text);
+            for (const number of numbers) {
+              let issue;
+              try {
+                issue = (await github.rest.issues.get({ ...context.repo, issue_number: number })).data;
+              } catch (e) {
+                continue; // not an issue number
+              }
+              if (issue.pull_request) continue; // "PR #23" in the text is a pull request, not an issue
+              let next;
+              if (context.payload.action === 'closed') next = pr.merged && closing(number) ? 'status: merged' : 'status: in progress';
+              else if (context.payload.action === 'converted_to_draft' || pr.draft) next = 'status: in progress';
+              else next = 'status: in review';
+              for (const label of STATUS.filter((l) => l !== next)) {
+                try {
+                  await github.rest.issues.removeLabel({ ...context.repo, issue_number: number, name: label });
+                } catch (e) { /* the label was not on the issue */ }
+              }
+              await github.rest.issues.addLabels({ ...context.repo, issue_number: number, labels: [next] });
+            }
+
+  milestone:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.payload.release.tag_name;
+            const all = await github.paginate(github.rest.issues.listMilestones, { ...context.repo, state: 'open', per_page: 100 });
+            const found = all.find((m) => m.title === tag);
+            if (found) await github.rest.issues.updateMilestone({ ...context.repo, milestone_number: found.number, state: 'closed' });

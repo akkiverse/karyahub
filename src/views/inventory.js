@@ -2,7 +2,8 @@ import { W } from '../words.js';
 // Inventory screens (CR-0011, US-25): the list, one item with its history, the add and edit form, the CSV import,
 // and the sheets for stock in, stock out, count and taking a part for a job.
 import { icon } from '../ui/icons.js';
-import { escapeHtml, rupees, rupeesExact, localDmy } from '../format.js';
+import { escapeHtml, rupees, rupeesExact, localDmy, localClock } from '../format.js';
+import { initials } from '../domain/access.js';
 import { byTimeNewestFirst } from '../domain/history.js';
 import { isSynced } from '../ids.js';
 import { deviceToday, today } from '../clock.js';
@@ -131,6 +132,10 @@ export function inventory({ state, ui, allow }) {
 }
 
 // ---------- one item ----------
+/** Who did it, plainly: their initials and their name, on a line of its own (CR-0016). */
+const whoLine = (name) => (name ? `<span class="move-who" data-testid="move-who"><span class="who-mark" aria-hidden="true">${e(initials(name))}</span><span>${W.byPerson} <strong>${e(name)}</strong></span></span>` : '');
+/** The time of a move, when it was entered on the day it is dated (a stock-in can carry an earlier date). */
+const timeOf = (m, demo) => (m.at && localDmy(m.at, demo) === dmy(m.date) ? `<span class="move-time">${e(localClock(m.at, demo))}</span>` : '');
 export function itemPage({ state, ui, params, allow }) {
   const it = (state.items || []).find((i) => i.id === params.id);
   if (!it) return `<section class="page"><a class="back" href="#/inventory">${icon('arrowLeft', { size: 18 })} Inventory</a><h1 id="page-title" tabindex="-1">Item not found</h1><div class="empty"><p>This item isn't in your inventory.</p></div></section>`;
@@ -141,7 +146,11 @@ export function itemPage({ state, ui, params, allow }) {
   const histUnit = units.some((u) => u.unit === (ui.inv && ui.inv.histUnit)) ? ui.inv.histUnit : it.unit;
   const history = historyOf(state, it, histUnit);
   // Stock moves and the item's own changes, in one list, newest first (CR-0016).
-  const timeline = [...(it.history || []).map((h) => ({ ...h, item_line: true })).reverse(), ...history].sort(byTimeNewestFirst);
+  // "Added" and its opening stock are one action, so they show as one line.
+  const opened = (state.stock_moves || []).some((m) => m.item_id === it.id && m.kind === 'opening');
+  const itemLines = (it.history || []).filter((h) => !(opened && h.what === W.itemAdded)).map((h) => ({ ...h, item_line: true })).reverse();
+  const timeline = [...itemLines, ...history].sort(byTimeNewestFirst);
+  const demoClock = !isSynced(state);
   const canSee = allow('view_inventory');
   return `<section class="page" aria-labelledby="page-title">
     <a class="back" href="#/inventory">${icon('arrowLeft', { size: 18 })} Inventory</a>
@@ -171,12 +180,12 @@ export function itemPage({ state, ui, params, allow }) {
       <div class="panel-head"><h2 class="panel-title">History</h2><span class="muted small">Who did what. Moves can't be changed: a mistake is fixed with a new move.</span></div>
       ${units.length > 1 ? `<div class="chips" role="group" aria-label="History of" data-testid="hist-units">${units.map((u) => `<button type="button" class="chip ${u.unit === histUnit ? 'is-on' : ''}" aria-pressed="${u.unit === histUnit}" data-action="inv-hist-unit" data-unit="${e(u.unit)}">${e(UNITS[u.unit])}</button>`).join('')}</div>` : ''}
       ${timeline.length ? `<ol class="moves" data-testid="inv-history">${timeline.map((m) => (m.item_line ? `<li class="move move-item" data-kind="item" data-testid="item-line">
-        <span class="move-date">${e(localDmy(m.at, !isSynced(state)))}</span>
-        <span class="move-what"><strong>${e(m.what)}</strong><span class="muted small" data-testid="move-who">${e(m.who)}</span></span>
+        <span class="move-date">${e(localDmy(m.at, demoClock))}<span class="move-time">${e(localClock(m.at, demoClock))}</span></span>
+        <span class="move-what"><strong>${e(m.what === W.itemAdded ? W.itemAddedLine : m.what)}</strong>${whoLine(m.who)}</span>
         <span class="move-qty"></span>
       </li>` : `<li class="move" data-kind="${m.kind}">
-        <span class="move-date">${e(dmy(m.date))}</span>
-        <span class="move-what"><strong>${MOVE_LABELS[m.kind] || m.kind}${m.kind === 'cut' ? (m.unit === histUnit ? ` into ${e(qtyText(m.gave, m.to_unit))}` : ` from ${e(UNITS[m.unit])}`) : ''}${m.job_id ? ` · <a href="#/jobs/${encodeURIComponent(m.job_id)}">job</a>` : ''}${m.after === undefined ? ' <span class="tag tag-soon">Waiting to send</span>' : ''}</strong><span class="muted small">${e(m.who || '')}${m.note ? ` · ${e(m.note)}` : ''}</span></span>
+        <span class="move-date">${e(dmy(m.date))}${timeOf(m, demoClock)}</span>
+        <span class="move-what"><strong>${m.kind === 'opening' ? W.itemAddedOpening : MOVE_LABELS[m.kind] || m.kind}${m.kind === 'cut' ? (m.unit === histUnit ? ` into ${e(qtyText(m.gave, m.to_unit))}` : ` from ${e(UNITS[m.unit])}`) : ''}${m.job_id ? ` · <a href="#/jobs/${encodeURIComponent(m.job_id)}">job</a>` : ''}${m.after === undefined ? ' <span class="tag tag-soon">Waiting to send</span>' : ''}</strong>${whoLine(m.who)}${m.note ? `<span class="muted small move-note">${e(m.note)}</span>` : ''}</span>
         <span class="move-qty"><strong class="${m.qty > 0 ? 'is-in' : ''}">${e(signedText(m.qty, histUnit))}</strong><span class="muted small">then ${e(qtyText(m.shown_after, histUnit))}</span></span>
       </li>`)).join('')}</ol>` : '<p class="muted">No moves yet.</p>'}
     </div>` : ''}

@@ -24,6 +24,25 @@ export function historyOnDevice(state) {
   return out.sort(byTimeNewestFirst).map((x, i) => ({ id: i + 1, ...x }));
 }
 
+/** "Added inventory item X" and its opening stock are one action, logged as two lines: show them as one. The list is newest first. */
+export function joinAddedLines(entries) {
+  const out = [];
+  for (let i = 0; i < entries.length; i += 1) {
+    const openings = [];
+    let j = i;
+    while (j < entries.length && entries[j].who === entries[i].who && String(entries[j].text).startsWith('Opening stock: ')) { openings.push(entries[j]); j += 1; }
+    const added = entries[j];
+    const match = openings.length && added && added.who === entries[i].who && /^Added inventory item (.+)$/.exec(String(added.text));
+    const name = match ? match[1] : '';
+    if (name && openings.every((x) => x.text.endsWith(` ${name}`))) {
+      const amounts = openings.map((x) => x.text.slice('Opening stock: '.length, -(name.length + 1))).reverse();
+      out.push({ ...added, text: `${added.text}, opening stock ${amounts.join(', ')}` });
+      i = j;
+    } else out.push(entries[i]);
+  }
+  return out;
+}
+
 export function filterHistory(entries, { group = '', who = '', q = '' } = {}) {
   const words = String(q).toLowerCase().split(/\s+/).filter(Boolean);
   return entries.filter((x) => (!group || x.group === group) && (!who || x.who === who) && words.every((w) => `${x.who} ${x.text}`.toLowerCase().includes(w)));

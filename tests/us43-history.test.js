@@ -4,7 +4,7 @@ import { setup, until } from './helpers.js';
 import { meFor, PEOPLE } from './fake-accounts.js';
 import { fakeApi } from './fake-api.js';
 import { itemChanges } from '../src/domain/inventory.js';
-import { historyOnDevice, filterHistory } from '../src/domain/history.js';
+import { historyOnDevice, filterHistory, joinAddedLines } from '../src/domain/history.js';
 import { localClock, localDay } from '../src/format.js';
 
 let t;
@@ -38,10 +38,39 @@ describe('US-43 History', () => {
     expect(line.what).toBe('Changed: sale price ₹350 to ₹400');
     expect(line.who).toBe('Akash Mehta');
     const shown = t.$$('[data-testid="item-line"]').map((x) => x.textContent);
+    expect(shown.at(-1)).toContain('Item added'); // no opening stock: its own line
     expect(shown[0]).toContain('sale price ₹350 to ₹400');
     expect(shown[0]).toContain('Akash Mehta');
     t.click('[data-action="inv-stop"]');
     expect(t.$('[data-testid="item-line"]').textContent).toContain('Stopped using');
+  });
+
+  it('AC-43.2: an item added with opening stock is one line, and every line says plainly who did it', () => {
+    t = setup({ hash: '#/inventory/new' });
+    fill('name', 'Wire 1.5 sq mm'); fill('sale', '90'); fill('opening', '40');
+    t.$('form[data-form="inv-item"]').requestSubmit();
+    const it = t.app.store.get().items.find((i) => i.name === 'Wire 1.5 sq mm');
+    t.go(`#/inventory/item/${it.id}`);
+    const rows = t.$$('[data-testid="inv-history"] .move');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('Item added · Opening stock');
+    expect(rows[0].querySelector('[data-testid="move-who"]').textContent).toContain('By Akash Mehta');
+    t.go('#/inventory');
+    t.click(`[data-inv-step="${it.id}:out"]`);
+    t.go(`#/inventory/item/${it.id}`);
+    const top = t.$('[data-testid="inv-history"] .move');
+    expect(top.querySelector('[data-testid="move-who"]').textContent).toContain('By Akash Mehta');
+    expect(top.querySelector('.move-note').textContent).toContain('Taken with');
+  });
+
+  it('AC-43.2: in the full History, Added and its opening stock join, and nothing else does', () => {
+    const line = (who, text) => ({ who, text, at: '2026-11-04T10:00:00' });
+    const name = 'Added inventory item Wire';
+    expect(joinAddedLines([line('A', 'Stock in: 1 Coil Wire'), line('A', 'Opening stock: 5 m Wire'), line('A', 'Opening stock: 40 Coil Wire'), line('A', name), line('A', 'Signed in')]).map((x) => x.text))
+      .toEqual(['Stock in: 1 Coil Wire', 'Added inventory item Wire, opening stock 40 Coil, 5 m', 'Signed in']);
+    expect(joinAddedLines([line('B', 'Opening stock: 40 Coil Wire'), line('A', name)])).toHaveLength(2); // two people: two lines
+    expect(joinAddedLines([line('A', 'Opening stock: 40 Coil Pipe'), line('A', name)])).toHaveLength(2); // two items: two lines
+    expect(joinAddedLines([line('A', 'Opening stock: 40 Coil Wire')])).toHaveLength(1);
   });
 
   it('AC-43.2: what changed names no cost figures', () => {

@@ -148,7 +148,7 @@ The founder's design system. Tokens are in the first lines of `src/styles.css`; 
 
 ## Additions in CR-0016 (History)
 - **History** is in the sidebar under Manage (clock icon) and in the account menu on a phone. Tools in one panel: search, a person menu, chips for the five kinds. Then one panel with day headings (Today, Yesterday, 4 Nov 2026) and rows: avatar, the person's name in bold, what they did under it, the time at the right in mono. Show older at the end. Typing redraws only the list, so the cursor stays.
-- **Item page:** the item's own lines (Added, Changed: ..., Stopped using) are in the same list as stock moves, each with the name; dates are dd-mm-yyyy like the moves.
+- **Item page:** the item's own lines (Item added, Changed: ..., Stopped using) are in the same list as stock moves. Each row has its date and time, the title, then a line of its own with a small initials mark and "By <name>" (the name in the text colour, after the founder's first look found it too quiet), then any note. Item added and its opening stock are one row, here and in History.
 - **Bill page:** History is open, newest first, with the name in bold.
 - **States:** loading, nothing yet, nothing matches, could not reach the server with Try again.
 

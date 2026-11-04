@@ -1524,6 +1524,13 @@ button.seg { border: 0; background: transparent; font: inherit; font-size: 0.875
 .hist-when { font-size: 0.8rem; color: var(--kh-text-muted); }
 [data-slot="hist-results"] > .btn { justify-self: start; }
 .move-item .move-what strong { font-weight: 600; }
+.move-what { gap: 3px; }
+.move-date { display: grid; align-content: start; }
+.move-time { font-family: var(--font-mono); font-size: 0.78rem; }
+.move-who { display: inline-flex; align-items: center; gap: 7px; font-size: 0.85rem; color: var(--kh-text-muted); }
+.move-who strong { color: var(--kh-text); font-weight: 600; }
+.who-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none; background: var(--kh-primary-grad); color: #fff; font-size: 0.62rem; font-weight: 700; }
+.move-note { overflow-wrap: anywhere; }
 .bill-history summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; min-height: 32px; }
 .bill-history .history li { padding: 8px 0; border-top: 1px solid var(--kh-border); }
 

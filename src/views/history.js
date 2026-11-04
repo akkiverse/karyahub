@@ -3,9 +3,10 @@ import { icon } from '../ui/icons.js';
 import { escapeHtml as e, localDay, localClock } from '../format.js';
 import { W } from '../words.js';
 import { initials } from '../domain/access.js';
+import { joinAddedLines } from '../domain/history.js';
 
 export function historyRows(h, { demo, today }) {
-  const entries = h.entries || [];
+  const entries = joinAddedLines(h.entries || []);
   if (h.error && !entries.length) return `<div class="empty" data-testid="history-error"><p>${e(h.error)}</p><button type="button" class="btn btn-secondary" data-action="hist-reload">${W.tryAgain}</button></div>`;
   if (h.loading && !entries.length) return `<p class="muted" role="status"><span class="spinner" aria-hidden="true"></span> ${W.historyLoading}</p>`;
   if (!entries.length) return `<div class="empty" data-testid="history-empty">${icon('clock', { size: 28 })}<p>${h.q || h.group || h.who ? W.historyNoMatch : W.historyEmpty}</p></div>`;

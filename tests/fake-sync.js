@@ -62,7 +62,10 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
     if (existing) {
       const merged = clone(body);
       if (kind === 'job') for (const f of ['state', 'events', 'otp', 'parts_used']) if (f in existing.body) merged[f] = existing.body[f];
-      if (kind === 'item') merged.qty = existing.body.qty || 0; // the quantity is the server's
+      if (kind === 'item') { // the quantity is the server's, in every unit
+        merged.qty = existing.body.qty || 0;
+        merged.sells = (merged.sells || []).map((x) => ({ ...x, qty: ((existing.body.sells || []).find((o) => o.unit === x.unit) || {}).qty || 0 }));
+      }
       existing.body = merged;
       existing.seq = server.counters.seq;
       return existing;
@@ -72,7 +75,7 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
     if (!num && kind === 'document') num = `${body.type === 'invoice' ? 'INV' : 'QT'}-2027-${pad((server.counters[body.type] += 1))}`;
     const rec = { kind, id, number: num, body: clone(body), seq: server.counters.seq };
     if (kind === 'job') { rec.body.otp = null; rec.body.parts_used = {}; if (!keepState) rec.body.state = 'WORK_DONE'; }
-    if (kind === 'item') rec.body.qty = 0;
+    if (kind === 'item') { rec.body.qty = 0; rec.body.sells = (rec.body.sells || []).map((x) => ({ ...x, qty: 0 })); }
     server.records.set(key(kind, id), rec);
     return rec;
   }
@@ -81,7 +84,23 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
     if (server.records.has(key('stock_move', id))) return "Stock moves can't be changed. Add a correction instead.";
     const item = server.records.get(key('item', b.item_id));
     if (!item) return "That item isn't in your inventory.";
-    const have = item.body.qty || 0;
+    const nameOf = (u) => (server.records.get(key('unit', u)) || { body: {} }).body.name || u;
+    const slotOf = (u) => (u === item.body.unit ? item.body : (item.body.sells || []).find((x) => x.unit === u));
+    const unit = b.unit || item.body.unit;
+    const slot = slotOf(unit);
+    if (!slot) return "That item isn't sold in that unit.";
+    if (b.kind === 'cut') {
+      const to = slotOf(b.to_unit);
+      if (!to) return "That item isn't sold in both of those units.";
+      if (b.count > (slot.qty || 0)) return `Only ${slot.qty || 0} ${nameOf(unit)} in stock. If that's wrong, count the stock first.`;
+      slot.qty = Math.round(((slot.qty || 0) - b.count) * 1000) / 1000;
+      to.qty = Math.round(((to.qty || 0) + b.gives) * 1000) / 1000;
+      item.seq = ++server.counters.seq;
+      server.counters.seq += 1;
+      server.records.set(key('stock_move', id), { kind: 'stock_move', id, number: '', seq: server.counters.seq, body: { ...clone(b), id, qty: -b.count, after: slot.qty, to_after: to.qty } });
+      return null;
+    }
+    const have = slot.qty || 0;
     const qty = b.kind === 'count' ? Math.round((b.counted - have) * 1000) / 1000 : SIGNED[b.kind] * Math.abs(b.qty);
     if (b.kind === 'out' && have + qty < 0) return `Only ${have} ${item.body.unit} in stock. If that's wrong, count the stock first.`;
     let job = null;
@@ -90,7 +109,7 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
       if (!job) return "That job isn't on the server yet. Try again with signal.";
       if (['CLOSED', 'CANCELLED'].includes(job.body.state)) return "This job is closed, so its parts can't change.";
     }
-    item.body.qty = Math.round((have + qty) * 1000) / 1000;
+    slot.qty = Math.round((have + qty) * 1000) / 1000;
     item.seq = ++server.counters.seq;
     if (job) {
       const parts = { ...(job.body.parts_used || {}) };
@@ -100,7 +119,7 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
       job.seq = ++server.counters.seq;
     }
     server.counters.seq += 1;
-    server.records.set(key('stock_move', id), { kind: 'stock_move', id, number: '', seq: server.counters.seq, body: { ...clone(b), id, qty, after: item.body.qty } });
+    server.records.set(key('stock_move', id), { kind: 'stock_move', id, number: '', seq: server.counters.seq, body: { ...clone(b), id, qty, after: slot.qty } });
     return null;
   }
   const changesSince = (since) => {

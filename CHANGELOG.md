@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
+- **An item sold in several units, and Cut.** See [CR-0014](docs/changes/CR-0014-selling-units-and-cut.md) and [ADR-0018](docs/adr/0018-selling-units-in-the-item-and-cut-as-one-move.md).
+- **Also sold as:** an item can be sold in other units (up to 49 besides the main one), each with its own sale price, cost price, low-stock level, opening stock and its own stock count; stock in, stock out and count ask which unit; the list and the item page show every unit; History can be shown one unit at a time.
+- **Cut:** a button on an item with two or more units. Cut a coil into loose metres (the usual 90 is filled in and can be changed); one move, with who and when, shown in both units' history.
+- A **Unit** menu on a bill or estimate line; choosing one changes the unit name and the price; a saved bill takes and returns stock in the unit sold.
+- **CSV:** one row for each unit of an item (same code), with `cut_from` and `cut_gives`.
+
+### Fixed
+- Importing a CSV file over an existing item no longer turns a service item into a stocked one or drops "price includes GST".
+- Choosing "cut from" or a unit on the item form shows its boxes at once.
+
+### Added
 - **Your own item details, lists and units.** See [CR-0013](docs/changes/CR-0013-own-fields-and-units.md) and [ADR-0017](docs/adr/0017-own-item-fields-lists-and-units-as-records.md).
 - **Item details** (Inventory → Item details): the owner adds details such as Brand, Material type, Size or Colour (text, number or pick-list; needed, show in the list, filter, print on bills), renames and stops them; a starter set for the kind of business is one tap; up to 15 in use.
 - **Lists:** staff who manage inventory add brands and the like on that screen or by typing a new one on the item form; renaming an entry changes every item; a name added twice (two phones, no signal) is kept once.

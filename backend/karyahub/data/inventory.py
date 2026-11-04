@@ -47,7 +47,8 @@ UNIT_ALIASES = {
 }
 # 0.25% (rough diamonds and stones) and 3% (gold and silver) were added by CR-0012 (AC-27.6).
 GST_RATES = (0, 0.25, 3, 5, 18, 40)
-MOVE_KINDS = ("opening", "in", "out", "used", "returned", "count")
+MOVE_KINDS = ("opening", "in", "out", "used", "returned", "count", "cut")
+MAX_SELLS = 49  # selling units besides the item's main one (50 in all, CR-0014)
 # What a person needs to save each kind of move. Parts for a job are the office's call,
 # or an allowed technician's.
 MOVE_PERMISSION = {
@@ -55,6 +56,7 @@ MOVE_PERMISSION = {
     "in": "manage_inventory",
     "out": "manage_inventory",
     "count": "manage_inventory",
+    "cut": "manage_inventory",
     "used": "use_parts",
     "returned": "use_parts",
 }
@@ -163,13 +165,47 @@ def clean_item(item_id: str, body: Any) -> dict[str, Any]:
         "stopped": bool(body.get("stopped", False)),
         # CR-0013: the business's own details (field id -> value); checked against its fields by item_fields.
         "attrs": body.get("attrs") if isinstance(body.get("attrs"), dict) else {},
+        # CR-0014: the other units the item is sold in, each with its own prices and stock.
+        "sells": _clean_sells(body.get("sells")),
     }
+
+
+def _clean_sells(raw: Any) -> list[dict[str, Any]]:
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_SELLS:
+        raise AppError(
+            "validation_error", f"An item can be sold in up to {MAX_SELLS + 1} units, this one included.", 422
+        )
+    out = []
+    for entry in raw:
+        if not isinstance(entry, dict) or not isinstance(entry.get("unit"), str) or not entry["unit"]:
+            raise AppError("validation_error", "Each selling unit needs a unit.", 422)
+        low = _number(entry.get("low"))
+        if low is not None and not 0 <= low <= MAX_QTY:
+            raise AppError("validation_error", "The low-stock level must be a number from 0 up.", 422)
+        gives = _number(entry.get("cut_gives"))
+        if gives is not None and not 0 < gives <= MAX_QTY:
+            raise AppError("validation_error", "A cut gives a number above 0.", 422)
+        out.append(
+            {
+                "unit": entry["unit"],
+                "sale": _paise(entry.get("sale"), required=True),
+                "cost": _paise(entry.get("cost")),
+                "low": None if low is None else r3(low),
+                "cut_from": str(entry.get("cut_from") or ""),
+                "cut_gives": None if gives is None else r3(gives),
+            }
+        )
+    return out
 
 
 def hide_cost(rec_kind: str, body: dict[str, Any]) -> dict[str, Any]:
     """Cost prices belong to the people who manage the inventory."""
     if rec_kind in {"item", "stock_move"}:
         body.pop("cost", None)
+    for unit in body.get("sells") or []:
+        unit.pop("cost", None)
     return body
 
 
@@ -227,6 +263,28 @@ class Batch:
                 self.found.setdefault((kind, row.id), row)
             self._loaded.add(kind)
         return [rec for (k, _), rec in self.found.items() if k == kind]
+
+    @staticmethod
+    def slot_qty(item: Record, unit_id: str) -> float | None:
+        """What the item holds in one of its selling units (its main unit or an extra one), or None."""
+        if unit_id == item.body["unit"]:
+            return float(item.body.get("qty", 0))
+        for sold in item.body.get("sells") or []:
+            if sold["unit"] == unit_id:
+                return float(sold.get("qty", 0))
+        return None
+
+    @staticmethod
+    def set_slot_qty(item: Record, unit_id: str, after: float) -> None:
+        body = dict(item.body)
+        if unit_id == body["unit"]:
+            body["qty"] = after
+        else:
+            body["sells"] = [
+                {**sold, "qty": after} if sold["unit"] == unit_id else sold
+                for sold in body.get("sells") or []
+            ]
+        item.body = body
 
     async def unit_info(self, unit_id: str) -> tuple[str, bool]:
         """(name, whole numbers only) of a unit: one of the six built-in units or the business's own."""
@@ -311,12 +369,22 @@ class Batch:
         if item is None:
             raise AppError("not_found", "That item isn't in your inventory.", 404)
         name = item.body["name"]
-        unit, whole = await self.unit_info(item.body["unit"])
-        have = float(item.body.get("qty", 0))
         if item.body.get("service"):
             raise AppError("service_item", f"{name} is a service, so it has no stock.", 409)
         if item.body.get("stopped") and kind != "returned":
             raise AppError("stopped", f"{name} is not in use. Use it again first.", 409)
+        if kind == "cut":
+            return await self._cut(move_id, raw, item)
+        unit_id = str(raw.get("unit") or item.body["unit"])
+        have_there = self.slot_qty(item, unit_id)
+        if have_there is None:
+            raise AppError("not_sold_in", f"{name} isn't sold in that unit.", 422)
+        if unit_id != item.body["unit"] and kind in {"used", "returned"}:
+            raise AppError(
+                "main_unit_only", "Parts for a job are taken in the item's main unit, the first one.", 422
+            )
+        unit, whole = await self.unit_info(unit_id)
+        have = have_there
 
         if kind == "count":
             counted = _number(raw.get("counted"))
@@ -368,6 +436,8 @@ class Batch:
         }
         if kind == "count":
             move["counted"] = after
+        if unit_id != item.body["unit"]:
+            move["unit"] = unit_id
         if job_id:
             move["job_id"] = job_id
         if kind == "in":
@@ -377,7 +447,7 @@ class Batch:
 
         if job is not None:
             self._job_parts(job, move, item, magnitude or 0, unit)
-        item.body = {**item.body, "qty": after}
+        self.set_slot_qty(item, unit_id, after)
         item.seq = self.take_seq()
         item.updated_at = self.now
         rec = Record(
@@ -394,7 +464,74 @@ class Batch:
         self._audit_move(kind, name, unit, qty, move)
         return rec
 
-    async def bill_move(self, item_id: str, qty: float, note: str, doc_id: str, number: str) -> None:
+    async def _cut(self, move_id: str, raw: dict[str, Any], item: Record) -> Record:
+        """Cut some of one unit into another (a coil into loose metres): one move (CR-0014)."""
+        name = item.body["name"]
+        from_id, to_id = str(raw.get("unit") or ""), str(raw.get("to_unit") or "")
+        if not from_id or not to_id or from_id == to_id:
+            raise AppError("validation_error", "Pick the unit you are cutting and the unit it makes.", 422)
+        have_from, have_to = self.slot_qty(item, from_id), self.slot_qty(item, to_id)
+        if have_from is None or have_to is None:
+            raise AppError("not_sold_in", f"{name} isn't sold in both of those units.", 422)
+        (from_name, from_whole), (to_name, to_whole) = (
+            await self.unit_info(from_id),
+            await self.unit_info(to_id),
+        )
+        count, gives = _number(raw.get("count")), _number(raw.get("gives"))
+        if count is None or count <= 0 or gives is None or gives <= 0:
+            raise AppError(
+                "validation_error", "Say how many you cut and how many it makes. Both must be above 0.", 422
+            )
+        if problem := quantity_problem(from_name, count, from_whole) or quantity_problem(
+            to_name, gives, to_whole
+        ):
+            raise AppError("validation_error", problem, 422)
+        if count > have_from + 1e-9:
+            raise AppError(
+                "short",
+                f"Only {fmt(have_from)} {from_name} in stock. If that's wrong, count the stock first.",
+                409,
+            )
+        from_after, to_after = r3(have_from - count), r3(have_to + gives)
+        self.set_slot_qty(item, from_id, from_after)
+        self.set_slot_qty(item, to_id, to_after)
+        item.seq = self.take_seq()
+        item.updated_at = self.now
+        move = {
+            "id": move_id,
+            "item_id": item.id,
+            "kind": "cut",
+            "unit": from_id,
+            "qty": r3(-count),
+            "after": from_after,
+            "to_unit": to_id,
+            "gave": r3(gives),
+            "to_after": to_after,
+            "date": self._date(raw.get("date")),
+            "at": self.now.isoformat(timespec="seconds"),
+            "who": self.p.user.name,
+            "who_id": self.p.user.id,
+            "note": str(raw.get("note") or "")[:200],
+        }
+        rec = Record(
+            business_id=self.business_id,
+            kind="stock_move",
+            id=move_id,
+            number="",
+            body=move,
+            seq=self.take_seq(),
+            updated_at=self.now,
+        )
+        self.db.add(rec)
+        self.found[("stock_move", move_id)] = rec
+        self.audits.append(
+            ("stock_move", f"Cut: {fmt(count)} {from_name} into {fmt(gives)} {to_name} ({name})")
+        )
+        return rec
+
+    async def bill_move(
+        self, item_id: str, qty: float, note: str, doc_id: str, number: str, unit_id: str = ""
+    ) -> None:
         """A stock move made by a bill (CR-0012, AC-27.10): ``sold`` takes stock out, ``sale_cancelled`` puts
         it back. Only the server makes these. A bill is never refused for stock: the shelf may be ahead of the
         records, and the low-stock marks show it."""
@@ -402,7 +539,11 @@ class Batch:
         if item is None:
             return
         kind = "sold" if qty < 0 else "sale_cancelled"
-        after = r3(float(item.body.get("qty", 0)) + qty)
+        if not unit_id or self.slot_qty(item, unit_id) is None:
+            unit_id = item.body[
+                "unit"
+            ]  # a unit taken off the item since: its stock goes back to the main one
+        after = r3(float(self.slot_qty(item, unit_id) or 0) + qty)
         move_id = f"bill-{doc_id}-{self.take_seq()}"[:64]
         move = {
             "id": move_id,
@@ -418,7 +559,9 @@ class Batch:
             "doc_id": doc_id,
             "bill": number,
         }
-        item.body = {**item.body, "qty": after}
+        if unit_id != item.body["unit"]:
+            move["unit"] = unit_id
+        self.set_slot_qty(item, unit_id, after)
         item.seq = self.take_seq()
         item.updated_at = self.now
         rec = Record(

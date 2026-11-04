@@ -55,6 +55,7 @@ PHONE_FIELDS = (
 )
 LINE_FIELDS = (
     "item_id",
+    "unit_id",
     "description",
     "hsn",
     "qty",
@@ -141,6 +142,7 @@ def _line(raw: Any) -> dict[str, Any]:
     line["hsn"] = _text(raw.get("hsn"), 8)
     line["unit"] = _text(raw.get("unit"), 12)
     line["item_id"] = _text(raw.get("item_id"), 64)
+    line["unit_id"] = _text(raw.get("unit_id"), 64)  # which of the item's units the line sells (CR-0014)
     line["price_includes_gst"] = bool(raw.get("price_includes_gst"))
     line["from_job_parts"] = bool(raw.get("from_job_parts"))
     return line
@@ -388,6 +390,8 @@ class Bills:
         """AC-27.10: item lines not from a job's parts take stock; cancelling gives it back. Only the
         difference from what the bill already took is moved, so changing a saved bill keeps stock right."""
         body = rec.body
+        # The key is the item's id, or "item|unit" for one of its other units, so bills made before
+        # units existed (which hold plain item ids) read as the main unit.
         wanted: dict[str, float] = {}
         if not cancelled:
             for line in body["lines"]:
@@ -397,20 +401,23 @@ class Bills:
                 if item is None or item.body.get("service"):
                     continue
                 qty = tax.scaled(line.get("qty"), 3) or 0
-                wanted[item.id] = inventory.r3(wanted.get(item.id, 0) + qty / 1000)
+                unit_id = str(line.get("unit_id") or "")
+                key = item.id if not unit_id or unit_id == item.body["unit"] else f"{item.id}|{unit_id}"
+                wanted[key] = inventory.r3(wanted.get(key, 0) + qty / 1000)
         taken: dict[str, float] = dict(body.get("stock_taken") or {})
         number = body["number"]
-        for item_id in sorted(set(wanted) | set(taken)):
-            change = inventory.r3(wanted.get(item_id, 0) - taken.get(item_id, 0))
+        for key in sorted(set(wanted) | set(taken)):
+            change = inventory.r3(wanted.get(key, 0) - taken.get(key, 0))
             if change == 0:
                 continue
             if cancelled:
                 note = f"Bill {number} cancelled"
-            elif item_id not in taken:
+            elif key not in taken:
                 note = f"Sold on {number}"
             else:
                 note = f"Bill {number} changed"
-            await self.batch.bill_move(item_id, -change, note, rec.id, number)
+            item_id, _, unit_id = key.partition("|")
+            await self.batch.bill_move(item_id, -change, note, rec.id, number, unit_id)
         body = deepcopy(body)
         body["stock_taken"] = {k: v for k, v in wanted.items() if v}
         rec.body = body

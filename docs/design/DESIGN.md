@@ -116,3 +116,10 @@ Design record: the clickable mockup `docs/design/mockups/inventory.html` (uses `
 - **Inventory list:** chosen details sit under the name on a phone and become columns from 760 px; a menu for each filterable pick-list sits under the chips.
 - **Plain checkboxes:** `.check-line` is a visible 22 px checkbox with its label (the older `.check` is the invisible-input toggle used by the permission grid; using it for labelled checkboxes hid them in v0.8.0).
 - **Phone full:** a red notice at the top ("This phone is nearly full for KaryaHub...") in the same place as the sync notices.
+
+## Additions in CR-0014 (selling units and Cut)
+- **Item form, "Also sold as":** a group under the opening stock; each other unit is a bordered card (unit, sale price, cost price, low level, "Made by cutting", the number one gives, opening stock for a new item) with "Take this unit off"; "Add a unit" under the cards. Choosing a unit or a cut redraws the form at once and keeps the cursor and what was typed.
+- **Item page:** one tile for each other unit (its quantity, price, low level, usual cut); a **Cut** button beside Stock in, Stock out and Count when there are two or more units; History has a chip for each unit.
+- **Stock sheets** show a Unit menu when the item has more than one unit. **Cut sheet:** the unit cut and its stock, how many, the unit made and its stock, how many it gives (the usual number said under the label), an optional note.
+- **Inventory list:** other units' quantities as one small line under the main quantity. **Bill line:** a Unit menu before the quantity when the item has several units.
+- **Import:** a "Another unit" tag and a "Unit rows" tile.

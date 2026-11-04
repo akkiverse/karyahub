@@ -377,11 +377,11 @@ describe('US-34 The CSV file has the business\'s own columns', () => {
   };
 
   it('AC-34.1: the template has a column for each detail in use, named as it is, with one example row', () => {
-    expect(csvColumns(state)).toEqual(['code', 'name', 'Brand', 'Material type', 'Size', 'unit', 'sale_price', 'cost_price', 'hsn', 'gst_rate', 'low_stock_at', 'opening_stock']);
+    expect(csvColumns(state)).toEqual(['code', 'name', 'Brand', 'Material type', 'Size', 'unit', 'sale_price', 'cost_price', 'hsn', 'gst_rate', 'low_stock_at', 'opening_stock', 'cut_from', 'cut_gives']);
     const rows = csvTemplate(state).trimEnd().split('\n');
-    expect(rows[0]).toBe('code,name,Brand,Material type,Size,unit,sale_price,cost_price,hsn,gst_rate,low_stock_at,opening_stock');
-    expect(rows[1]).toBe('CAP-35,Capacitor 35 µF,Havells,Example,1,nos,380,170,8532,18,5,10');
-    expect(csvTemplate({ item_fields: [] }).split('\n')[0]).toBe('code,name,unit,sale_price,cost_price,hsn,gst_rate,low_stock_at,opening_stock'); // as before
+    expect(rows[0]).toBe('code,name,Brand,Material type,Size,unit,sale_price,cost_price,hsn,gst_rate,low_stock_at,opening_stock,cut_from,cut_gives');
+    expect(rows[1]).toBe('CAP-35,Capacitor 35 µF,Havells,Example,1,nos,380,170,8532,18,5,10,,');
+    expect(csvTemplate({ item_fields: [] }).split('\n')[0]).toBe('code,name,unit,sale_price,cost_price,hsn,gst_rate,low_stock_at,opening_stock,cut_from,cut_gives'); // the standard columns, then the cut ones
   });
 
   it('AC-34.1: a detail called with a comma or quote in its name is written safely', () => {

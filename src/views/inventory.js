@@ -222,22 +222,34 @@ export function itemForm({ state, ui, params, allow }) {
   return `<section class="page" aria-labelledby="page-title">
     <a class="back" href="${back}">${icon('arrowLeft', { size: 18 })} ${it ? e(it.name) : 'Inventory'}</a>
     <header class="page-head"><h1 id="page-title" tabindex="-1">${it ? 'Edit item' : 'Add an item'}</h1><p class="muted">${it ? 'The quantity changes only through Stock in, Stock out, Count and parts used on jobs.' : 'One part or material you keep in the store.'}</p></header>
-    <form class="panel" data-form="inv-item" data-item="${e(params.id || '')}" novalidate>
-      <div class="form-grid">
+    <form class="panel item-form" data-form="inv-item" data-item="${e(params.id || '')}" novalidate>
+      <section class="form-section" aria-labelledby="fs-item">
+        <h2 class="form-section-title" id="fs-item">The item</h2>
+        <div class="form-grid">
         ${input('name', 'Name', '', 'data-autofocus placeholder="for example Capacitor 35 µF"')}
         ${input('code', 'Code', 'optional, unique in your business', 'placeholder="for example CAP-35"')}
         <label class="field">Unit<select name="unit" data-unit-select ${inv(errors, 'unit')}>${pickableUnits(state, it && it.unit).map((u) => `<option value="${e(u.id)}" ${v.unit === u.id ? 'selected' : ''}>${e(u.name)}</option>`).join('')}${manage ? `<option value="__new__" ${v.unit === '__new__' ? 'selected' : ''}>New unit…</option>` : ''}</select>${fieldErr(errors, 'unit')}</label>
         <div class="field new-unit" data-slot="new-unit" ${v.unit === '__new__' ? '' : 'hidden'}>${input('new_unit', 'Name of the new unit', 'up to 12 letters, for example Coil', 'maxlength="12"')}<label class="check-line"><input type="checkbox" name="new_unit_whole" ${v.new_unit_whole ? 'checked' : ''}> Whole numbers only</label></div>
+        ${activeFields(state).map((x) => detailInput(state, x, v, errors, manage)).join('')}
+        </div>
+      </section>
+      <section class="form-section" aria-labelledby="fs-price">
+        <h2 class="form-section-title" id="fs-price">Prices and tax</h2>
+        <div class="form-grid">
         ${input('sale', 'Sale price (₹)', 'per unit, used on estimates and bills', 'inputmode="decimal"')}
         ${input('cost', 'Cost price (₹)', 'optional; only people who manage inventory see it', 'inputmode="decimal"')}
-        ${activeFields(state).map((x) => detailInput(state, x, v, errors, manage)).join('')}
-        ${input('hsn', 'HSN code', 'optional, 4, 6 or 8 digits', 'inputmode="numeric"')}
         <label class="field">GST rate<select name="gst" ${inv(errors, 'gst')}>${GST_RATES.map((g) => `<option value="${g}" ${String(v.gst) === String(g) ? 'selected' : ''}>${g} %</option>`).join('')}</select>${fieldErr(errors, 'gst')}</label>
-        <label class="check-line"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}><span>${W.priceIncludesGst} <span class="muted small">(MRP)</span></span></label>
-        <label class="check-line"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}><span>${W.service} <span class="muted small">(for example Gas refill)</span></span></label>
+        ${input('hsn', 'HSN code', 'optional, 4, 6 or 8 digits', 'inputmode="numeric"')}
+        </div>
+        <div class="check-row"><label class="check-line"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}><span>${W.priceIncludesGst} <span class="muted small">(MRP)</span></span></label><label class="check-line"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}><span>${W.service} <span class="muted small">(for example Gas refill)</span></span></label></div>
+      </section>
+      <section class="form-section" aria-labelledby="fs-stock">
+        <h2 class="form-section-title" id="fs-stock">Stock</h2>
+        <div class="form-grid">
         ${input('low', 'Low-stock level', 'optional; marked Low at or below this', 'inputmode="decimal"')}
         ${it ? '' : input('opening', 'Opening stock', 'optional; what is on the shelf today', 'inputmode="decimal"')}
-      </div>
+        </div>
+      </section>
       ${v.service === true || v.service === 'on' ? '' : sellRows(state, v, errors, manage, !it)}
       <div class="actions"><a class="btn btn-ghost" href="${back}">Cancel</a><button type="submit" class="btn btn-primary">${it ? 'Save changes' : 'Add item'}</button></div>
     </form>

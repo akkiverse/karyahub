@@ -1,12 +1,12 @@
 # CR-0016: History: who did what
 
-- **Status:** In progress
+- **Status:** Released
 - **Requested by:** Founder, 4 Nov 2026: "Item added or decreased, or bill generated: any stuff like this should be logged and also display in history the name of the user who made the changes."
 - **Date:** 2026-11-04
 - **Kind:** Feature (minor version)
-- **Release:** v0.11.0 with CR-0015 (planned)
+- **Release:** v0.11.0, with CR-0015
 - **Branch:** `cr/0016-history-who-did-what` 
-- **Pull request:** see `TASKS.md`, K10
+- **Pull request:** [#22](https://github.com/akkiverse/karyahub/pull/22)
 
 ## Why
 The server already logged most actions with the person's name, but they were hard to see: the activity log was on Admin only, showed the latest 15 lines, and read in server time. An item's page showed stock moves only, not who added it or changed its price.

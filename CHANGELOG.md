@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-04
+
 ### Added
 - **The Deep Ocean Teal look.** See [CR-0015](docs/changes/CR-0015-deep-ocean-teal.md) and [ADR-0019](docs/adr/0019-design-tokens-self-hosted-fonts-and-a-per-device-theme.md).
 - **Aurora Dark and Clean Light:** a Sun or Moon button in the top bar and on sign-in, and Dark, Light, System in Settings. Dark is the default; a light or dark choice you already made is kept.
@@ -196,6 +198,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.11.0]: https://github.com/akkiverse/karyahub/pull/21
 [0.10.0]: https://github.com/akkiverse/karyahub/pull/19
 [0.9.0]: https://github.com/akkiverse/karyahub/pull/17
 [0.8.0]: https://github.com/akkiverse/karyahub/pull/15

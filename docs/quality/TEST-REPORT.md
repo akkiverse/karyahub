@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-04 · **Branch:** `cr/0016-history-who-did-what` (CR-0016, on CR-0015) · **Result:** 594 of 594 tests passing (290 server + 1 Postgres-only test skipped without its database, 304 web), covering all 239 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-04 · **Branch:** `main` at v0.11.0 (CR-0015, CR-0016) · **Result:** 594 of 594 tests passing (290 server + 1 Postgres-only test skipped without its database, 304 web), covering all 239 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
@@ -520,6 +520,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
+- v0.11.0 (2026-11-04): CR-0015 and CR-0016 released together; 594 of 594 tests passing (290 server, 304 web), plus the Postgres-only test (not run: no schema change). One round of changes after the founder's first look at each preview: Home from the founder's image, the gradient's middle stop, and the name made plain in history rows.
 - v0.10.0 (2026-11-04): CR-0014 released; 543 of 543 tests passing (283 server, 260 web), plus the Postgres-only test (not run: no schema change). Three fixes after the founder's first check of the preview (the form emptied by a redraw, a tap on Add a unit lost, the unit rows scattered) have tests. The founder checked the preview (three rounds: the form emptied by a redraw, the unit rows scattered, the form layout) and merged PR #19; the production deployment of the merge commit `3883d25` is READY and serves the new screens.
 - v0.9.0 (2026-11-04): CR-0013 part 1 released; 496 of 496 tests passing (264 server, 232 web), plus the Postgres-only test (not run for this change: no schema change, the records table is the one the v0.8.0 run used). Founder checked the preview on a phone (two fixes after the check: Change now scrolls to its form; the new-unit box shows only when chosen) and merged PR #17.
 - v0.8.0 (2026-11-04): CR-0012 released; 443 of 443 tests passing (241 server, 202 web), plus the Postgres-only test (run on PostgreSQL 16.2). Founder merged PR #15 after its preview built; production deployment `dpl_3x9GBr7kYuxXQSqee7AK9fvZ549Y` (commit `100b0af`) is READY and serves `/api/health`, the app and the public bill page (wrong token answers 404, noindex).

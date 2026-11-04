@@ -54,6 +54,22 @@ const noticeHtml = (ui, key) => {
 const fieldErr = (errors, k) => (errors[k] ? `<span class="field-error" id="err-${k}">${e(errors[k])}</span>` : '');
 const inv = (errors, k) => (errors[k] ? `aria-invalid="true" aria-describedby="err-${k}"` : '');
 
+/** The stock cell of the table (CR-0015): − and + for one of the main unit, each one an ordinary stock move, and the low level under them. */
+function stockCell(state, i, manage) {
+  const extras = extrasHtml(state, i);
+  if (i.service) return qtyHtml(state, i);
+  const low = i.low == null ? '' : `<span class="cell-sub">Low at <span class="mono">${e(qtyText(i.low, i.unit))}</span></span>`;
+  if (!manage || i.stopped) return `${qtyHtml(state, i)}${extras}${low}`;
+  const q = stockOf(state, i);
+  const step = (dir, sign, verb) => `<button type="button" class="step-btn" data-action="inv-step" data-dir="${dir}" data-item="${e(i.id)}" data-inv-step="${e(i.id)}:${dir}" aria-label="${verb} 1 ${e(UNITS[i.unit])}: ${e(i.name)}" ${dir === 'out' && q <= 0 ? 'disabled' : ''}>${icon(sign, { size: 16 })}</button>`;
+  return `<span class="stepper">${step('out', 'minus', 'Take out')}${qtyHtml(state, i)}${step('in', 'plus', 'Add')}</span>${extras}${low}`;
+}
+/** Every stocked item gets a status word in the table: the existing mark, or In stock. */
+function statusHtml(state, i) {
+  if (i.stopped) return '<span class="mark mark-service">Stopped</span>';
+  return markHtml(state, i) || '<span class="mark mark-ok">In stock</span>';
+}
+
 // ---------- the list ----------
 export function chipsHtml(state, ui) {
   const c = summary(state);
@@ -69,7 +85,9 @@ export function filtersHtml(state, ui) {
 export function resultsHtml(state, ui, allow) {
   const inv = ui.inv || {};
   const rows = listItems(state, { filter: inv.filter || 'all', q: inv.q || '', f: inv.f || {} });
+  const category = activeFields(state).find((f) => /categor/i.test(f.name));
   const shown = activeFields(state).filter((f) => f.in_list);
+  const shownAsColumns = shown.filter((f) => f !== category);
   const manage = allow('manage_inventory');
   if (!rows.length) {
     const q = String(inv.q || '').trim();
@@ -78,9 +96,9 @@ export function resultsHtml(state, ui, allow) {
   }
   const href = (i) => `#/inventory/item/${encodeURIComponent(i.id)}`;
   const cards = rows.map((i) => `<li class="row-card inv-card" data-item="${e(i.id)}"><a href="${href(i)}"><span class="row-main"><strong>${e(i.name)}</strong><span class="code">${e(i.code || 'No code')} · ${UNITS[i.unit]}${i.stopped ? ' · stopped' : ''}</span>${shown.length && detailsLine(state, i, 'in_list') ? `<span class="muted small" data-testid="card-details">${e(detailsLine(state, i, 'in_list'))}</span>` : ''}</span><span class="inv-card-side">${qtyHtml(state, i)}${extrasHtml(state, i)}${markHtml(state, i)}</span></a></li>`).join('');
-  const table = `<div class="panel inv-table-wrap"><div class="table-wrap"><table class="table">
-    <thead><tr><th scope="col">Item</th><th scope="col">Code</th>${shown.map((f) => `<th scope="col">${e(f.name)}</th>`).join('')}<th scope="col" class="num">In stock</th><th scope="col" class="num">Low at</th><th scope="col" class="num">Sale price</th>${manage ? '<th scope="col" class="num">Cost price</th>' : ''}<th scope="col">Mark</th></tr></thead>
-    <tbody>${rows.map((i) => `<tr data-href="${href(i)}" data-item="${e(i.id)}"><td><a class="row-name" href="${href(i)}">${e(i.name)}</a></td><td class="code">${e(i.code || '—')}</td>${shown.map((f) => `<td>${e(detailOf(state, i, f) || '—')}</td>`).join('')}<td class="num">${qtyHtml(state, i)}${extrasHtml(state, i) ? `<br>${extrasHtml(state, i)}` : ''}</td><td class="num">${i.low == null ? '—' : e(qtyText(i.low, i.unit))}</td><td class="num">${price(i.sale)}<span class="muted small"> /${UNITS[i.unit]}</span></td>${manage ? `<td class="num">${price(i.cost)}</td>` : ''}<td>${markHtml(state, i)}</td></tr>`).join('')}</tbody>
+  const table = `<div class="inv-table-wrap"><div class="table-wrap"><table class="table inv-table">
+    <thead><tr><th scope="col">SKU</th><th scope="col">Item</th><th scope="col">${category ? `${e(category.name)} and ` : ''}HSN/SAC</th>${shownAsColumns.map((f) => `<th scope="col">${e(f.name)}</th>`).join('')}<th scope="col">In stock</th>${manage ? '<th scope="col" class="num">Cost price</th>' : ''}<th scope="col" class="num">Sale price</th><th scope="col" class="num">GST</th><th scope="col">Status</th></tr></thead>
+    <tbody>${rows.map((i) => `<tr data-item="${e(i.id)}"><td><span class="sku">${e(i.code || '—')}</span></td><td><a class="row-name" href="${href(i)}">${e(i.name)}</a></td><td>${category && detailOf(state, i, category) ? `<span class="cell-main">${e(detailOf(state, i, category))}</span>` : ''}<span class="cell-sub mono">${i.hsn ? `HSN ${e(i.hsn)}` : '—'}</span></td>${shownAsColumns.map((f) => `<td>${e(detailOf(state, i, f) || '—')}</td>`).join('')}<td>${stockCell(state, i, manage)}</td>${manage ? `<td class="num mono">${price(i.cost)}</td>` : ''}<td class="num"><span class="mono">${price(i.sale)}</span><span class="muted small"> /${UNITS[i.unit]}</span></td><td class="num mono">${i.service && i.gst == null ? '—' : `${e(i.gst)}%`}</td><td>${statusHtml(state, i)}</td></tr>`).join('')}</tbody>
   </table></div></div>`;
   return `<ul class="inv-cards" data-testid="inv-list">${cards}</ul>${table}<p class="muted small">${rows.length} item${rows.length === 1 ? '' : 's'} shown. Search works on this phone's copy, with or without signal.</p>`;
 }
@@ -93,7 +111,7 @@ export function inventory({ state, ui, allow }) {
     ${noticeHtml(ui, 'inventory')}
     <div class="page-head-row">
       <header class="page-head"><h1 id="page-title" tabindex="-1">Inventory</h1><p class="muted">${demo ? SAMPLE_NOTE : "Parts in your store. Parts for a job are taken on the job's screen."}</p></header>
-      ${manage ? `<div class="actions"><a class="btn btn-ghost" href="#/inventory/fields">${icon('settings', { size: 18 })} Item details</a>${demo ? '' : `<a class="btn btn-ghost" href="#/inventory/import">${icon('upload', { size: 18 })} Import CSV</a>`}<a class="btn btn-primary" href="#/inventory/new">${icon('plus', { size: 18 })} Add item</a></div>` : ''}
+      ${manage ? `<div class="actions"><a class="btn btn-ghost" href="#/inventory/fields">${icon('settings', { size: 18 })} Item details</a>${demo ? '' : `<a class="btn btn-secondary" href="#/inventory/import">${icon('upload', { size: 18 })} Import CSV</a>`}<a class="btn btn-primary" href="#/inventory/new">${icon('plus', { size: 18 })} Add item</a></div>` : ''}
     </div>
     <ul class="kpis inv-kpis" data-testid="inv-kpis">
       <li class="kpi"><span class="kpi-label">${icon('box', { size: 16 })} Items</span><span class="kpi-value" data-testid="kpi-items">${c.all}</span><span class="kpi-sub muted">in use</span></li>
@@ -102,7 +120,7 @@ export function inventory({ state, ui, allow }) {
       ${manage ? `<li class="kpi"><span class="kpi-label">${icon('file', { size: 16 })} Stock value</span><span class="kpi-value money" data-testid="kpi-value">${price(c.value)}</span><span class="kpi-sub muted">at cost price</span></li>` : ''}
     </ul>
     ${manage ? '' : `<p class="notice" data-testid="inv-readonly">${icon('shield', { size: 18 })}<span>You can see inventory. Ask the office to add or correct stock.</span></p>`}
-    <div class="inv-tools">
+    <div class="panel inv-tools">
       <div class="inv-search">${icon('search', { size: 18 })}<label class="sr-label" for="inv-q">Search inventory by name or code</label><input id="inv-q" type="search" placeholder="Search name or code, e.g. cap 45" value="${e((ui.inv && ui.inv.q) || '')}" autocomplete="off" data-inv-search></div>
       <div class="chips" role="group" aria-label="Show" data-slot="inv-chips">${chipsHtml(state, ui)}</div>
       <div class="inv-filters" data-slot="inv-filters">${filtersHtml(state, ui)}</div>

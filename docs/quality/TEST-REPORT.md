@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-04 · **Branch:** `cr/0014-selling-units-and-cut` (CR-0014, part 2) · **Result:** 543 of 543 tests passing (283 server + 1 Postgres-only test skipped without its database, 260 web), covering all 205 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-04 · **Branch:** `cr/0015-deep-ocean-teal` (CR-0015) · **Result:** 568 of 568 tests passing (283 server + 1 Postgres-only test skipped without its database, 285 web), covering all 205 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
@@ -12,6 +12,8 @@ Three suites:
 Some criteria have a test on each side (for example AC-7.2 and AC-23.1: the web app calls the API, and the server does the work). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
 Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see the spec); their old on-device tests were replaced by the tests for AC-18 to AC-22.
+
+**CR-0015** added 25 web tests (`us38-deep-ocean.test.js`) and changed no older test and no server code. A real browser (Chrome) ran every main screen at 1440 px and 375 px in both themes, with no script errors and no sideways scrolling, and a further pass at 360 px on an emulated touch phone. Scripts also drove the theme switch, System following the device, the theme being set before the body appears, the drawer, Ctrl + K search, the − and + buttons and their history, Remind and Create GST quote on Home, and the print view from the dark theme (paper alone, on white). Not run in a real browser: a real business's data against Postgres (no server change), and a real phone.
 
 **CR-0012** added 90 server tests (`test_us26_packs.py`, `test_us27_tax.py`, `test_us28_bills.py`, `test_us30_links.py`) and 65 web tests (`us26-bills.test.js`, `us27-tax.test.js`). The tax engine's 36 shared cases in `tests/fixtures/gst_cases.json` run on both sides, one test each, and must give identical figures (AC-27.9). It changed older tests where it meant to change behaviour: the US-4 tests now go through Make estimate and Make bill and the bill editor (AC-4.1 to AC-4.3 changed; AC-4.4 retired), the AC-25.13 tests check the editor's lines, the coordinator's navigation has Bills (AC-14.3), the technician's job screen says "Estimates and bills are made by the office." (AC-14.1), the role table has 13 permissions (AC-19.1), and the wall coverage test allows `doc_links` (a token hash looked up before the business is known; ADR-0016). The Postgres-only test was run again on PostgreSQL 16.2 with migration 0004, and an end-to-end run of the API on that database with the restricted role on (`row_level_security: on`) made a business, answered the type question, synced an item, its opening stock and a saved bill (numbered 26-27/0001, ₹3,393; stock 10 → 7.5), sent it (wa.me link), opened the public page (noindex) and PDF (22 KB, ₹ printed), refused a wrong token (404), and cancelled the bill (stock back to 10).
 
@@ -431,6 +433,28 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-37.1 | `tests/api/test_us36_selling_units.py::test_ac_37_1_a_cut_lowers_one_unit_and_raises_the_other_in_one_move`, `…a_cut_is_refused_when_there_is_not_enough_or_the_numbers_are_wrong`; web `tests/us36-selling-units.test.js` › AC-37.1 (the Cut sheet, refusals, no Cut button with one unit, a real business: a cut with no signal sent once; a cut the server refuses is taken back) | Pass |
 | AC-37.2 | `tests/api/test_us36_selling_units.py::test_ac_37_2_the_person_may_change_the_metres_a_coil_gives`; web `tests/us36-selling-units.test.js` › AC-37.2 | Pass |
 | AC-37.3 | `tests/api/test_us36_selling_units.py::test_ac_37_3_a_cut_cannot_be_changed_and_is_for_people_who_manage_stock`; web `tests/us36-selling-units.test.js` › AC-37.3 (history in both units, who and when) | Pass |
+| AC-38.1 | `tests/us38-deep-ocean.test.js` › AC-38.1: the first visit is Aurora Dark…; the sign-in screen has the same button | Pass |
+| AC-38.2 | `tests/us38-deep-ocean.test.js` › AC-38.2: Settings offers Dark, Light and System… | Pass |
+| AC-38.3 | `tests/us38-deep-ocean.test.js` › AC-38.3: a light or dark choice made on an older version is kept… | Pass |
+| AC-38.4 | `tests/us38-deep-ocean.test.js` › AC-38.4: the theme is set before the first paint… | Pass |
+| AC-38.5 | `tests/us38-deep-ocean.test.js` › AC-38.5: the exact design tokens of both themes are in the stylesheet | Pass |
+| AC-38.6 | `tests/us38-deep-ocean.test.js` › AC-38.6: the three font roles are bundled with the app… | Pass |
+| AC-38.7 | `tests/us38-deep-ocean.test.js` › AC-38.7: the paper is white in both themes… | Pass |
+| AC-39.1 | `tests/us38-deep-ocean.test.js` › AC-39.1: the top bar shows where you are, and the side menu opens as a drawer… | Pass |
+| AC-39.2 | `tests/us38-deep-ocean.test.js` › AC-39.2: Ctrl or Cmd + K goes to the search… | Pass |
+| AC-39.3 | `tests/us38-deep-ocean.test.js` › AC-39.3: search shows only what this person may open | Pass |
+| AC-39.4 | `tests/us38-deep-ocean.test.js` › AC-39.4: + New is one button… | Pass |
+| AC-39.5 | `tests/us38-deep-ocean.test.js` › AC-39.5: the entrance plays when the screen changes… | Pass |
+| AC-40.1 | `tests/us38-deep-ocean.test.js` › AC-40.1: three figures come from saved bills… | Pass |
+| AC-40.2 | `tests/us38-deep-ocean.test.js` › AC-40.2: the field stream shows each technician message… | Pass |
+| AC-40.3 | `tests/us38-deep-ocean.test.js` › AC-40.3: the renewals list gives customer, equipment, urgency and value… | Pass |
+| AC-40.4 | `tests/us38-deep-ocean.test.js` › AC-40.4: GST this month adds only saved bills of this month | Pass |
+| AC-40.5 | `tests/us38-deep-ocean.test.js` › AC-40.5: a technician sees no money on Home | Pass |
+| AC-41.1 | `tests/us38-deep-ocean.test.js` › AC-41.1: the bills table shows number and date, customer and GSTIN… | Pass |
+| AC-41.2 | `tests/us38-deep-ocean.test.js` › AC-41.2: a row has Send on WhatsApp and the PDF…; the answer of a send shows on the list | Pass |
+| AC-41.3 | `tests/us38-deep-ocean.test.js` › AC-41.3: − and + in the stock column write ordinary moves…; someone who may only see inventory gets no − or + | Pass |
+| AC-41.4 | `tests/us38-deep-ocean.test.js` › AC-41.4: Admin has the team and forms on the left… | Pass |
+| AC-41.5 | `tests/us38-deep-ocean.test.js` › AC-41.5: Settings has the forms on the left and the live paper… | Pass |
 
 ## Design checklist
 | Check | Result |

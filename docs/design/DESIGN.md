@@ -6,6 +6,8 @@ A sales demo for owners of AC, RO and fire-safety service firms in India (person
 ## The main screen's one job
 Home makes the owner feel the money he is losing: one big rupee number, "Money at stake in the next 90 days", then a single button into the chat that shows how KaryaHub recovers it.
 
+> **Since CR-0015 the look is "Deep Ocean Teal".** Colours, type and layout are in *Additions in CR-0015* at the end of this file. The palette, typography and shell below are history where they differ; states and the rules still hold.
+
 ## Palette
 | Token | Light | Dark | Use |
 |---|---|---|---|
@@ -124,3 +126,22 @@ Design record: the clickable mockup `docs/design/mockups/inventory.html` (uses `
 - **Inventory list:** other units' quantities as one small line under the main quantity. **Bill line:** a Unit menu before the quantity when the item has several units.
 - **Import:** a "Another unit" tag and a "Unit rows" tile.
 - **Item form layout (after the founder's second look):** three sections with a heading each (The item; Prices and tax, with the two checkboxes under the boxes; Stock) then Also sold as; at most 960 px wide on a big screen, the name on its own full-width line, boxes in rows of up to four. The hint of a box is under it, so every box in a row starts at the same height. Selects are drawn by the page (`appearance: none`, a chevron, 44 px) so they are as tall as the text boxes in Safari and Chrome alike.
+
+## Additions in CR-0015 (Deep Ocean Teal)
+The founder's design system. Tokens are in the first lines of `src/styles.css`; the components are in its last layer. Decisions: [ADR-0019](../adr/0019-design-tokens-self-hosted-fonts-and-a-per-device-theme.md).
+- **Themes:** Aurora Dark (default; near-black canvas `#060814` with a teal and blue aura, glass cards) and Clean Light (`#F8FAFC`, frosted white cards). `data-theme` on `<html>`, kept in `localStorage` `kh-theme`: `dark`, `light` or `system`.
+- **Brand:** `--kh-primary-grad`, teal `#0F766E` to sky `#0EA5E9` to blue `#2563EB`, on primary buttons, the active sidebar item, active pills and segments, the + New button, avatars and the chat header.
+- **Status colours:** emerald for paid, active and in stock; amber for unpaid (Saved, Sent), low and pending; rose for overdue, out and cancelled; `--kh-ok`, `--kh-warn`, `--kh-bad`, each with `-bg` and `-line`. Draft and neutral marks are quiet grey. The classes are `.chip-status`, `.mark`, `.status`, `.tag`, `.pill`.
+- **Type:** headings Plus Jakarta Sans 600 to 800 at -0.02em; interface Inter 400 to 600; JetBrains Mono 500 to 700 for ₹ figures, GSTIN, HSN or SAC, bill numbers, mobile numbers, PINs and quantities (`.mono`, or by the selector list in the layer).
+- **Surfaces:** cards (`.panel`, `.kpi`, `.stake-card`) are glass, 16 px radius; rows inside them use `--kh-row`; what floats over content (menus, sheets, the total bar, search results) uses solid `--kh-solid`. Blur only from 760 px, to keep phones smooth.
+- **KPI cards:** a 3 px gradient bar across the top, opacity .45 and 1 on hover; Home's also carry a tinted icon badge top right.
+- **Motion:** primary buttons lift on hover and press in; cards rise 2 px on hover where hover exists; a 280 ms entrance when the screen changes, never on a redraw. All off under reduced motion.
+- **Shell:** sidebar 264 px, sticky from 900 px and a drawer below (menu button, backdrop, Escape). Top bar 64 px, blurred: menu button (phone), breadcrumb (with the business's name on a phone), search with its key hint (from 900 px), demo pill, sync badge, theme button (name from 1280 px), account menu (phone; from 900 px the sidebar's person strip links to My account), + New (fixed into the top bar from 900 px, the same element as the phone's corner button). The phone's bottom tab bar stays. Content is at most 1440 px wide, with 32 px sides.
+- **Splits:** `.split-12` with `.col-5`, `.col-6`, `.col-7`; one column below 1100 px, because the sidebar takes the room first.
+- **Home:** demo only, the hero (gradient tint, headline, next renewal, the yellow note); then three figures; left the stream, Get started and the day's figures; right AMC renewals due and GST this month.
+- **Tables** (bills, inventory): rows drawn as separate cards. Quick actions on a bill row appear on hover or keyboard focus and are always there on touch. Phones keep their cards (rule 8).
+- **Inventory stepper:** − and + beside the quantity: 34 px with a mouse, 44 px on touch. There is no notice on success, as the quantity itself changes and the focus stays on the button.
+- **The paper:** white with dark text in both themes through its own token values. In both A4 layouts `--bill-fill` is the gradient in the default colour and the business's colour otherwise: A4 classic has a 6 px top bar and a coloured title, A4 modern a full header band with white text; both have the total in a filled box. The receipt stays plain. In print the classic title falls back to solid colour, as printers may not paint text through a gradient.
+- **Sign in:** a gradient panel with the white K badge, headline and three darker glass points; the card on the theme's canvas; the theme button top right.
+- **Phone first still holds:** no sideways scroll at 360 px; targets in the top bar and tab bar and + New are at least 44 px; every list keeps its own search.
+

@@ -5,8 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>KaryaHub demo · WhatsApp to job records and AMC renewals</title>
     <meta name="description" content="A demo for AMC service firms: technicians' WhatsApp voice notes and job-sheet photos become job records, GST-format quotes and renewal reminders. Sample data only." />
-    <meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0c1413" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#060814" />
+    <script>
+      // Set the theme before the first paint, so the page never flashes the wrong one. The same steps as src/theme.js (CR-0015).
+      (function () {
+        var pref = 'dark';
+        try {
+          var saved = localStorage.getItem('kh-theme');
+          if (saved === 'dark' || saved === 'light' || saved === 'system') pref = saved;
+          else {
+            var old = JSON.parse(localStorage.getItem('karyahub.prefs.v1') || '{}').theme;
+            if (old === 'light' || old === 'dark') pref = old;
+          }
+        } catch (e) {}
+        var theme = pref === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pref;
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#F8FAFC' : '#060814';
+      })();
+    </script>
     <meta property="og:title" content="KaryaHub demo" />
     <meta property="og:description" content="Never miss an AMC renewal again. See a technician's WhatsApp voice note become a job record, a quote and a renewal reminder." />
     <meta property="og:type" content="website" />

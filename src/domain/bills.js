@@ -164,7 +164,7 @@ export function billList(documents, { kind = 'invoice', q = '', chip = 'all' }, 
   const matching = mine.filter((d) => {
     if (!words.length) return true;
     const c = d.customer || {};
-    const hay = `${d.number || ''} ${c.name || ''}`.toLowerCase();
+    const hay = `${d.number || ''} ${c.name || ''} ${c.gstin || ''}`.toLowerCase();
     return words.every((w) => hay.includes(w)) || (digits.length >= 3 && String(c.phone || '').replace(/\D/g, '').includes(digits));
   });
   const counts = Object.fromEntries(CHIPS.map(([k]) => [k, matching.filter((d) => chipHas(k, statusOf(d, today))).length]));
@@ -179,15 +179,31 @@ export function billFigures(documents, today) {
   let billedToday = 0;
   let unpaid = 0;
   let overdue = 0;
+  let overdueAmount = 0;
+  let madeToday = 0;
+  let unpaidCount = 0;
   for (const d of documents) {
     if (!isV2(d) || !isBill(d) || d.deleted) continue;
     const s = statusOf(d, today);
     const t = totalOf(d) || 0;
-    if (d.date === today && ['saved', 'sent', 'paid', 'overdue'].includes(s)) billedToday += t;
-    if (['saved', 'sent', 'overdue'].includes(s)) unpaid += t;
-    if (s === 'overdue') overdue += 1;
+    if (d.date === today && ['saved', 'sent', 'paid', 'overdue'].includes(s)) { billedToday += t; madeToday += 1; }
+    if (['saved', 'sent', 'overdue'].includes(s)) { unpaid += t; unpaidCount += 1; }
+    if (s === 'overdue') { overdue += 1; overdueAmount += t; }
   }
-  return { billedToday, unpaid, overdue };
+  return { billedToday, unpaid, overdue, overdueAmount, madeToday, unpaidCount };
+}
+
+/** Home's GST card (CR-0015): what this calendar month's saved bills add up to, in paise. Cancelled bills and drafts don't count. */
+export function gstThisMonth(documents, today) {
+  const month = String(today).slice(0, 7);
+  const sum = { count: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
+  for (const d of documents) {
+    if (!isV2(d) || !isBill(d) || d.deleted || !d.totals || String(d.date).slice(0, 7) !== month) continue;
+    if (!['saved', 'sent', 'paid', 'overdue'].includes(statusOf(d, today))) continue;
+    sum.count += 1;
+    for (const k of ['taxable', 'cgst', 'sgst', 'igst', 'total']) sum[k] += Number(d.totals[k]) || 0;
+  }
+  return sum;
 }
 
 // ---------- the demo business: numbered on the device (AC-30.6) ----------

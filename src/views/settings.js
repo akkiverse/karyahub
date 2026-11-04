@@ -1,7 +1,9 @@
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../format.js';
 import { SERVICES, SERVER_KEYS, configuredKeys } from '../config.js';
-import { setupPanel, lookPanel } from './bills.js';
+import { setupPanel, lookPanel, lookPreview } from './bills.js';
+import { themePref } from '../theme.js';
+import { W } from '../words.js';
 
 const BANNERS = {
   server: ['Server mode: KaryaHub API', 'Messages are read by the KaryaHub server (Python). It holds the outside services and their keys; today it answers them with demo data, so nothing real is sent.'],
@@ -58,15 +60,19 @@ export function settings({ state, ui, me }) {
   const serverLine = mode === 'server'
     ? `<p class="server-line" data-testid="server-line">${icon('server', { size: 16 })} ${meta && meta.data ? `Connected to KaryaHub API v${escapeHtml(meta.data.version)} for ${escapeHtml(meta.data.tenant.business_name)}` : meta && meta.error ? "Can't reach the KaryaHub server. Chat falls back to the in-browser demo; proof of work and visit plans wait for the server." : 'Checking the KaryaHub server…'}</p>`
     : '';
-  const themeBlock = `<fieldset class="setting">
-      <legend>Theme</legend>
-      ${['system', 'light', 'dark'].map((t) => `<label class="radio"><input type="radio" name="theme" value="${t}" data-action="set-theme" ${s.theme === t ? 'checked' : ''}> ${t === 'system' ? 'Follow system' : t[0].toUpperCase() + t.slice(1)}</label>`).join('')}
+  const pref = themePref();
+  const themeBlock = `<fieldset class="setting" data-testid="theme-setting">
+      <legend>${W.themeTitle}</legend>
+      ${[['dark', W.themeDark], ['light', W.themeLight], ['system', W.themeSystem]].map(([t, label]) => `<label class="radio"><input type="radio" name="theme" value="${t}" data-action="set-theme" ${pref === t ? 'checked' : ''}> ${label}</label>`).join('')}
     </fieldset>`;
-  return `<section class="page">
+  const hasBusiness = Boolean(me && me.business);
+  return `<section class="page page-wide">
     <header class="page-head"><h1 id="page-title" tabindex="-1">Settings</h1></header>
+    <div class="split-12 settings-split ${hasBusiness ? '' : 'is-single'}">
+    <div class="col-6 stack">
     ${profileForm(s, ui, demo, me)}
-    ${me && me.business ? setupPanel({ me, ui }) : ''}
-    ${me && me.business ? lookPanel({ me, ui, state }) : ''}
+    ${hasBusiness ? setupPanel({ me, ui }) : ''}
+    ${hasBusiness ? lookPanel({ me, ui }) : ''}
     ${demo ? `<div class="mode-banner ${mode === 'live' ? 'is-live' : ''}" data-testid="mode-banner">${icon(mode === 'server' ? 'server' : 'plug')}<div><strong>${title}</strong><p>${text}</p></div></div>` : ''}
     ${serverLine}
     <h2 class="section-title">Services</h2>
@@ -88,5 +94,8 @@ export function settings({ state, ui, me }) {
     </div>` : ''}
     ${ui.toast && ui.toast.where === 'settings' ? `<p class="notice" role="status">${escapeHtml(ui.toast.text)}</p>` : ''}
     ${demo ? `<p class="muted small">Demo business: ${escapeHtml(s.business_name)}, GSTIN ${escapeHtml(s.gstin)} (dummy). All customer data is invented.</p>` : ''}
+    </div>
+    ${hasBusiness ? `<div class="col-6 settings-preview">${lookPreview({ me, ui, state })}</div>` : ''}
+    </div>
   </section>`;
 }

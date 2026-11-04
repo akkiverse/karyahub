@@ -272,7 +272,7 @@ As an owner, I want to say once what kind of business I run so that KaryaHub sho
 - **AC-26.2** Given a business created before v0.8.0, or the demo business, then it is Repair and service, GST Regular, Field service on, with its saved state code; it never sees the question, and every screen it had in v0.7.0 is still there. *(added CR-0012)*
 - **AC-26.3** Given Field service is off, then no menu, tab, button, field, Home figure or + New choice for jobs, Chat, renewals, AMC or proof of work appears, and their addresses and API routes answer 403 pack_off "This part of KaryaHub is switched off for your business."; switching it on again brings everything back with its data. *(added CR-0012)*
 - **AC-26.4** Given I have manage_settings, when I switch a pack or change the GST registration in Settings, then it applies to everyone in the business at their next screen load and goes in the activity log; without the permission the switches are not shown and the server refuses with 403. *(added CR-0012)*
-- **AC-26.5** Given any main screen, then one + New button offers only what my packs and permissions allow, in this order: Bill, Estimate, Item, Job (Field service); on a phone it sits at the bottom right within thumb reach. *(added CR-0012)*
+- **AC-26.5** Given any main screen, then one + New button offers only what my packs and permissions allow, in this order: Bill, Estimate, Item, Job (Field service); on a phone it sits at the bottom right within thumb reach; from 900 px it sits in the top bar, also on Admin and Settings. *(added CR-0012, changed CR-0015)*
 - **AC-26.6** Given the screens added or changed in this release, then their words come from one words file, and a test scanning the screen sources finds none of "voucher", "ledger", "debit note" or "credit note". *(added CR-0012)*
 
 ### US-27: Bills that are right
@@ -366,8 +366,42 @@ As an owner or assistant, I want to cut a coil into loose metres in the app, so 
 - **AC-37.2** Given a unit that is made by cutting (AC-36.1), then the Cut sheet fills in its usual number (90) and the person may change it (88); the usual number is not changed. *(added CR-0014)*
 - **AC-37.3** Given a saved cut, then it shows in the history of both units ("Cut into 90 m", "Cut from Coil") with who and when, the history of an item can be shown one unit at a time, and a saved move can't be changed (a mistake is fixed with a new move). *(added CR-0014)*
 
+### US-38: Aurora Dark and Clean Light
+As anyone using KaryaHub, I want to switch between a dark and a light look at any moment, so that it suits where I am working.
+- **AC-38.1** Given a first visit, then the theme is Aurora Dark; given the Sun or Moon button in the top bar or on the sign-in screen, when I press it, then the theme changes at once, the button says which is on, and my choice is kept on this device under `kh-theme`. *(added CR-0015)*
+- **AC-38.2** Given Settings, then I can choose Dark, Light or System; on System the app follows the device, also when the device changes; the button and the choice stay in step. *(added CR-0015)*
+- **AC-38.3** Given a light or dark choice made on an earlier version, then it is kept; an earlier "Follow system", which was the default, starts dark. *(added CR-0015)*
+- **AC-38.4** Given any page load, then the theme is set before the first paint; given something being typed, then switching theme leaves it alone. *(added CR-0015)*
+- **AC-38.5** Given the stylesheet, then it holds the design system's exact colours for both themes, and the theme comes only from `data-theme`. *(added CR-0015)*
+- **AC-38.6** Given any screen, then headings use Plus Jakarta Sans, the interface Inter, and rupee figures, GSTIN, HSN or SAC codes, bill numbers, mobile numbers, PINs and quantities JetBrains Mono; the fonts come with the app, with no outside request. *(added CR-0015)*
+- **AC-38.7** Given either theme, then the bill paper is white with dark text; its A4 layouts carry the brand gradient in the default colour and the business's own colour otherwise; printing gives the paper alone on white. *(added CR-0015)*
+
+### US-39: The shell
+As anyone signed in, I want the same frame on every screen, so that I always know where I am and can get anywhere quickly.
+- **AC-39.1** Given any signed-in screen, then the top bar shows "Workspace / <screen>"; on a phone a menu button opens the sidebar as a drawer, which closes on Escape, on the backdrop and on a link. *(added CR-0015)*
+- **AC-39.2** Given Ctrl or Cmd + K or the box in the top bar (from 900 px), when I type, then it finds bills, estimates, items and jobs on this device, and a result opens it. *(added CR-0015)*
+- **AC-39.3** Given search, then it shows only what this person may open. *(added CR-0015)*
+- **AC-39.4** Given a main screen, then there is one + New button (AC-26.5). *(added CR-0015)*
+- **AC-39.5** Given a change of screen, then the content enters with a short movement (280 ms), which never replays on a redraw of the same screen and is off under reduced motion. *(added CR-0015)*
+
+### US-40: Home
+As an owner, I want the money, the field work and the renewals on one screen, so that I can act without opening anything else.
+- **AC-40.1** Given I may make bills, then three figures come from saved bills: Billed today, Unpaid receivables, and Overdue with its rupees and how many. *(added CR-0015)*
+- **AC-40.2** Given technician messages, then the field stream shows the latest four with who, kind, time and what was read; a job waiting for a check links to Chat; an approved job offers Create GST quote, which opens the estimate with the job's lines, and then Open quote. *(added CR-0015)*
+- **AC-40.3** Given I may see renewals, then the list shows the next five with customer, equipment, urgency and ₹ value, and Remind opens the same preview as on Renewals; no message is sent. *(added CR-0015)*
+- **AC-40.4** Given I may make bills, then GST this month adds the taxable value, CGST, SGST, IGST and total of this month's saved bills only, with Make a bill. *(added CR-0015)*
+- **AC-40.5** Given a technician, then Home shows no money. *(added CR-0015)*
+
+### US-41: Bills, Inventory, Team and Settings at full width
+As an owner on a laptop, I want these screens to use the width, so that I see more and scroll less.
+- **AC-41.1** Given 760 px or more, then the bills table shows number and date, customer and GSTIN (or Unregistered), source (WhatsApp voice, photo or text from its job, or Counter), taxable with tax, total and status; search also finds a GSTIN. *(added CR-0015)*
+- **AC-41.2** Given a saved bill and permission to make bills, then its row has Send on WhatsApp and, for a real business, its PDF (shown on hover or focus; always on touch); the answer of a send shows on the list. *(added CR-0015)*
+- **AC-41.3** Given I manage inventory, then each stocked item's row has − and + beside its quantity with the low level under it; each press is an ordinary stock move of one main unit, in the item's history; − is off with nothing in stock; without the permission, or for a service or stopped item, there are no buttons. *(added CR-0015)*
+- **AC-41.4** Given Admin from 1100 px, then the team and the add forms are on the left (5 of 12 columns), the roles and activity log on the right (7). *(added CR-0015)*
+- **AC-41.5** Given Settings from 1100 px, then the forms are on the left (6 of 12), and the live paper stays in view in its own column on the right (6). *(added CR-0015)*
+
 ## Screens and flows
-Sign in first (CR-0003). Then a bottom tab bar on phones and a dark sidebar on desktop, showing only the screens the person's role and packs allow: Home, Bills, Chat, Jobs, Inventory, Renewals (Workspace; on a phone Renewals is in the account menu, CR-0012) and Admin, Settings (Manage). An account menu in the top bar shows the person and role, with Settings, Admin and Sign out.
+Sign in first (CR-0003). Then a bottom tab bar and a drawer on phones and a sidebar on desktop, showing only the screens the person's role and packs allow: Home, Bills, Chat, Jobs, Inventory, Renewals (Workspace; on a phone Renewals is in the account menu, CR-0012) and Admin, Settings (Manage). An account menu in the top bar shows the person and role, with Settings, Admin and Sign out.
 
 | Screen | Shows | Empty state | Error state |
 |---|---|---|---|
@@ -391,7 +425,7 @@ Demo flow (3 minutes): Sign in as the owner → Home → See how it works → pi
 - **Personality:** dependable, quick, money-aware.
 - **Who and where:** an owner watching over the founder's shoulder on a phone in a busy shop, or on a laptop video call.
 - **Colour mood:** calm, trustworthy teal with a familiar WhatsApp-like chat area; money in strong green, lapsed in red. Main brand colour: deep teal **#0F766E**. Do not copy WhatsApp's logo or exact green.
-- **Typography:** friendly, legible sans (Inter or Noto Sans); large numerals for ₹ totals.
+- **Typography:** Plus Jakarta Sans for headings, Inter for the interface, JetBrains Mono for ₹ figures and other numbers (CR-0015); Noto Sans as the Devanagari fallback.
 - **References:** WhatsApp chat layout (familiar), Khatabook's big-number ledger, Linear's clean lists. Unlike IndiaMART-style AMC software with dense grey tables, KaryaHub shows one big number and a chat.
 - **Avoid:** dense tables on mobile, jargon ("tickets", "SLA"), tiny tap targets, stock photos, anything implying real messages are sent.
 - **Delight moment:** the processing steps tick through and the summary card lands in the chat, then the Home total updates to show the new ₹ at stake.

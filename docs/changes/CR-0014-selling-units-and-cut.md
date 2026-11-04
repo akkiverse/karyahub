@@ -1,10 +1,10 @@
 # CR-0014: Selling an item in several units, and Cut (part 2 of the item changes)
 
-- **Status:** In review
+- **Status:** Released
 - **Requested by:** Founder, 4 Nov 2026, in the approved design ([KaryaHub: your own item fields, lists and selling units](https://claude.ai/artifact/2LErXeWJXtGswTV8uhbdEm)): a wire is sold by the coil and by the metre, each counted on its own; a person cuts a coil into loose metres and may change the metres (88 instead of 90); as many units as the business wants. "Proceed ahead" after v0.9.0 was merged. TASKS K5d.
 - **Date:** 2026-11-04
 - **Kind:** Feature (minor version)
-- **Release:** v0.10.0 (planned)
+- **Release:** v0.10.0
 - **Branch:** `cr/0014-selling-units-and-cut`
 - **Pull request:** [#19](https://github.com/akkiverse/karyahub/pull/19)
 - **References:** [Design for approval](https://claude.ai/artifact/2LErXeWJXtGswTV8uhbdEm), [ADR-0018](../adr/0018-selling-units-in-the-item-and-cut-as-one-move.md), [CR-0013](CR-0013-own-fields-and-units.md)

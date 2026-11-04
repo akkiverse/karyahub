@@ -1,10 +1,10 @@
 # CR-0015: The Deep Ocean Teal look, with Aurora Dark and Clean Light
 
-- **Status:** In progress
+- **Status:** Released
 - **Requested by:** Founder, 4 Nov 2026, with reference screenshots and a written design system
 - **Date:** 2026-11-04
 - **Kind:** Feature (minor version)
-- **Release:** v0.11.0 (planned; Getting paid moves to v0.12.0)
+- **Release:** v0.11.0 (Getting paid moves to v0.12.0)
 - **Branch:** `cr/0015-deep-ocean-teal`
 - **Pull request:** [#21](https://github.com/akkiverse/karyahub/pull/21)
 - **References:** [ADR-0019](../adr/0019-design-tokens-self-hosted-fonts-and-a-per-device-theme.md), [DESIGN](../design/DESIGN.md)

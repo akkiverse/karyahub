@@ -6,7 +6,7 @@
 - **Kind:** Feature (minor version)
 - **Release:** v0.10.0 (planned)
 - **Branch:** `cr/0014-selling-units-and-cut`
-- **Pull request:** to be opened
+- **Pull request:** [#19](https://github.com/akkiverse/karyahub/pull/19)
 - **References:** [Design for approval](https://claude.ai/artifact/2LErXeWJXtGswTV8uhbdEm), [ADR-0018](../adr/0018-selling-units-in-the-item-and-cut-as-one-move.md), [CR-0013](CR-0013-own-fields-and-units.md)
 
 ## Why

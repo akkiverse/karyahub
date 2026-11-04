@@ -27,6 +27,8 @@ export const PERMISSIONS = [
   { id: 'view_inventory', label: 'See inventory (parts and stock)', roles: ['owner', 'coordinator'] },
   { id: 'manage_inventory', label: 'Add items, import, stock in and out, counts (Inventory)', roles: ['owner', 'coordinator'] },
   { id: 'use_parts', label: 'Take parts from inventory for a job', roles: ['owner', 'coordinator'] },
+  // History (CR-0016): who did what. The owner's unless they switch it on for a role or a person.
+  { id: 'view_history', label: 'See the history (who did what)', roles: ['owner'] },
 ];
 
 /** The starting permissions for a role (before an owner's switches). Used by tests and the demo. */
@@ -42,7 +44,7 @@ export const roleShort = (role) => (role === PLATFORM_ROLE.id ? PLATFORM_ROLE.sh
 export const ROUTE_PERMISSION = {
   home: 'view_dashboard', chat: 'use_chat', jobs: 'view_jobs', job: 'view_jobs', doc: 'create_documents',
   renewals: 'manage_renewals', settings: 'manage_settings', admin: 'manage_team', businesses: 'manage_businesses',
-  inventory: 'view_inventory', item: 'view_inventory', 'item-form': 'manage_inventory', 'inventory-import': 'manage_inventory', 'inventory-fields': 'view_inventory',
+  history: 'view_history', inventory: 'view_inventory', item: 'view_inventory', 'item-form': 'manage_inventory', 'inventory-import': 'manage_inventory', 'inventory-fields': 'view_inventory',
   bills: 'create_documents', estimates: 'create_documents', bill: 'create_documents', 'bill-edit': 'create_documents', 'bill-new': 'create_documents',
 };
 export const canOpen = (me, routeName) => !ROUTE_PERMISSION[routeName] || can(me, ROUTE_PERMISSION[routeName]);

@@ -307,6 +307,7 @@ class Bills:
             self.batch.audits.append(("document_saved", f"Saved {WORDS[body['type']]} {number}"))
         else:
             _history(body, self.p, "Changed", self.now)
+            self.batch.audits.append(("document_saved", f"Changed {WORDS[body['type']]} {number}"))
         rec = self._put(doc_id, body, current, number)
         if body["type"] == "invoice":
             await self.settle_stock(rec, cancelled=False)

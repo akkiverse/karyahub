@@ -180,6 +180,15 @@ export function createApiClient({ base = '/api/v1', fetchImpl = (...a) => global
     memberPermissions: (id, overrides) => put(`/team/${encodeURIComponent(id)}/permissions`, { overrides }),
     rolePermissions: (role, permissions) => put(`/team/roles/${encodeURIComponent(role)}/permissions`, { permissions }),
     audit: () => call('GET', '/team/audit'),
+    history: ({ group = '', who = '', q = '', before = null } = {}) => {
+      const query = new URLSearchParams();
+      if (group) query.set('group', group);
+      if (who) query.set('who', who);
+      if (q) query.set('q', q);
+      if (before) query.set('before', String(before));
+      const text = query.toString();
+      return call('GET', `/history${text ? `?${text}` : ''}`);
+    },
     saveBusinessProfile: (fields) => put('/business/profile', fields),
     saveLogo: (dataUrl) => put('/business/logo', { data_url: dataUrl }),
     removeLogo: () => call('DELETE', '/business/logo'),

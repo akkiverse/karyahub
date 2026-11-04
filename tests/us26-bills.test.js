@@ -30,7 +30,7 @@ function real({ api = fakeApi(), me = owner(), hash = '#/' } = {}) {
 }
 const type = (x, sel, value, ev = 'input') => { const el = x.$(sel); el.value = value; el.dispatchEvent(new Event(ev, { bubbles: true })); };
 const change = (x, sel, value) => type(x, sel, value, 'change');
-const nav = (x) => x.$$('nav.tabs a.tab span').map((s) => s.textContent).filter((w) => !['Admin', 'Settings'].includes(w)); // the Workspace places
+const nav = (x) => x.$$('nav.tabs a.tab span').map((s) => s.textContent).filter((w) => !['Admin', 'History', 'Settings'].includes(w)); // the Workspace places
 
 /** + New → Bill, an item line from the search, typed values; returns the draft's id. */
 async function newBill(x, { kind = 'bills', item = 'it-r32', qty = '2', rate = null } = {}) {

@@ -16,7 +16,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, literal, select, union_all
+from sqlalchemy import delete, func, literal, or_, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -731,6 +731,83 @@ async def list_audit(db: AsyncSession, p: Principal, limit: int = 50) -> list[di
         }
         for r in rows
     ]
+
+
+# The History screen's filters (CR-0016): which log actions belong to which.
+HISTORY_GROUPS: dict[str, tuple[str, ...]] = {
+    "stock": ("stock_move", "inventory_item", "inventory_field", "inventory_list", "inventory_import"),
+    "bills": ("document_saved", "document_sent", "document_paid", "document_cancelled", "document_link"),
+    "jobs": ("job_added", "job_step", "customer_added", "customer_changed", "reminder"),
+    "team": (
+        "sign_in",
+        "member_added",
+        "member_updated",
+        "pin_changed",
+        "pin_reset",
+        "pin_reset_otp",
+        "owner_pin_reset",
+        "access_changed",
+        "role_access_changed",
+    ),
+    "settings": ("business_updated", "business_setup", "bill_look", "logo_changed", "device_import"),
+}
+_GROUP_OF = {action: group for group, actions in HISTORY_GROUPS.items() for action in actions}
+HISTORY_PAGE = 50
+
+
+async def list_history(
+    db: AsyncSession,
+    p: Principal,
+    *,
+    group: str = "",
+    who: str = "",
+    q: str = "",
+    before: int | None = None,
+    limit: int = HISTORY_PAGE,
+) -> dict:
+    """One page of the business's log, newest first, with the names to filter by."""
+    if group and group not in HISTORY_GROUPS:
+        raise AppError("validation_error", "Pick one of the filters shown.", 422)
+    business = _require_business(p)
+    size = max(1, min(limit, 100))
+    query = select(AuditLog).where(AuditLog.business_id == business.id)
+    if group:
+        query = query.where(AuditLog.action.in_(HISTORY_GROUPS[group]))
+    if who:
+        query = query.where(AuditLog.actor_name == who)
+    for word in q.lower().split()[:6]:
+        query = query.where(
+            or_(
+                func.lower(AuditLog.detail).contains(word, autoescape=True),
+                func.lower(AuditLog.actor_name).contains(word, autoescape=True),
+            )
+        )
+    if before is not None:
+        query = query.where(AuditLog.id < before)
+    rows = list((await db.execute(query.order_by(AuditLog.id.desc()).limit(size + 1))).scalars())
+    people = (
+        await db.execute(
+            select(AuditLog.actor_name)
+            .where(AuditLog.business_id == business.id)
+            .distinct()
+            .order_by(AuditLog.actor_name)
+        )
+    ).scalars()
+    return {
+        "entries": [
+            {
+                "id": r.id,
+                "who": r.actor_name,
+                "action": r.action,
+                "group": _GROUP_OF.get(r.action, "settings"),
+                "text": r.detail,
+                "at": r.at.isoformat(timespec="seconds"),
+            }
+            for r in rows[:size]
+        ],
+        "more": len(rows) > size,
+        "people": list(people),
+    }
 
 
 def business_dict(b: Business) -> dict:

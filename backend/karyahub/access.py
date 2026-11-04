@@ -70,6 +70,8 @@ PERMISSIONS: list[Permission] = [
         roles=_OFFICE,
     ),
     Permission(id="use_parts", label="Take parts from inventory for a job", roles=_OFFICE),
+    # History (CR-0016): who did what. The owner's unless they switch it on for a role or a person.
+    Permission(id="view_history", label="See the history (who did what)", roles=["owner"]),
 ]
 
 # Packs (CR-0012, AC-26.3). Field service is jobs, Chat, renewals, AMC and proof of work; when a business

@@ -4,6 +4,7 @@ Every change to KaryaHub is recorded here: what changed, why, and how it affecte
 
 | CR | Change | Why (short) | Status | Release |
 |---|---|---|---|---|
+| [CR-0016](CR-0016-history-who-did-what.md) | History: every change with who and when, filters by kind and person, who changed what on an item, more actions logged, times on the device's clock | Founder wants every change logged and shown with the person's name | In progress | v0.11.0 (planned) |
 | [CR-0015](CR-0015-deep-ocean-teal.md) | The Deep Ocean Teal look: Aurora Dark and Clean Light, a new shell with search, and new layouts for Home, Bills, Inventory, Team, Settings and Sign in | Founder asked for a redesign with a live theme switch, keeping all logic | In progress | v0.11.0 (planned) |
 | [CR-0014](CR-0014-selling-units-and-cut.md) | An item sold in several units (each with its own price and stock) and Cut: units on the item form, item page, stock sheets, bill lines and the CSV (one row per unit); a coil cut into loose metres in one move | Founder: wire sold by the coil and by the metre, counted apart | Released | v0.10.0 |
 | [CR-0013](CR-0013-own-fields-and-units.md) | Your own item details, lists and units: the owner adds fields (Brand, Size...), lists and units; item form, list, search and filters use them; per-business CSV template with new entries and typo checks; files over 500 rows in parts; phone-full warning | Founder: a wire sold by the coil failed on import; brand and material had no place | Released | v0.9.0 |

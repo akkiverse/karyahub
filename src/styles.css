@@ -1508,3 +1508,22 @@ button.seg { border: 0; background: transparent; font: inherit; font-size: 0.875
   /* Printers may not paint text through a gradient: the title prints in the solid colour. */
   .bill-paper.layout-a4_classic .doc-heading { background: none; color: var(--bill-accent); -webkit-text-fill-color: var(--bill-accent); }
 }
+
+/* History (CR-0016): who did what */
+.history-tools { gap: 12px; padding: 14px; }
+.history-tools-top { display: grid; gap: 10px; }
+@media (min-width: 760px) { .history-tools-top { grid-template-columns: minmax(0, 1fr) minmax(180px, 260px); align-items: center; } }
+.history-tools .inv-filter select { width: 100%; }
+.hist-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.hist-day { padding: 14px 0 6px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--kh-text-muted); }
+.hist-day:first-child { padding-top: 0; }
+.hist-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--kh-border); }
+.hist-main { display: grid; min-width: 0; }
+.hist-main strong { font-weight: 600; }
+.hist-text { font-size: 0.9rem; color: var(--kh-text-muted); overflow-wrap: anywhere; }
+.hist-when { font-size: 0.8rem; color: var(--kh-text-muted); }
+[data-slot="hist-results"] > .btn { justify-self: start; }
+.move-item .move-what strong { font-weight: 600; }
+.bill-history summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; min-height: 32px; }
+.bill-history .history li { padding: 8px 0; border-top: 1px solid var(--kh-border); }
+

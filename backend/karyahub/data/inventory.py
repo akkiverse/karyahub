@@ -125,6 +125,39 @@ def _paise(value: Any, *, required: bool = False) -> int | None:
     return round(n)
 
 
+HISTORY_KEEP = 30  # the latest changes kept on an item; the full log is the business's History
+
+
+def _rupees(paise: Any) -> str:
+    if paise is None:
+        return "none"
+    return f"₹{paise // 100}" if paise % 100 == 0 else f"₹{paise / 100:.2f}"
+
+
+def _item_changes(before: dict[str, Any], clean: dict[str, Any]) -> list[str]:
+    """What changed on an item, in plain words. Cost figures stay out: not every reader may see them."""
+    said: list[str] = []
+    for key, label in (("name", "name"), ("code", "code"), ("hsn", "HSN")):
+        if before.get(key) != clean[key]:
+            said.append(f"{label} {before.get(key) or 'none'} to {clean[key] or 'none'}")
+    if before.get("unit") != clean["unit"]:
+        said.append("unit")
+    if before.get("sale") != clean["sale"]:
+        said.append(f"sale price {_rupees(before.get('sale'))} to {_rupees(clean['sale'])}")
+    if before.get("cost") != clean["cost"]:
+        said.append("cost price")
+    if before.get("gst") != clean["gst"]:
+        said.append(f"GST {before.get('gst')}% to {clean['gst']}%")
+    if before.get("low") != clean["low"]:
+        was, now = before.get("low"), clean["low"]
+        said.append(
+            f"low-stock level {'none' if was is None else fmt(was)} to {'none' if now is None else fmt(now)}"
+        )
+    if any(before.get(k) != clean[k] for k in ("price_includes_gst", "service", "attrs", "sells")):
+        said.append("other details")
+    return said
+
+
 def clean_item(item_id: str, body: Any) -> dict[str, Any]:
     """The item as it is stored. The quantity is not here: it belongs to the server."""
     if not isinstance(body, dict):
@@ -305,7 +338,20 @@ class Batch:
         if new_key != old_key:
             await self._move_code(item_id, old_key, new_key, clean["code"])
         body = {**clean, "qty": float(existing.body.get("qty", 0)) if existing is not None else 0}
+        kept = (
+            [h for h in (existing.body.get("history") or []) if isinstance(h, dict)]
+            if existing is not None
+            else []
+        )
+
+        def with_history(what: str) -> None:
+            entry = {"at": self.now.isoformat(timespec="seconds"), "who": self.p.user.name, "what": what}
+            body["history"] = [*kept, entry][-HISTORY_KEEP:]
+
+        if kept:
+            body["history"] = kept
         if existing is None:
+            with_history("Added")
             rec = Record(
                 business_id=self.business_id,
                 kind="item",
@@ -322,14 +368,19 @@ class Batch:
         before = existing.body
         changed = {k for k in clean if before.get(k) != clean[k]}
         if changed:
-            existing.body = body
             existing.seq = self.take_seq()
             existing.updated_at = self.now
             if "stopped" in changed:
                 said = "Stopped using" if clean["stopped"] else "Started using again"
+                with_history(said)
                 self.audits.append(("inventory_item", f"{said} inventory item {clean['name']}"))
             else:
-                self.audits.append(("inventory_item", f"Changed inventory item {clean['name']}"))
+                what = ", ".join(_item_changes(before, clean))
+                with_history(f"Changed: {what}" if what else "Changed")
+                self.audits.append(
+                    ("inventory_item", f"Changed inventory item {clean['name']}{f': {what}' if what else ''}")
+                )
+            existing.body = body
         return existing
 
     async def _move_code(self, item_id: str, old_key: str, new_key: str, shown: str) -> None:
@@ -575,6 +626,11 @@ class Batch:
         )
         self.db.add(rec)
         self.found[("stock_move", move_id)] = rec
+        shown_unit, _ = await self.unit_info(unit_id)
+        said = "Sold on bill" if qty < 0 else "Put back from bill"
+        self.audits.append(
+            ("stock_move", f"{said} {number}: {fmt(abs(qty))} {shown_unit} {item.body['name']}")
+        )
 
     def _date(self, value: Any) -> str:
         today = self.now.date()
@@ -649,4 +705,7 @@ class Batch:
             self.audits.append(
                 ("stock_move", f"Count: {name} is now {fmt(move['after'])} {unit} ({qty:+g} correction)")
             )
-        # Parts used and put back go in the job's own history, not the activity log.
+        elif kind == "used":
+            self.audits.append(("stock_move", f"Used on a job: {fmt(-qty)} {unit} {name}"))
+        elif kind == "returned":
+            self.audits.append(("stock_move", f"Put back from a job: {fmt(qty)} {unit} {name}"))

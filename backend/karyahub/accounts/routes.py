@@ -217,6 +217,19 @@ async def role_permissions(role: str, req: RolePermissionsRequest, p: ManageTeam
     return await service.list_team(db, p)
 
 
+@router.get("/history")
+async def history(
+    p: Annotated[service.Principal, Depends(require("view_history"))],
+    db: DbDep,
+    group: str = "",
+    who: str = "",
+    q: str = "",
+    before: int | None = None,
+    limit: int = service.HISTORY_PAGE,
+) -> dict:
+    return await service.list_history(db, p, group=group, who=who, q=q[:80], before=before, limit=limit)
+
+
 @router.get("/team/audit")
 async def audit_log(p: ManageTeam, db: DbDep, limit: int = 50) -> dict:
     return {"entries": await service.list_audit(db, p, limit)}

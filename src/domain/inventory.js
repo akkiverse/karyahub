@@ -121,6 +121,20 @@ export function listItems(state, { filter = 'all', q = '', f = {} } = {}) {
     .sort(nameOf);
 }
 /** One unit's moves, newest first, each with the quantity left in that unit after it. A cut shows in both units. */
+/** What changed on an item, in plain words, as the server says it (CR-0016). No cost figures: not everyone who reads this may see them. */
+export function itemChanges(before, after) {
+  const rupee = (p) => (p == null ? 'none' : p % 100 === 0 ? `₹${p / 100}` : `₹${(p / 100).toFixed(2)}`);
+  const said = [];
+  for (const [k, label] of [['name', 'name'], ['code', 'code'], ['hsn', 'HSN']]) if ((before[k] || '') !== (after[k] || '')) said.push(`${label} ${before[k] || 'none'} to ${after[k] || 'none'}`);
+  if (before.unit !== after.unit) said.push('unit');
+  if (before.sale !== after.sale) said.push(`sale price ${rupee(before.sale)} to ${rupee(after.sale)}`);
+  if ((before.cost ?? null) !== (after.cost ?? null)) said.push('cost price');
+  if (Number(before.gst) !== Number(after.gst)) said.push(`GST ${before.gst}% to ${after.gst}%`);
+  if ((before.low ?? null) !== (after.low ?? null)) said.push(`low-stock level ${before.low == null ? 'none' : fmtQty(before.low)} to ${after.low == null ? 'none' : fmtQty(after.low)}`);
+  if (JSON.stringify([Boolean(before.price_includes_gst), Boolean(before.service), before.attrs || {}, before.sells || []]) !== JSON.stringify([Boolean(after.price_includes_gst), Boolean(after.service), after.attrs || {}, after.sells || []])) said.push('other details');
+  return said.join(', ');
+}
+
 export function historyOf(state, item, unit = item.unit) {
   const moves = movesOf(state, item.id).map((m, order) => ({ m, order })).filter(({ m }) => deltaOf(m, unit, item) !== 0 || (m.kind === 'cut' && (m.unit === unit || m.to_unit === unit)));
   moves.sort((a, b) => (a.m.at === b.m.at ? b.order - a.order : a.m.at < b.m.at ? 1 : -1));

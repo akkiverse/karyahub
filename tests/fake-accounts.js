@@ -78,6 +78,7 @@ export function fakeAccounts({ editable = true, accounts = [], needsSetup = fals
 
     team: async () => ({ members: clone(members), roles: clone(ROLES), permissions: PERMISSIONS.map((p) => ({ id: p.id, label: p.label, locked_for_owner: locked.includes(p.id) })), role_permissions: clone(matrix), editable }),
     audit: async () => ({ entries: clone(log) }),
+    history: async (params = {}) => { rec('history', [params]); return { entries: clone(log).map((x) => ({ group: 'team', ...x })), more: false, people: [...new Set(log.map((x) => x.who))] }; },
     addMember: async (form) => {
       rec('addMember', [form]);
       if (members.some((m) => m.phone === String(form.phone).replace(/\D/g, ''))) fail('That mobile number already has a KaryaHub account (in this or another business).', 'phone_in_use', 409);

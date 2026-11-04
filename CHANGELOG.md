@@ -13,12 +13,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Bills:** source, GSTIN and tax in the table, Send on WhatsApp and PDF on each row, and search by GSTIN.
 - **Inventory:** − and + for stock in the table, each one an ordinary move in the item's history; an SKU badge, GST and an In stock status.
 
+- **History: who did what.** See [CR-0016](docs/changes/CR-0016-history-who-did-what.md). Every change in the business with the person's name and the time, filtered by kind or person, searchable. An item's page also shows who added it and who changed what; a bill's page shows its history open. Owners can allow it for a role or a person. More is logged: customers, reminders, jobs and their steps, parts on jobs, stock sold on bills, changed bills.
+
 ### Changed
 - A 264 px sidebar (a drawer on a phone), a sticky top bar with a breadcrumb, and pages up to 1440 px wide instead of a narrow column.
 - **Team and Settings** are side by side from 1100 px; Settings keeps the live bill paper in view.
 - New fonts, bundled with the app: Plus Jakarta Sans, Inter, JetBrains Mono for figures. The sign-in screen and the bill paper are redrawn; the paper stays white in both themes.
 
 ### Fixed
+- Times in Admin's activity log and in a bill's history showed server time, 5½ hours behind India; they now use the device's clock (CR-0016).
 - The sample chips in Chat are one scrolling row again, not a stack that squeezed the conversation.
 
 ## [0.10.0] - 2026-11-04

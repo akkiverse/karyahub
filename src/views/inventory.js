@@ -2,7 +2,8 @@ import { W } from '../words.js';
 // Inventory screens (CR-0011, US-25): the list, one item with its history, the add and edit form, the CSV import,
 // and the sheets for stock in, stock out, count and taking a part for a job.
 import { icon } from '../ui/icons.js';
-import { escapeHtml, rupees, rupeesExact } from '../format.js';
+import { escapeHtml, rupees, rupeesExact, localDmy } from '../format.js';
+import { byTimeNewestFirst } from '../domain/history.js';
 import { isSynced } from '../ids.js';
 import { deviceToday, today } from '../clock.js';
 import {
@@ -139,6 +140,8 @@ export function itemPage({ state, ui, params, allow }) {
   const units = unitsOf(it);
   const histUnit = units.some((u) => u.unit === (ui.inv && ui.inv.histUnit)) ? ui.inv.histUnit : it.unit;
   const history = historyOf(state, it, histUnit);
+  // Stock moves and the item's own changes, in one list, newest first (CR-0016).
+  const timeline = [...(it.history || []).map((h) => ({ ...h, item_line: true })).reverse(), ...history].sort(byTimeNewestFirst);
   const canSee = allow('view_inventory');
   return `<section class="page" aria-labelledby="page-title">
     <a class="back" href="#/inventory">${icon('arrowLeft', { size: 18 })} Inventory</a>
@@ -165,13 +168,17 @@ export function itemPage({ state, ui, params, allow }) {
       ${units.slice(1).map((u) => `<li class="kpi" data-unit-kpi="${e(u.unit)}"><span class="kpi-label">${icon('box', { size: 16 })} ${e(UNITS[u.unit])}</span><span class="kpi-value">${qtyHtml(state, it, u.unit)}</span><span class="kpi-sub muted">${price(u.sale)} per ${e(UNITS[u.unit])}${u.low == null ? '' : ` · Low at ${e(qtyText(u.low, u.unit))}`}${manage && u.cost != null ? ` · cost ${price(u.cost)}` : ''}${u.cut_from ? ` · 1 ${e(UNITS[u.cut_from] || '')} gives ${e(qtyText(u.cut_gives, u.unit))}` : ''}</span></li>`).join('')}
     </ul>
     ${canSee ? `<div class="panel">
-      <div class="panel-head"><h2 class="panel-title">History</h2><span class="muted small">Moves can't be changed. A mistake is fixed with a new move.</span></div>
+      <div class="panel-head"><h2 class="panel-title">History</h2><span class="muted small">Who did what. Moves can't be changed: a mistake is fixed with a new move.</span></div>
       ${units.length > 1 ? `<div class="chips" role="group" aria-label="History of" data-testid="hist-units">${units.map((u) => `<button type="button" class="chip ${u.unit === histUnit ? 'is-on' : ''}" aria-pressed="${u.unit === histUnit}" data-action="inv-hist-unit" data-unit="${e(u.unit)}">${e(UNITS[u.unit])}</button>`).join('')}</div>` : ''}
-      ${history.length ? `<ol class="moves" data-testid="inv-history">${history.map((m) => `<li class="move" data-kind="${m.kind}">
+      ${timeline.length ? `<ol class="moves" data-testid="inv-history">${timeline.map((m) => (m.item_line ? `<li class="move move-item" data-kind="item" data-testid="item-line">
+        <span class="move-date">${e(localDmy(m.at, !isSynced(state)))}</span>
+        <span class="move-what"><strong>${e(m.what)}</strong><span class="muted small" data-testid="move-who">${e(m.who)}</span></span>
+        <span class="move-qty"></span>
+      </li>` : `<li class="move" data-kind="${m.kind}">
         <span class="move-date">${e(dmy(m.date))}</span>
         <span class="move-what"><strong>${MOVE_LABELS[m.kind] || m.kind}${m.kind === 'cut' ? (m.unit === histUnit ? ` into ${e(qtyText(m.gave, m.to_unit))}` : ` from ${e(UNITS[m.unit])}`) : ''}${m.job_id ? ` · <a href="#/jobs/${encodeURIComponent(m.job_id)}">job</a>` : ''}${m.after === undefined ? ' <span class="tag tag-soon">Waiting to send</span>' : ''}</strong><span class="muted small">${e(m.who || '')}${m.note ? ` · ${e(m.note)}` : ''}</span></span>
         <span class="move-qty"><strong class="${m.qty > 0 ? 'is-in' : ''}">${e(signedText(m.qty, histUnit))}</strong><span class="muted small">then ${e(qtyText(m.shown_after, histUnit))}</span></span>
-      </li>`).join('')}</ol>` : '<p class="muted">No moves yet.</p>'}
+      </li>`)).join('')}</ol>` : '<p class="muted">No moves yet.</p>'}
     </div>` : ''}
     ${stockSheet({ state, ui })}
   </section>`;

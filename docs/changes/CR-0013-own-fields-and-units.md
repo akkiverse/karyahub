@@ -6,7 +6,7 @@
 - **Kind:** Feature (minor version)
 - **Release:** v0.9.0 (planned)
 - **Branch:** `cr/0013-own-fields-and-units`
-- **Pull request:** to be opened
+- **Pull request:** [#17](https://github.com/akkiverse/karyahub/pull/17)
 - **References:** [Design for approval](https://claude.ai/artifact/2LErXeWJXtGswTV8uhbdEm), [ADR-0017](../adr/0017-own-item-fields-lists-and-units-as-records.md)
 
 ## Why

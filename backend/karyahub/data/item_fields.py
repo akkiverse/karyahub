@@ -263,7 +263,55 @@ async def check_item(batch: Batch, body: dict[str, Any], existing: Record | None
             )
     body["unit"] = unit
     body["attrs"] = await clean_attrs(batch, body.get("attrs"), before.get("attrs") or {})
+    body["sells"] = await check_sells(batch, body, before)
     return body
+
+
+async def check_sells(batch: Batch, body: dict[str, Any], before: dict[str, Any]) -> list[dict[str, Any]]:
+    """The item's other selling units (CR-0014): real units, none twice, a cut that starts from one of
+    the item's units; each keeps the quantity the server holds, and a unit with stock can't be taken off."""
+    sells = body.get("sells") or []
+    if sells and body.get("service"):
+        raise AppError("validation_error", "A service has no stock, so it has one price and no units.", 422)
+    held = {s["unit"]: s for s in before.get("sells") or []}
+    seen = [body["unit"]]
+    out: list[dict[str, Any]] = []
+    for sold in sells:
+        unit = sold["unit"]
+        if unit not in UNITS:
+            rec = await batch.record("unit", unit)
+            if rec is None:
+                raise AppError("validation_error", "Pick a unit from your list for each way of selling.", 422)
+            if rec.body.get("alias_of"):
+                unit = str(rec.body["alias_of"])
+                rec = await batch.record("unit", unit) if unit not in UNITS else None
+            if rec is not None and rec.body.get("stopped") and unit not in held:
+                raise AppError(
+                    "validation_error", f"The unit {rec.body['name']} is not in use. Pick another.", 409
+                )
+        if unit in seen:
+            name, _ = await batch.unit_info(unit)
+            raise AppError("validation_error", f"{name} is listed twice for this item.", 422)
+        seen.append(unit)
+        out.append({**sold, "unit": unit, "qty": float(held.get(unit, {}).get("qty", 0))})
+    for sold in out:
+        if sold["cut_from"] and sold["cut_from"] not in seen:
+            raise AppError("validation_error", "A cut must start from one of this item's own units.", 422)
+        if sold["cut_from"] == sold["unit"]:
+            raise AppError("validation_error", "A unit can't be cut from itself.", 422)
+        if sold["cut_from"] and not sold["cut_gives"]:
+            raise AppError("validation_error", "Say how many a cut gives.", 422)
+        if not sold["cut_from"]:
+            sold["cut_gives"] = None
+    for unit, kept in held.items():
+        if unit not in seen and kept.get("qty"):
+            name, _ = await batch.unit_info(unit)
+            raise AppError(
+                "validation_error",
+                f"{name} still has stock. Count it to 0 (or cut it) before taking it off the item.",
+                409,
+            )
+    return out
 
 
 async def clean_attrs(batch: Batch, raw: Any, before: dict[str, Any]) -> dict[str, Any]:

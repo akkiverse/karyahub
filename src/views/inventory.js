@@ -7,14 +7,14 @@ import { isSynced } from '../ids.js';
 import { deviceToday, today } from '../clock.js';
 import {
   UNITS, UNIT_NAMES, GST_RATES, MOVE_LABELS, qtyText, signedText, stockOf, markOf, markText, summary, listItems, historyOf,
-  matches, nameOf, parseQty, dmy, r3, pickableUnits,
+  matches, nameOf, parseQty, dmy, r3, pickableUnits, unitsOf, unitMark, MAX_SELLS,
 } from '../domain/inventory.js';
 import { activeFields, pickable, detailsLine, detailOf } from '../domain/fields.js';
 
 const e = escapeHtml;
 const price = (paise) => (paise == null ? '—' : paise % 100 === 0 ? rupees(paise / 100) : rupeesExact(paise / 100));
 const SAMPLE_NOTE = 'Sample stock for the demo. It stays on this device.';
-export const CSV_COLUMNS = ['code', 'name', 'unit', 'sale_price', 'cost_price', 'hsn', 'gst_rate', 'low_stock_at', 'opening_stock'];
+export const CSV_COLUMNS = ['code', 'name', 'unit', 'sale_price', 'cost_price', 'hsn', 'gst_rate', 'low_stock_at', 'opening_stock', 'cut_from', 'cut_gives'];
 /** The business's own template (CR-0013): code, name, then a column for each of its item details, then the rest. */
 export function csvColumns(state) {
   return ['code', 'name', ...activeFields(state).map((f) => f.name), ...CSV_COLUMNS.slice(2)];
@@ -24,22 +24,28 @@ export function csvTemplate(state) {
   const fields = activeFields(state);
   const sample = fields.map((f) => (f.type === 'list' ? (pickable(state, f.id)[0] || { name: 'Example' }).name : f.type === 'number' ? '1' : 'Example'));
   const head = csvColumns(state).map(csvCell).join(',');
-  const row = ['CAP-35', 'Capacitor 35 µF', ...sample.map(csvCell), 'nos', '380', '170', '8532', '18', '5', '10'].join(',');
+  const row = ['CAP-35', 'Capacitor 35 µF', ...sample.map(csvCell), 'nos', '380', '170', '8532', '18', '5', '10', '', ''].join(',');
   return `${head}\n${row}\n`;
 }
 export const CSV_TEMPLATE = csvTemplate({ item_fields: [] });
 
-function markHtml(state, item) {
+function markHtml(state, item, unit = item.unit) {
   if (item.service) return `<span class="mark mark-service" data-testid="mark">${W.service}</span>`; // CR-0012: never counted
-  const q = stockOf(state, item);
-  const m = markOf(q, item.low);
-  return m ? `<span class="mark mark-${m.kind}" data-testid="mark">${m.kind === 'low' ? icon('alert', { size: 12 }) : ''}${e(markText(m, q, item.unit))}</span>` : '';
+  const q = stockOf(state, item, unit);
+  const m = unitMark(state, item, unitsOf(item).find((u) => u.unit === unit));
+  return m ? `<span class="mark mark-${m.kind}" data-testid="mark">${m.kind === 'low' ? icon('alert', { size: 12 }) : ''}${e(markText(m, q, unit))}</span>` : '';
 }
-function qtyHtml(state, item) {
+function qtyHtml(state, item, unit = item.unit) {
   if (item.service) return '<span class="qty" data-testid="qty">–</span>';
-  const q = stockOf(state, item);
-  const m = markOf(q, item.low);
-  return `<span class="qty ${m ? `is-${m.kind}` : ''}" data-testid="qty">${e(qtyText(q, item.unit))}</span>`;
+  const q = stockOf(state, item, unit);
+  const m = unitMark(state, item, unitsOf(item).find((u) => u.unit === unit));
+  return `<span class="qty ${m ? `is-${m.kind}` : ''}" data-testid="qty">${e(qtyText(q, unit))}</span>`;
+}
+/** What an item holds in its other units, one small line each (CR-0014). */
+function extrasHtml(state, item) {
+  const more = unitsOf(item).filter((u) => !u.main);
+  if (!more.length || item.service) return '';
+  return `<span class="qty-extras small muted" data-testid="qty-extras">${more.map((u) => { const m = unitMark(state, item, u); return `${e(qtyText(stockOf(state, item, u.unit), u.unit))}${m ? ` · ${m.kind === 'low' ? 'Low' : 'Short'}` : ''}`; }).join(' · ')}</span>`;
 }
 const noticeHtml = (ui, key) => {
   const n = ui.inv && ui.inv.notice;
@@ -71,10 +77,10 @@ export function resultsHtml(state, ui, allow) {
     return `<div class="empty" data-testid="inv-empty">${icon('search', { size: 28 })}<p>${e(text)}</p>${manage ? `<button type="button" class="btn btn-secondary" data-action="inv-add" data-name="${e(q)}">${icon('plus', { size: 18 })} Add ${q ? `“${e(q)}”` : 'an item'}</button>` : ''}</div>`;
   }
   const href = (i) => `#/inventory/item/${encodeURIComponent(i.id)}`;
-  const cards = rows.map((i) => `<li class="row-card inv-card" data-item="${e(i.id)}"><a href="${href(i)}"><span class="row-main"><strong>${e(i.name)}</strong><span class="code">${e(i.code || 'No code')} · ${UNITS[i.unit]}${i.stopped ? ' · stopped' : ''}</span>${shown.length && detailsLine(state, i, 'in_list') ? `<span class="muted small" data-testid="card-details">${e(detailsLine(state, i, 'in_list'))}</span>` : ''}</span><span class="inv-card-side">${qtyHtml(state, i)}${markHtml(state, i)}</span></a></li>`).join('');
+  const cards = rows.map((i) => `<li class="row-card inv-card" data-item="${e(i.id)}"><a href="${href(i)}"><span class="row-main"><strong>${e(i.name)}</strong><span class="code">${e(i.code || 'No code')} · ${UNITS[i.unit]}${i.stopped ? ' · stopped' : ''}</span>${shown.length && detailsLine(state, i, 'in_list') ? `<span class="muted small" data-testid="card-details">${e(detailsLine(state, i, 'in_list'))}</span>` : ''}</span><span class="inv-card-side">${qtyHtml(state, i)}${extrasHtml(state, i)}${markHtml(state, i)}</span></a></li>`).join('');
   const table = `<div class="panel inv-table-wrap"><div class="table-wrap"><table class="table">
     <thead><tr><th scope="col">Item</th><th scope="col">Code</th>${shown.map((f) => `<th scope="col">${e(f.name)}</th>`).join('')}<th scope="col" class="num">In stock</th><th scope="col" class="num">Low at</th><th scope="col" class="num">Sale price</th>${manage ? '<th scope="col" class="num">Cost price</th>' : ''}<th scope="col">Mark</th></tr></thead>
-    <tbody>${rows.map((i) => `<tr data-href="${href(i)}" data-item="${e(i.id)}"><td><a class="row-name" href="${href(i)}">${e(i.name)}</a></td><td class="code">${e(i.code || '—')}</td>${shown.map((f) => `<td>${e(detailOf(state, i, f) || '—')}</td>`).join('')}<td class="num">${qtyHtml(state, i)}</td><td class="num">${i.low == null ? '—' : e(qtyText(i.low, i.unit))}</td><td class="num">${price(i.sale)}<span class="muted small"> /${UNITS[i.unit]}</span></td>${manage ? `<td class="num">${price(i.cost)}</td>` : ''}<td>${markHtml(state, i)}</td></tr>`).join('')}</tbody>
+    <tbody>${rows.map((i) => `<tr data-href="${href(i)}" data-item="${e(i.id)}"><td><a class="row-name" href="${href(i)}">${e(i.name)}</a></td><td class="code">${e(i.code || '—')}</td>${shown.map((f) => `<td>${e(detailOf(state, i, f) || '—')}</td>`).join('')}<td class="num">${qtyHtml(state, i)}${extrasHtml(state, i) ? `<br>${extrasHtml(state, i)}` : ''}</td><td class="num">${i.low == null ? '—' : e(qtyText(i.low, i.unit))}</td><td class="num">${price(i.sale)}<span class="muted small"> /${UNITS[i.unit]}</span></td>${manage ? `<td class="num">${price(i.cost)}</td>` : ''}<td>${markHtml(state, i)}</td></tr>`).join('')}</tbody>
   </table></div></div>`;
   return `<ul class="inv-cards" data-testid="inv-list">${cards}</ul>${table}<p class="muted small">${rows.length} item${rows.length === 1 ? '' : 's'} shown. Search works on this phone's copy, with or without signal.</p>`;
 }
@@ -112,7 +118,9 @@ export function itemPage({ state, ui, params, allow }) {
   const manage = allow('manage_inventory');
   const q = stockOf(state, it);
   const mark = markOf(q, it.low);
-  const history = historyOf(state, it);
+  const units = unitsOf(it);
+  const histUnit = units.some((u) => u.unit === (ui.inv && ui.inv.histUnit)) ? ui.inv.histUnit : it.unit;
+  const history = historyOf(state, it, histUnit);
   const canSee = allow('view_inventory');
   return `<section class="page" aria-labelledby="page-title">
     <a class="back" href="#/inventory">${icon('arrowLeft', { size: 18 })} Inventory</a>
@@ -124,7 +132,8 @@ export function itemPage({ state, ui, params, allow }) {
       ${manage ? `<div class="actions">
         ${it.stopped ? '' : `<button type="button" class="btn btn-primary" data-action="inv-sheet" data-type="in">${icon('plus', { size: 18 })} Stock in</button>
         <button type="button" class="btn btn-secondary" data-action="inv-sheet" data-type="out">${icon('minus', { size: 18 })} Stock out</button>
-        <button type="button" class="btn btn-ghost" data-action="inv-sheet" data-type="count">${icon('count', { size: 18 })} Count</button>`}
+        <button type="button" class="btn btn-ghost" data-action="inv-sheet" data-type="count">${icon('count', { size: 18 })} Count</button>
+        ${units.length > 1 ? `<button type="button" class="btn btn-secondary" data-action="inv-sheet" data-type="cut" data-testid="cut-button">${icon('minus', { size: 18 })} Cut</button>` : ''}`}
         <a class="btn btn-ghost" href="#/inventory/item/${encodeURIComponent(it.id)}/edit">${icon('pencil', { size: 18 })} Edit</a>
         <button type="button" class="btn ${it.stopped ? 'btn-secondary' : 'btn-danger-ghost'}" data-action="inv-stop" data-stopped="${it.stopped ? 'false' : 'true'}">${icon(it.stopped ? 'rotate' : 'archive', { size: 18 })} ${it.stopped ? 'Use again' : 'Stop using'}</button>
       </div>` : ''}
@@ -135,13 +144,15 @@ export function itemPage({ state, ui, params, allow }) {
       <li class="kpi"><span class="kpi-label">${icon('box', { size: 16 })} In stock</span><span class="kpi-value">${qtyHtml(state, it)}</span><span class="kpi-sub muted">${it.low == null ? 'No low-stock level' : `Low at ${e(qtyText(it.low, it.unit))}`}</span></li>
       <li class="kpi"><span class="kpi-label">Sale price</span><span class="kpi-value">${price(it.sale)}</span><span class="kpi-sub muted">per ${UNITS[it.unit]}, on quotes and invoices</span></li>
       ${manage ? `<li class="kpi"><span class="kpi-label">Cost price</span><span class="kpi-value">${price(it.cost)}</span><span class="kpi-sub muted">Value in stock ${price(Math.round(Math.max(q, 0) * (it.cost || 0)))}</span></li>` : ''}
+      ${units.slice(1).map((u) => `<li class="kpi" data-unit-kpi="${e(u.unit)}"><span class="kpi-label">${icon('box', { size: 16 })} ${e(UNITS[u.unit])}</span><span class="kpi-value">${qtyHtml(state, it, u.unit)}</span><span class="kpi-sub muted">${price(u.sale)} per ${e(UNITS[u.unit])}${u.low == null ? '' : ` · Low at ${e(qtyText(u.low, u.unit))}`}${manage && u.cost != null ? ` · cost ${price(u.cost)}` : ''}${u.cut_from ? ` · 1 ${e(UNITS[u.cut_from] || '')} gives ${e(qtyText(u.cut_gives, u.unit))}` : ''}</span></li>`).join('')}
     </ul>
     ${canSee ? `<div class="panel">
       <div class="panel-head"><h2 class="panel-title">History</h2><span class="muted small">Moves can't be changed. A mistake is fixed with a new move.</span></div>
+      ${units.length > 1 ? `<div class="chips" role="group" aria-label="History of" data-testid="hist-units">${units.map((u) => `<button type="button" class="chip ${u.unit === histUnit ? 'is-on' : ''}" aria-pressed="${u.unit === histUnit}" data-action="inv-hist-unit" data-unit="${e(u.unit)}">${e(UNITS[u.unit])}</button>`).join('')}</div>` : ''}
       ${history.length ? `<ol class="moves" data-testid="inv-history">${history.map((m) => `<li class="move" data-kind="${m.kind}">
         <span class="move-date">${e(dmy(m.date))}</span>
-        <span class="move-what"><strong>${MOVE_LABELS[m.kind] || m.kind}${m.job_id ? ` · <a href="#/jobs/${encodeURIComponent(m.job_id)}">job</a>` : ''}${m.after === undefined ? ' <span class="tag tag-soon">Waiting to send</span>' : ''}</strong><span class="muted small">${e(m.who || '')}${m.note ? ` · ${e(m.note)}` : ''}</span></span>
-        <span class="move-qty"><strong class="${m.qty > 0 ? 'is-in' : ''}">${e(signedText(m.qty, it.unit))}</strong><span class="muted small">then ${e(qtyText(m.shown_after, it.unit))}</span></span>
+        <span class="move-what"><strong>${MOVE_LABELS[m.kind] || m.kind}${m.kind === 'cut' ? (m.unit === histUnit ? ` into ${e(qtyText(m.gave, m.to_unit))}` : ` from ${e(UNITS[m.unit])}`) : ''}${m.job_id ? ` · <a href="#/jobs/${encodeURIComponent(m.job_id)}">job</a>` : ''}${m.after === undefined ? ' <span class="tag tag-soon">Waiting to send</span>' : ''}</strong><span class="muted small">${e(m.who || '')}${m.note ? ` · ${e(m.note)}` : ''}</span></span>
+        <span class="move-qty"><strong class="${m.qty > 0 ? 'is-in' : ''}">${e(signedText(m.qty, histUnit))}</strong><span class="muted small">then ${e(qtyText(m.shown_after, histUnit))}</span></span>
       </li>`).join('')}</ol>` : '<p class="muted">No moves yet.</p>'}
     </div>` : ''}
     ${stockSheet({ state, ui })}
@@ -149,6 +160,44 @@ export function itemPage({ state, ui, params, allow }) {
 }
 
 // ---------- the add and edit form ----------
+/** An item's other units as the form's rows (CR-0014). */
+function sellValues(it) {
+  const out = {};
+  (it.sells || []).forEach((x, i) => {
+    Object.assign(out, { [`sell_unit_${i}`]: x.unit, [`sell_sale_${i}`]: x.sale / 100, [`sell_cost_${i}`]: x.cost == null ? '' : x.cost / 100, [`sell_low_${i}`]: x.low ?? '', [`sell_cut_from_${i}`]: x.cut_from || '', [`sell_cut_gives_${i}`]: x.cut_gives ?? '' });
+  });
+  return out;
+}
+/** The rows of "Also sold as": one per other unit, each with its own price, level and cut. */
+function sellRows(state, v, errors, manage, isNew) {
+  const rows = [];
+  for (let i = 0; Object.prototype.hasOwnProperty.call(v, `sell_unit_${i}`); i += 1) rows.push(i);
+  const k = (n, i) => `sell_${n}_${i}`;
+  const unitName = (id) => (id === '__new__' ? v.new_unit || 'the new unit' : UNITS[id] || '');
+  const field = (label, name, i, hint = '', extra = '') => `<label class="field">${label}${hint ? ` <span class="field-hint">${hint}</span>` : ''}<input name="${k(name, i)}" value="${e(v[k(name, i)] ?? '')}" ${inv(errors, k(name, i))} autocomplete="off" ${extra}>${fieldErr(errors, k(name, i))}</label>`;
+  const items = rows.map((i) => {
+    const mine = v[k('unit', i)];
+    const from = [v.unit, ...rows.map((j) => v[k('unit', j)])].filter((u, at, all) => u && u !== mine && all.indexOf(u) === at);
+    const cut = v[k('cut_from', i)];
+    return `<li class="sell-row" data-sell="${i}">
+      <div class="sell-head"><strong>${mine ? e((pickableUnits(state, mine).find((u) => u.id === mine) || { name: UNITS[mine] }).name) : `Unit ${i + 2}`}</strong><button type="button" class="btn btn-ghost btn-small" data-action="inv-remove-unit" data-i="${i}">Take this unit off</button></div>
+      <div class="sell-grid">
+        <label class="field">Unit<select name="${k('unit', i)}" ${inv(errors, k('unit', i))}><option value="">Choose a unit</option>${pickableUnits(state, mine).map((u) => `<option value="${e(u.id)}" ${mine === u.id ? 'selected' : ''}>${e(u.name)}</option>`).join('')}</select>${fieldErr(errors, k('unit', i))}</label>
+        ${field('Sale price (₹)', 'sale', i, '', 'inputmode="decimal"')}
+        ${manage ? field('Cost price (₹)', 'cost', i, 'optional', 'inputmode="decimal"') : ''}
+        ${field('Low-stock level', 'low', i, 'optional', 'inputmode="decimal"')}
+        <label class="field">Made by cutting <span class="field-hint">optional</span><select name="${k('cut_from', i)}" ${inv(errors, k('cut_from', i))}><option value="">Not cut from another unit</option>${from.map((u) => `<option value="${e(u)}" ${cut === u ? 'selected' : ''}>Cut from ${e(unitName(u))}</option>`).join('')}</select>${fieldErr(errors, k('cut_from', i))}</label>
+        ${cut ? field(`One ${e(unitName(cut))} gives`, 'cut_gives', i, 'the usual amount', 'inputmode="decimal"') : ''}
+        ${isNew ? field('Opening stock', 'opening', i, 'optional', 'inputmode="decimal"') : ''}
+      </div>
+    </li>`;
+  }).join('');
+  return `<fieldset class="sells" data-testid="sells"><legend>Also sold as</legend>
+    <p class="muted small">Sold in another unit too, for example loose metres as well as coils? Each unit has its own price and its own stock.</p>
+    ${rows.length ? `<ul class="sell-rows">${items}</ul>` : ''}${fieldErr(errors, 'sells')}
+    ${rows.length < MAX_SELLS ? `<button type="button" class="btn btn-secondary btn-small" data-action="inv-add-unit" data-testid="add-unit">${icon('plus', { size: 16 })} Add a unit</button>` : ''}
+  </fieldset>`;
+}
 /** One of the business's own details on the item form: text, a number, or a list to pick from (or type a new one). */
 function detailInput(state, f, v, errors, manage) {
   const k = `attr:${f.id}`;
@@ -165,7 +214,7 @@ export function itemForm({ state, ui, params, allow }) {
   const key = params.id || 'new';
   const f = ui.inv && ui.inv.form && ui.inv.form.key === key ? ui.inv.form : null;
   const v = (f && f.values) || (it
-    ? { name: it.name, code: it.code || '', unit: it.unit, sale: it.sale / 100, cost: it.cost == null ? '' : it.cost / 100, hsn: it.hsn || '', gst: String(it.gst), low: it.low ?? '', price_includes_gst: Boolean(it.price_includes_gst), service: Boolean(it.service), ...Object.fromEntries(activeFields(state).map((x) => [`attr:${x.id}`, detailOf(state, it, x)])) }
+    ? { name: it.name, code: it.code || '', unit: it.unit, sale: it.sale / 100, cost: it.cost == null ? '' : it.cost / 100, hsn: it.hsn || '', gst: String(it.gst), low: it.low ?? '', price_includes_gst: Boolean(it.price_includes_gst), service: Boolean(it.service), ...Object.fromEntries(activeFields(state).map((x) => [`attr:${x.id}`, detailOf(state, it, x)])), ...sellValues(it) }
     : { unit: 'nos', gst: '18', name: (ui.inv && ui.inv.prefill) || '' });
   const errors = (f && f.errors) || {};
   const input = (k, label, hint = '', extra = '') => `<label class="field">${label}${hint ? ` <span class="field-hint">${hint}</span>` : ''}<input name="${k}" value="${e(v[k] ?? '')}" ${inv(errors, k)} ${extra} autocomplete="off">${fieldErr(errors, k)}</label>`;
@@ -173,22 +222,35 @@ export function itemForm({ state, ui, params, allow }) {
   return `<section class="page" aria-labelledby="page-title">
     <a class="back" href="${back}">${icon('arrowLeft', { size: 18 })} ${it ? e(it.name) : 'Inventory'}</a>
     <header class="page-head"><h1 id="page-title" tabindex="-1">${it ? 'Edit item' : 'Add an item'}</h1><p class="muted">${it ? 'The quantity changes only through Stock in, Stock out, Count and parts used on jobs.' : 'One part or material you keep in the store.'}</p></header>
-    <form class="panel" data-form="inv-item" data-item="${e(params.id || '')}" novalidate>
-      <div class="form-grid">
+    <form class="panel item-form" data-form="inv-item" data-item="${e(params.id || '')}" novalidate>
+      <section class="form-section" aria-labelledby="fs-item">
+        <h2 class="form-section-title" id="fs-item">The item</h2>
+        <div class="form-grid">
         ${input('name', 'Name', '', 'data-autofocus placeholder="for example Capacitor 35 µF"')}
         ${input('code', 'Code', 'optional, unique in your business', 'placeholder="for example CAP-35"')}
         <label class="field">Unit<select name="unit" data-unit-select ${inv(errors, 'unit')}>${pickableUnits(state, it && it.unit).map((u) => `<option value="${e(u.id)}" ${v.unit === u.id ? 'selected' : ''}>${e(u.name)}</option>`).join('')}${manage ? `<option value="__new__" ${v.unit === '__new__' ? 'selected' : ''}>New unit…</option>` : ''}</select>${fieldErr(errors, 'unit')}</label>
         <div class="field new-unit" data-slot="new-unit" ${v.unit === '__new__' ? '' : 'hidden'}>${input('new_unit', 'Name of the new unit', 'up to 12 letters, for example Coil', 'maxlength="12"')}<label class="check-line"><input type="checkbox" name="new_unit_whole" ${v.new_unit_whole ? 'checked' : ''}> Whole numbers only</label></div>
+        ${activeFields(state).map((x) => detailInput(state, x, v, errors, manage)).join('')}
+        </div>
+      </section>
+      <section class="form-section" aria-labelledby="fs-price">
+        <h2 class="form-section-title" id="fs-price">Prices and tax</h2>
+        <div class="form-grid">
         ${input('sale', 'Sale price (₹)', 'per unit, used on estimates and bills', 'inputmode="decimal"')}
         ${input('cost', 'Cost price (₹)', 'optional; only people who manage inventory see it', 'inputmode="decimal"')}
-        ${activeFields(state).map((x) => detailInput(state, x, v, errors, manage)).join('')}
-        ${input('hsn', 'HSN code', 'optional, 4, 6 or 8 digits', 'inputmode="numeric"')}
         <label class="field">GST rate<select name="gst" ${inv(errors, 'gst')}>${GST_RATES.map((g) => `<option value="${g}" ${String(v.gst) === String(g) ? 'selected' : ''}>${g} %</option>`).join('')}</select>${fieldErr(errors, 'gst')}</label>
-        <label class="check-line"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}> ${W.priceIncludesGst} <span class="muted small">(MRP)</span></label>
-        <label class="check-line"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}> ${W.service} <span class="muted small">(for example Gas refill)</span></label>
+        ${input('hsn', 'HSN code', 'optional, 4, 6 or 8 digits', 'inputmode="numeric"')}
+        </div>
+        <div class="check-row"><label class="check-line"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}><span>${W.priceIncludesGst} <span class="muted small">(MRP)</span></span></label><label class="check-line"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}><span>${W.service} <span class="muted small">(for example Gas refill)</span></span></label></div>
+      </section>
+      <section class="form-section" aria-labelledby="fs-stock">
+        <h2 class="form-section-title" id="fs-stock">Stock</h2>
+        <div class="form-grid">
         ${input('low', 'Low-stock level', 'optional; marked Low at or below this', 'inputmode="decimal"')}
         ${it ? '' : input('opening', 'Opening stock', 'optional; what is on the shelf today', 'inputmode="decimal"')}
-      </div>
+        </div>
+      </section>
+      ${v.service === true || v.service === 'on' ? '' : sellRows(state, v, errors, manage, !it)}
       <div class="actions"><a class="btn btn-ghost" href="${back}">Cancel</a><button type="submit" class="btn btn-primary">${it ? 'Save changes' : 'Add item'}</button></div>
     </form>
   </section>`;
@@ -214,8 +276,8 @@ export function inventoryImport({ state, ui }) {
   const c = ui.inv && ui.inv.csv;
   const rows = c && c.rows;
   const n = (s) => (c && c.counts ? c.counts[s] || 0 : 0);
-  const good = n('new') + n('update');
-  const tag = { new: '<span class="tag">New</span>', update: '<span class="tag tag-soon">Update</span>', same: '<span class="tag tag-past">No change</span>', problem: '<span class="tag tag-lapsed">Problem</span>' };
+  const good = n('new') + n('update') + n('unit');
+  const tag = { unit: '<span class="tag tag-soon">Another unit</span>', new: '<span class="tag">New</span>', update: '<span class="tag tag-soon">Update</span>', same: '<span class="tag tag-past">No change</span>', problem: '<span class="tag tag-lapsed">Problem</span>' };
   const result = ui.inv && ui.inv.csvResult;
   return `<section class="page page-wide" aria-labelledby="page-title">
     <a class="back" href="#/inventory">${icon('arrowLeft', { size: 18 })} Inventory</a>
@@ -224,7 +286,7 @@ export function inventoryImport({ state, ui }) {
     <p class="notice">${icon('server', { size: 18 })}<span>Importing needs a signal, because each code is checked against your whole business.</span></p>
     <div class="panel">
       <ol class="start-steps">
-        <li class="start-step"><span class="step-num">1</span><div><h3>Download the template</h3><p class="muted">Columns: ${csvColumns(state).map((x) => `<code>${e(x)}</code>`).join(', ')}. Only <code>name</code> is needed; prices are in rupees. ${activeFields(state).length ? 'Your own details are columns too, named as in <a href="#/inventory/fields">Item details</a>.' : 'Add your own columns, such as Brand, in <a href="#/inventory/fields">Item details</a> first.'}</p><button type="button" class="btn btn-ghost btn-small" data-action="inv-template">${icon('download', { size: 18 })} Download template</button></div></li>
+        <li class="start-step"><span class="step-num">1</span><div><h3>Download the template</h3><p class="muted">Columns: ${csvColumns(state).map((x) => `<code>${e(x)}</code>`).join(', ')}. Only <code>name</code> is needed; prices are in rupees. An item sold in several units has one row for each, with the same code: the first row is its main unit, and a later row can say <code>cut_from</code> (for example Coil) and <code>cut_gives</code> (90). ${activeFields(state).length ? 'Your own details are columns too, named as in <a href="#/inventory/fields">Item details</a>.' : 'Add your own columns, such as Brand, in <a href="#/inventory/fields">Item details</a> first.'}</p><button type="button" class="btn btn-ghost btn-small" data-action="inv-template">${icon('download', { size: 18 })} Download template</button></div></li>
         <li class="start-step"><span class="step-num">2</span><div><h3>Choose your file</h3><p class="muted">KaryaHub checks every row before anything is saved.</p>
           <div class="actions"><label class="btn btn-secondary file-pick">${icon('upload', { size: 18 })} Choose a CSV file<input type="file" accept=".csv,text/csv" data-action="pick-inv-csv"></label></div></div></li>
         <li class="start-step"><span class="step-num">3</span><div><h3>Check, then import</h3><p class="muted">Rows with a problem are skipped; fix them in the file and import it again. A code that is already in your inventory updates that item. Importing the same file twice changes nothing.</p></div></li>
@@ -237,7 +299,7 @@ export function inventoryImport({ state, ui }) {
       <div class="panel-head"><h2 class="panel-title" id="h-check">Check: ${e(c.file)}</h2><span class="muted small">${rows.length} rows</span></div>
       <ul class="kpis inv-kpis">
         <li class="kpi"><span class="kpi-label">New items</span><span class="kpi-value" data-testid="csv-new">${n('new')}</span></li>
-        <li class="kpi"><span class="kpi-label">Updates</span><span class="kpi-value" data-testid="csv-update">${n('update')}</span>${n('same') ? `<span class="kpi-sub muted">${n('same')} already up to date</span>` : ''}</li>
+        ${n('unit') ? `<li class="kpi"><span class="kpi-label">Unit rows</span><span class="kpi-value" data-testid="csv-unit">${n('unit')}</span><span class="kpi-sub muted">other units of an item</span></li>` : ''}<li class="kpi"><span class="kpi-label">Updates</span><span class="kpi-value" data-testid="csv-update">${n('update')}</span>${n('same') ? `<span class="kpi-sub muted">${n('same')} already up to date</span>` : ''}</li>
         <li class="kpi"><span class="kpi-label">Problems</span><span class="kpi-value ${n('problem') ? 'is-out' : ''}" data-testid="csv-problem">${n('problem')}</span><span class="kpi-sub muted">skipped</span></li>
       </ul>
       ${addsHtml(c)}
@@ -265,24 +327,29 @@ export function stockSheet({ state, ui }) {
   const it = sh.item ? (state.items || []).find((i) => i.id === sh.item) : null;
   const errors = sh.errors || {};
   const v = sh.values || {};
-  const qtyField = (label) => `<label class="field">${label}<span class="unit-field"><input name="qty" inputmode="decimal" autocomplete="off" value="${e(v.qty ?? '')}" ${inv(errors, 'qty')} data-autofocus data-qty><span>${UNITS[it.unit]}</span></span>${fieldErr(errors, 'qty')}</label>`;
+  const units = it ? unitsOf(it) : [];
+  const su = it && units.some((u) => u.unit === sh.unit) ? sh.unit : it && it.unit; // the unit this move is in (CR-0014)
+  const unitPick = () => (units.length > 1 && sh.type !== 'pick' ? `<label class="field">Unit<select name="unit" data-sheet-unit>${units.map((u) => `<option value="${e(u.unit)}" ${u.unit === su ? 'selected' : ''}>${e(UNITS[u.unit])}</option>`).join('')}</select></label>` : '');
+  const qtyField = (label) => `<label class="field">${label}<span class="unit-field"><input name="qty" inputmode="decimal" autocomplete="off" value="${e(v.qty ?? '')}" ${inv(errors, 'qty')} data-autofocus data-qty><span>${UNITS[su]}</span></span>${fieldErr(errors, 'qty')}</label>`;
   let title = '';
   let body = '';
   let save = '';
   if (sh.type === 'in') {
     save = 'Save stock in';
     title = `Stock in: ${it.name}`;
-    body = `<p class="muted">In stock now: ${qtyHtml(state, it)}</p>
+    body = `<p class="muted">In stock now: ${qtyHtml(state, it, su)}</p>
+      ${unitPick()}
       <div class="form-grid">${qtyField('Quantity received')}
         <label class="field">Date <span class="field-hint">dd-mm-yyyy</span><input name="date" inputmode="numeric" value="${e(v.date ?? dmy(isSynced(state) ? deviceToday() : today()))}" ${inv(errors, 'date')}>${fieldErr(errors, 'date')}</label>
         <label class="field">Supplier <span class="field-hint">optional</span><input name="supplier" value="${e(v.supplier ?? '')}" autocomplete="off"></label>
         <label class="field">Bill number <span class="field-hint">optional</span><input name="bill" value="${e(v.bill ?? '')}" autocomplete="off"></label>
-        <label class="field">Cost per ${UNITS[it.unit]} (₹) <span class="field-hint">optional</span><input name="cost" inputmode="decimal" value="${e(v.cost ?? '')}" ${inv(errors, 'cost')}>${fieldErr(errors, 'cost')}</label></div>`;
+        <label class="field">Cost per ${UNITS[su]} (₹) <span class="field-hint">optional</span><input name="cost" inputmode="decimal" value="${e(v.cost ?? '')}" ${inv(errors, 'cost')}>${fieldErr(errors, 'cost')}</label></div>`;
   } else if (sh.type === 'out') {
     save = 'Save stock out';
     title = `Stock out: ${it.name}`;
     const reasons = [['supplier', 'Returned to supplier'], ['lost', 'Damaged or lost'], ['other', 'Used without a job']];
-    body = `<p class="muted">In stock now: ${qtyHtml(state, it)}</p>
+    body = `<p class="muted">In stock now: ${qtyHtml(state, it, su)}</p>
+      ${unitPick()}
       <p class="warn-note">${icon('wrench', { size: 16 })}<span>Taking a part for a job? Do it on the job's screen, so it goes on that job's invoice.</span></p>
       ${qtyField('Quantity going out')}
       <fieldset class="reason-list"><legend>Reason</legend>${reasons.map(([k, l]) => `<label class="radio"><input type="radio" name="reason" value="${k}" ${v.reason === k ? 'checked' : ''}> ${l}</label>`).join('')}${fieldErr(errors, 'reason')}</fieldset>
@@ -290,12 +357,30 @@ export function stockSheet({ state, ui }) {
   } else if (sh.type === 'count') {
     save = 'Save count';
     title = `Count: ${it.name}`;
-    const counted = parseQty(v.qty ?? '', it.unit);
-    const diff = counted.ok ? r3(counted.value - stockOf(state, it)) : null;
-    body = `<p class="muted">The records say ${qtyHtml(state, it)}. Count what is on the shelf and type it here.</p>
+    const counted = parseQty(v.qty ?? '', su);
+    const diff = counted.ok ? r3(counted.value - stockOf(state, it, su)) : null;
+    body = `<p class="muted">The records say ${qtyHtml(state, it, su)}. Count what is on the shelf and type it here.</p>
+      ${unitPick()}
       ${qtyField('Counted on the shelf')}
-      <p class="diff-line" data-slot="inv-diff" aria-live="polite">${diff == null ? '' : diff === 0 ? 'Count matches. Nothing to change.' : e(`This records ${signedText(diff, it.unit)} as a count correction.`)}</p>
+      <p class="diff-line" data-slot="inv-diff" aria-live="polite">${diff == null ? '' : diff === 0 ? 'Count matches. Nothing to change.' : e(`This records ${signedText(diff, su)} as a count correction.`)}</p>
       <label class="field">Reason <span class="field-hint">optional</span><input name="note" value="${e(v.note ?? '')}" placeholder="for example: monthly count" autocomplete="off"></label>`;
+  } else if (sh.type === 'cut') {
+    save = 'Cut';
+    title = `Cut: ${it.name}`;
+    const from = units.some((u) => u.unit === v.from) ? v.from : units[0].unit;
+    const others = units.filter((u) => u.unit !== from);
+    const to = others.some((u) => u.unit === v.to) ? v.to : (others.find((u) => u.cut_from === from) || others[0]).unit;
+    const toUnit = units.find((u) => u.unit === to);
+    const usual = toUnit && toUnit.cut_from === from ? toUnit.cut_gives : '';
+    const gives = v.gives !== undefined && v.gives !== '' ? v.gives : (usual ?? '');
+    body = `<p class="muted">Cut one unit into another, for example a coil into loose metres. Only the person at the shelf can say how much it gives.</p>
+      <div class="form-grid">
+        <label class="field">Cut this unit<select name="from" data-cut-pick>${units.map((u) => `<option value="${e(u.unit)}" ${u.unit === from ? 'selected' : ''}>${e(UNITS[u.unit])} (${e(qtyText(stockOf(state, it, u.unit), u.unit))} in stock)</option>`).join('')}</select>${fieldErr(errors, 'from')}</label>
+        <label class="field">How many do you cut?<span class="unit-field"><input name="count" inputmode="decimal" autocomplete="off" value="${e(v.count ?? '1')}" ${inv(errors, 'count')} data-autofocus><span>${e(UNITS[from])}</span></span>${fieldErr(errors, 'count')}</label>
+        <label class="field">Into<select name="to" data-cut-pick>${others.map((u) => `<option value="${e(u.unit)}" ${u.unit === to ? 'selected' : ''}>${e(UNITS[u.unit])} (${e(qtyText(stockOf(state, it, u.unit), u.unit))} in stock)</option>`).join('')}</select>${fieldErr(errors, 'to')}</label>
+        <label class="field">It gives${usual ? ` <span class="field-hint">usually ${e(qtyText(usual, to))}</span>` : ''}<span class="unit-field"><input name="gives" inputmode="decimal" autocomplete="off" value="${e(gives)}" ${inv(errors, 'gives')} data-testid="cut-gives"><span>${e(UNITS[to])}</span></span>${fieldErr(errors, 'gives')}</label>
+      </div>
+      <label class="field">Note <span class="field-hint">optional</span><input name="note" value="${e(v.note ?? '')}" autocomplete="off"></label>`;
   } else if (sh.type === 'pick' && !it) {
     title = 'Take a part from inventory';
     body = `<div class="inv-search">${icon('search', { size: 18 })}<label class="sr-label" for="pick-q">Search inventory</label><input id="pick-q" type="search" placeholder="Search by name or code" value="${e(sh.q || '')}" data-pick-search data-autofocus autocomplete="off"></div>

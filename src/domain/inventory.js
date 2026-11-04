@@ -33,7 +33,7 @@ export function pickableUnits(state, keep = null) {
 }
 export const GST_RATES = [0, 0.25, 3, 5, 18, 40]; // 0.25 % and 3 % added by CR-0012 (AC-27.6)
 const UNIT_ALIASES = { m: 'metre', mtr: 'metre', mtrs: 'metre', meter: 'metre', meters: 'metre', metres: 'metre', kgs: 'kg', l: 'litre', ltr: 'litre', ltrs: 'litre', litres: 'litre', liter: 'litre', pcs: 'nos', pc: 'nos', piece: 'nos', pieces: 'nos', no: 'nos', sets: 'set', rolls: 'roll' };
-export const MOVE_LABELS = { opening: 'Opening stock', in: 'Stock in', out: 'Stock out', used: 'Used on job', returned: 'Put back from job', count: 'Count correction' };
+export const MOVE_LABELS = { opening: 'Opening stock', in: 'Stock in', out: 'Stock out', used: 'Used on job', returned: 'Put back from job', count: 'Count correction', cut: 'Cut', sold: 'Sold on a bill', sale_cancelled: 'Bill cancelled' };
 
 export const r3 = (n) => Math.round((Number(n) + 0) * 1000) / 1000;
 /** 1.5 -> "1.5", 38 -> "38", 1200 -> "1,200". */
@@ -57,15 +57,38 @@ export const matches = (item, query, state = null) => {
 // ---------- what is in stock ----------
 const pending = (m) => m.after === undefined;
 export const movesOf = (state, itemId) => (state.stock_moves || []).filter((m) => m.item_id === itemId);
-/** The quantity to show: what the server last said, plus this phone's moves it has not answered yet. */
-export function stockOf(state, item) {
-  return r3(Number(item.qty || 0) + movesOf(state, item.id).filter(pending).reduce((s, m) => s + m.qty, 0));
+
+// ---------- the units an item is sold in (CR-0014) ----------
+/** Every unit the item is sold in, the main one first: [{unit, main, sale, cost, low, qty, cut_from, cut_gives}]. */
+export function unitsOf(item) {
+  return [
+    { unit: item.unit, main: true, sale: item.sale, cost: item.cost, low: item.low, qty: Number(item.qty || 0), cut_from: '', cut_gives: null },
+    ...(item.sells || []).map((x) => ({ ...x, main: false, qty: Number(x.qty || 0) })),
+  ];
+}
+/** What a stock move does to one unit of the item: a cut lowers the unit it cuts and raises the unit it makes. */
+const deltaOf = (m, unit, item) => {
+  if (m.kind === 'cut') return m.unit === unit ? m.qty : m.to_unit === unit ? m.gave : 0;
+  return (m.unit || item.unit) === unit ? m.qty : 0;
+};
+/** The quantity to show for one unit: what the server last said, plus this phone's moves it has not answered yet. */
+export function stockOf(state, item, unit = item.unit) {
+  const held = unitsOf(item).find((u) => u.unit === unit);
+  return r3((held ? held.qty : 0) + movesOf(state, item.id).filter(pending).reduce((sum, m) => sum + deltaOf(m, unit, item), 0));
 }
 export function markOf(qty, low) {
   if (qty < 0) return { kind: 'short' };
   if (qty === 0) return { kind: 'out' };
   if (low != null && qty <= low) return { kind: 'low' };
   return null;
+}
+/** The mark of one unit. The main unit is marked as before; another unit only when it has a level set or is short, so a unit that is cut on demand isn't "Out" all day. */
+export function unitMark(state, item, u) {
+  if (item.service) return null;
+  const q = stockOf(state, item, u.unit);
+  if (u.main) return markOf(q, u.low);
+  if (q < 0) return { kind: 'short' };
+  return u.low != null && q <= u.low ? { kind: 'low' } : null;
 }
 export const markText = (mark, qty, unit) => (!mark ? '' : mark.kind === 'low' ? 'Low' : mark.kind === 'out' ? 'Out' : `Short by ${qtyText(-qty, unit)}`);
 export const nameOf = (a, b) => a.name.localeCompare(b.name, 'en-IN');
@@ -76,11 +99,10 @@ export function summary(state) {
   let out = 0;
   let value = 0;
   for (const i of live) {
-    const q = stockOf(state, i);
-    const m = i.service ? null : markOf(q, i.low);
-    if (m && m.kind === 'low') low += 1;
-    if (m && (m.kind === 'out' || m.kind === 'short')) out += 1;
-    value += Math.max(q, 0) * (i.cost || 0);
+    const marks = unitsOf(i).map((u) => unitMark(state, i, u));
+    if (marks.some((m) => m && m.kind === 'low')) low += 1;
+    if (marks.some((m) => m && (m.kind === 'out' || m.kind === 'short'))) out += 1;
+    for (const u of unitsOf(i)) value += Math.max(stockOf(state, i, u.unit), 0) * (u.cost || 0);
   }
   return { all: live.length, low, out, stopped: (state.items || []).length - live.length, value: Math.round(value) };
 }
@@ -90,22 +112,23 @@ export function listItems(state, { filter = 'all', q = '', f = {} } = {}) {
     .filter((i) => (filter === 'stopped' ? i.stopped : !i.stopped))
     .filter((i) => picked.every(([fid, entry]) => (i.attrs || {})[fid] === entry))
     .filter((i) => {
-      const m = i.service ? null : markOf(stockOf(state, i), i.low);
-      if (filter === 'low') return m && m.kind === 'low';
-      if (filter === 'out') return m && (m.kind === 'out' || m.kind === 'short');
+      const marks = unitsOf(i).map((u) => unitMark(state, i, u)).filter(Boolean);
+      if (filter === 'low') return marks.some((m) => m.kind === 'low');
+      if (filter === 'out') return marks.some((m) => m.kind === 'out' || m.kind === 'short');
       return true;
     })
     .filter((i) => !String(q).trim() || matches(i, q, state))
     .sort(nameOf);
 }
-/** An item's moves, newest first, each with the quantity left after it. */
-export function historyOf(state, item) {
-  const moves = movesOf(state, item.id).map((m, order) => ({ m, order }));
+/** One unit's moves, newest first, each with the quantity left in that unit after it. A cut shows in both units. */
+export function historyOf(state, item, unit = item.unit) {
+  const moves = movesOf(state, item.id).map((m, order) => ({ m, order })).filter(({ m }) => deltaOf(m, unit, item) !== 0 || (m.kind === 'cut' && (m.unit === unit || m.to_unit === unit)));
   moves.sort((a, b) => (a.m.at === b.m.at ? b.order - a.order : a.m.at < b.m.at ? 1 : -1));
-  let run = stockOf(state, item);
+  let run = stockOf(state, item, unit);
   return moves.map(({ m }) => {
-    const row = { ...m, shown_after: run };
-    run = r3(run - m.qty);
+    const d = deltaOf(m, unit, item);
+    const row = { ...m, qty: d, shown_after: run };
+    run = r3(run - d);
     return row;
   });
 }
@@ -177,6 +200,50 @@ export const isoFromDmy = (s) => {
 };
 export const dmy = (iso) => { const [y, m, d] = String(iso || '').slice(0, 10).split('-'); return y ? `${d}-${m}-${y}` : ''; };
 
+export const MAX_SELLS = 49; // other units besides the main one (50 in all)
+/** The other units an item is sold in, from the form's rows (sell_unit_0, sell_sale_0 ...). `main` is the main unit's id, or '__new__' while it is still being made. */
+function readSells(v, main, errors, isNew) {
+  const sells = [];
+  const openings = [];
+  const seen = [main];
+  for (let i = 0; Object.prototype.hasOwnProperty.call(v, `sell_unit_${i}`); i += 1) {
+    const k = (n) => `sell_${n}_${i}`;
+    const unit = v[k('unit')];
+    if (!UNITS[unit]) errors[k('unit')] = 'Pick a unit.';
+    else if (seen.includes(unit)) errors[k('unit')] = `${UNITS[unit]} is already one of this item's units.`;
+    else seen.push(unit);
+    const sale = parseRupees(v[k('sale')]);
+    if (!sale.ok) errors[k('sale')] = sale.message;
+    else if (sale.value == null) errors[k('sale')] = 'Type the price for this unit.';
+    const cost = parseRupees(v[k('cost')]);
+    if (!cost.ok) errors[k('cost')] = cost.message;
+    let low = null;
+    if (String(v[k('low')] ?? '').trim()) {
+      const l = parseQty(v[k('low')], unit);
+      if (!l.ok) errors[k('low')] = 'Type a number, or leave it empty.'; else low = l.value;
+    }
+    const cutFrom = v[k('cut_from')] || '';
+    let gives = null;
+    if (cutFrom) {
+      const g = parseQty(v[k('cut_gives')], unit);
+      if (!g.ok) errors[k('cut_gives')] = g.message;
+      else if (g.value === 0) errors[k('cut_gives')] = 'A cut must give more than 0.';
+      else gives = g.value;
+    }
+    if (String(v[k('opening')] ?? '').trim() && isNew) {
+      const o = parseQty(v[k('opening')], unit);
+      if (!o.ok) errors[k('opening')] = o.message; else if (o.value > 0) openings.push({ unit, qty: o.value });
+    }
+    sells.push({ unit, sale: sale.value, cost: cost.value, low, cut_from: cutFrom, cut_gives: gives });
+  }
+  if (sells.length > MAX_SELLS) errors.sells = `An item can be sold in up to ${MAX_SELLS + 1} units.`;
+  for (const [i, x] of sells.entries()) {
+    if (x.cut_from && !seen.includes(x.cut_from)) errors[`sell_cut_from_${i}`] = "Cut from one of this item's own units.";
+    if (x.cut_from && x.cut_from === x.unit) errors[`sell_cut_from_${i}`] = "A unit can't be cut from itself.";
+  }
+  return { sells, openings };
+}
+
 /** Check the add or edit form. Returns the item to save (prices in paise) or the message for each wrong field.
  *  `pending` are list values typed that the list doesn't have yet; `newUnit` is a unit typed for this item. */
 export function validateItem(v, state, editingId = null) {
@@ -220,10 +287,11 @@ export function validateItem(v, state, editingId = null) {
   }
   const details = readDetails(state, v);
   Object.assign(errors, details.errors);
+  const { sells, openings } = readSells(v, newUnit ? '__new__' : unit, errors, editingId == null);
   if (Object.keys(errors).length) return { errors };
   const on = (x) => x === true || x === 'on' || x === 'true';
   return {
-    errors, opening, pending: details.pending, newUnit,
-    item: { name, code, unit, sale: sale.value, cost: cost.value, hsn, gst: Number(v.gst), low, price_includes_gst: on(v.price_includes_gst), service: on(v.service), attrs: details.attrs },
+    errors, opening, openings, pending: details.pending, newUnit,
+    item: { name, code, unit, sale: sale.value, cost: cost.value, hsn, gst: Number(v.gst), low, price_includes_gst: on(v.price_includes_gst), service: on(v.service), attrs: details.attrs, sells },
   };
 }

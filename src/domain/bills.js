@@ -5,6 +5,7 @@ import { compute, TaxInputError, gstinOk, STATES } from './tax.js';
 import { uid } from '../ids.js';
 import { W } from '../words.js';
 import { billName } from './fields.js';
+import { unitsOf } from './inventory.js';
 
 export const DOC_VERSION = 2;
 export const BIG_BILL = 5_000_000; // ₹50,000 in paise (AC-27.8)
@@ -117,11 +118,22 @@ export function lastPrice(documents, customer, itemId) {
   }
   return null;
 }
+/** The unit as a bill prints it: a unit of the business's own by its name, a built-in one as it always was. */
+export function unitText(state, unitId) {
+  const own = state && (state.units || []).find((u) => u.id === unitId);
+  return own ? own.name : unitId;
+}
+/** A line's unit changed to another of its item's units: its name and that unit's price (CR-0014). */
+export function lineInUnit(state, line, unitId) {
+  const item = (state.items || []).find((i) => i.id === line.item_id);
+  const u = item ? unitsOf(item).find((x) => x.unit === unitId) : null;
+  if (!u) return line;
+  return { ...line, unit_id: unitId, unit: unitText(state, unitId), rate: u.sale ?? 0, last_price: false };
+}
 /** A bill line from an item. With the on-device copy, the item's on-bill details join its name and a unit of the business's own prints by its name (CR-0013). */
 export function lineFromItem(item, price = null, state = null) {
-  const own = state && (state.units || []).find((u) => u.id === item.unit);
   return {
-    item_id: item.id, description: state ? billName(state, item) : item.name, hsn: item.hsn || '', qty: 1, unit: own ? own.name : item.unit, rate: price ?? item.sale ?? 0,
+    item_id: item.id, unit_id: item.unit, description: state ? billName(state, item) : item.name, hsn: item.hsn || '', qty: 1, unit: unitText(state, item.unit), rate: price ?? item.sale ?? 0,
     gst_rate: String(item.gst ?? 18), price_includes_gst: Boolean(item.price_includes_gst), discount: null,
     from_job_parts: false, last_price: price !== null,
   };

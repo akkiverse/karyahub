@@ -183,6 +183,18 @@ flowchart LR
 ```
 A business's own fields, the entries of its pick-lists and its units are ordinary records of the shared `records` table (ADR-0017): no migration, the same business wall and row-level security. An item stores `attrs` (field id to value; a pick-list value is an entry id). The phone keeps the unit names in one table refreshed from the business's units, so every screen that shows a quantity uses them.
 
+## Selling units and Cut (CR-0014)
+```mermaid
+flowchart LR
+  Ph[Phone: item form, stock sheets, Cut sheet, bill line] -- stock_move with unit, or kind cut --> Q[(sync queue)]
+  Q -- POST /api/v1/sync --> B[data/inventory.py Batch]
+  B -- slot_qty / set_slot_qty --> I[(item: qty + sells list, each with its own qty)]
+  B -- one move, both quantities --> M[(stock_move: cut, unit, to_unit, gave)]
+  Bill[data/bills.py settle_stock] -- key item or item|unit --> B
+  Csv[CSV: one row per unit] -- data/inventory_import.py --> I
+```
+An item keeps its main unit as before and gains a `sells` list of its other units, each with the server's own quantity (ADR-0018). A stock move names its unit only when it is not the main one. A cut is one move that lowers one unit and raises another, so the two halves can't be saved apart.
+
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.
 

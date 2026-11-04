@@ -347,7 +347,7 @@ export function mountApp(root, options = {}) {
       const target = root.querySelector(ui.inv.focusNext);
       ui.inv.focusNext = null;
       target?.focus({ preventScroll: !ui.inv.scrollNext });
-      if (ui.inv.scrollNext && target) target.scrollIntoView({ block: 'center' }); // the item details screen is long: bring the form or the answer into view
+      if (ui.inv.scrollNext && target) target.scrollIntoView?.({ block: 'center' }); // the item details screen is long: bring the form or the answer into view
       ui.inv.scrollNext = false;
     }
     const t2 = root.querySelector('.thread');
@@ -388,6 +388,7 @@ export function mountApp(root, options = {}) {
   function leaveInventoryRoute() {
     ui.inv.sheet = null;
     if (route.name !== 'inventory-fields') ui.fields = {};
+    if (route.name !== 'item-form') ui.inv.form = null; // a form left unsaved is not kept for next time
     if (ui.inv.notice && ui.inv.notice.at !== noticeKey(route)) ui.inv.notice = null;
   }
   const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.newOpen = false; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
@@ -402,6 +403,8 @@ export function mountApp(root, options = {}) {
   const unsub = store.subscribe((st, meta) => {
     applyUnits(st.units);
     applyTheme();
+    // The item form and the item details screen are where a person is typing: what arrives from the server must not redraw them (CR-0014).
+    if (meta && meta.remote && ['item-form', 'inventory-fields'].includes(route.name) && root.querySelector('form[data-form^="inv-"]')) return; // (a screen still waiting for its data is drawn when it arrives)
     if (meta && meta.remote && typing()) { renderWhenDone = true; return; }
     render();
   });
@@ -553,7 +556,7 @@ export function mountApp(root, options = {}) {
   // A file of more than 500 rows is sent in parts of 500 (the server takes that many at once); the answers are joined.
   async function runCsv(text, name, check) {
     const parts = splitCsv(text, 500);
-    const join = { rows: [], counts: { new: 0, update: 0, same: 0, problem: 0 }, adds: { units: [], lists: [] }, unknown: [], imported: { added: 0, updated: 0, skipped: 0 } };
+    const join = { rows: [], counts: { new: 0, update: 0, same: 0, problem: 0, unit: 0 }, adds: { units: [], lists: [] }, unknown: [], imported: { added: 0, updated: 0, skipped: 0 } };
     let offset = 0;
     for (const part of parts) {
       const res = await api.inventoryImport({ text: part.text, name, check });
@@ -606,6 +609,8 @@ export function mountApp(root, options = {}) {
     if (a === 'inv-add') { ui.inv.prefill = el.dataset.name || ''; ui.inv.form = null; navigate('#/inventory/new'); return; }
     if (a === 'inv-sheet') { openSheet({ type: el.dataset.type, item: itemId, values: {}, errors: {} }); return; }
     if (a === 'inv-close-sheet') { ui.inv.sheet = null; render(); return; }
+    if (a === 'inv-hist-unit') { ui.inv.histUnit = el.dataset.unit; render(); return; }
+    if (a === 'inv-add-unit' || a === 'inv-remove-unit') { editSellRows(a === 'inv-add-unit' ? null : Number(el.dataset.i)); return; }
     if (a === 'inv-stop') {
       const res = stock.setStopped(itemId, el.dataset.stopped === 'true');
       const it = store.get().items.find((i) => i.id === itemId);
@@ -639,6 +644,31 @@ export function mountApp(root, options = {}) {
     if (a === 'inv-do-import') { await importCsv(); return; }
     if (a === 'inv-clear-csv') { ui.inv.csv = null; ui.inv.csvResult = ''; render(); return; }
     if (a === 'inv-check-again' && ui.inv.csv) await checkCsv(ui.inv.csv.file, ui.inv.csv.text);
+  }
+  // The rows of "Also sold as" on the item form (CR-0014): keep what was typed, then add a row or take one off.
+  function editSellRows(removeAt) {
+    const form = root.querySelector('form[data-form="inv-item"]');
+    if (!form) return;
+    const v = Object.fromEntries(new FormData(form).entries());
+    const rows = [];
+    for (let i = 0; Object.prototype.hasOwnProperty.call(v, `sell_unit_${i}`); i += 1) rows.push(i);
+    const keys = ['unit', 'sale', 'cost', 'low', 'cut_from', 'cut_gives', 'opening'];
+    const kept = rows.filter((i) => i !== removeAt).map((i) => Object.fromEntries(keys.map((k) => [k, v[`sell_${k}_${i}`] ?? ''])));
+    for (const i of rows) for (const k of keys) delete v[`sell_${k}_${i}`];
+    if (removeAt == null) kept.push(Object.fromEntries(keys.map((k) => [k, ''])));
+    kept.forEach((row, i) => keys.forEach((k) => { v[`sell_${k}_${i}`] = row[k]; }));
+    ['price_includes_gst', 'service'].forEach((k) => { if (v[k] === undefined) v[k] = ''; });
+    ui.inv.form = { key: form.dataset.item || 'new', values: v, errors: {} };
+    const was = root.ownerDocument.activeElement && root.ownerDocument.activeElement.name;
+    render();
+    if (removeAt === 'keep') root.querySelector(`[name="${was}"]`)?.focus(); // only a redraw: the cursor stays where it was
+    else root.querySelector(`[name="sell_unit_${removeAt == null ? kept.length - 1 : Math.max(0, Math.min(removeAt, kept.length - 1))}"]`)?.focus();
+  }
+  // What is typed on the item form is kept in step as it is typed, so a redraw (or a tap that lands on a redrawn button) never empties it.
+  function rememberItemForm(field) {
+    const form = field && field.closest ? field.closest('form[data-form="inv-item"]') : null;
+    if (!form) return;
+    ui.inv.form = { key: form.dataset.item || 'new', values: Object.fromEntries(new FormData(form).entries()), errors: (ui.inv.form && ui.inv.form.key === (form.dataset.item || 'new') && ui.inv.form.errors) || {} };
   }
   // The item details screen: a notice after each change, an error stays on its form.
   function fieldsNote(text, error = false) { ui.fields = { notice: { text, error } }; ui.inv.focusNext = '[data-testid="fields-notice"]'; ui.inv.scrollNext = true; }
@@ -728,6 +758,15 @@ export function mountApp(root, options = {}) {
       render();
       return;
     }
+    if (sh.type === 'cut') {
+      const done = stock.cut(sh.item, v);
+      if (done.errors) { fail(done); return; }
+      ui.inv.sheet = null;
+      const it = store.get().items.find((i) => i.id === sh.item);
+      invNotice(at, done.error || `Cut ${qtyText(done.count, done.from)} of ${it.name} into ${qtyText(done.gives, done.to)}. In stock: ${qtyText(stockOf(store.get(), it, done.from), done.from)} and ${qtyText(stockOf(store.get(), it, done.to), done.to)}.`, Boolean(done.error));
+      render();
+      return;
+    }
     const res = stock.move(sh.item, sh.type, v);
     if (res.errors) { fail(res); return; }
     ui.inv.sheet = null;
@@ -738,8 +777,9 @@ export function mountApp(root, options = {}) {
       const m = res.move;
       const st = sync.status();
       const saved = st.active && st.state === 'offline' ? ' Saved on this phone; it will be sent when the signal returns.' : '';
-      const what = sh.type === 'in' ? `Added ${qtyText(Math.abs(m.qty), it.unit)} to ${it.name}.` : sh.type === 'out' ? `Took ${qtyText(Math.abs(m.qty), it.unit)} of ${it.name} out.` : `Count saved: ${signedText(m.qty, it.unit)} as a correction.`;
-      invNotice(at, `${what} In stock: ${qtyText(stockOf(store.get(), it), it.unit)}.${saved}`);
+      const u = res.unit || it.unit;
+      const what = sh.type === 'in' ? `Added ${qtyText(Math.abs(m.qty), u)} to ${it.name}.` : sh.type === 'out' ? `Took ${qtyText(Math.abs(m.qty), u)} of ${it.name} out.` : `Count saved: ${signedText(m.qty, u)} as a correction.`;
+      invNotice(at, `${what} In stock: ${qtyText(stockOf(store.get(), it, u), u)}.${saved}`);
     }
     render();
   }
@@ -931,10 +971,21 @@ export function mountApp(root, options = {}) {
 
   async function onChange(e) {
     const el = e.target;
+    rememberItemForm(el);
     const a = el.dataset.action;
     if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0]); return; }
     if (bills.onChange(e)) return;
     if (el.matches('[data-inv-filter]')) { ui.inv.f = { ...(ui.inv.f || {}), [el.dataset.invFilter]: el.value }; paintInv(); return; }
+    if (el.matches('[data-sheet-unit], [data-cut-pick]') && ui.inv.sheet) {
+      const form = root.querySelector('form[data-form="inv-sheet"]');
+      const v = Object.fromEntries(new FormData(form).entries());
+      if (el.matches('[data-cut-pick]') && el.name === 'from') { delete v.gives; delete v.to; }
+      if (el.matches('[data-cut-pick]') && el.name === 'to') delete v.gives;
+      ui.inv.sheet = { ...ui.inv.sheet, unit: v.unit || ui.inv.sheet.unit, values: v, errors: {} };
+      render();
+      return;
+    }
+    if (el.matches('select[name^="sell_unit_"], select[name^="sell_cut_from_"]')) { editSellRows('keep'); return; } // the cut box and the list of units to cut from follow what was picked
     if (el.matches('[data-unit-select]')) { const box = root.querySelector('[data-slot="new-unit"]'); if (box) box.hidden = el.value !== '__new__'; if (el.value === '__new__') root.querySelector('input[name="new_unit"]')?.focus(); return; }
     if (a === 'edit-line') actions.updateDocumentLine(el.dataset.doc, Number(el.dataset.index), { [el.dataset.key]: el.value === '' ? NaN : Number(el.value) });
     else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
@@ -979,6 +1030,7 @@ export function mountApp(root, options = {}) {
   }
   function onInput(e) {
     const t = e.target;
+    rememberItemForm(t);
     if (bills.onInput(e)) return;
     if (t.id === 'composer-input') ui.draft = t.value;
     else if (t.matches('[data-inv-search]')) { ui.inv.q = t.value; paintInv(); }
@@ -990,12 +1042,13 @@ export function mountApp(root, options = {}) {
       // A hint under the quantity while it is typed: what a count would record, or that a job will use more than there is.
       const st = store.get();
       const it = st.items.find((i) => i.id === ui.inv.sheet.item);
-      const q = it ? parseQty(t.value, it.unit) : { ok: false };
+      const su = ui.inv.sheet.unit || (it && it.unit);
+      const q = it ? parseQty(t.value, su) : { ok: false };
       const diff = root.querySelector('[data-slot="inv-diff"]');
-      const change = q.ok ? r3(q.value - stockOf(st, it)) : null;
-      if (diff) diff.textContent = change == null ? '' : change === 0 ? 'Count matches. Nothing to change.' : `This records ${signedText(change, it.unit)} as a count correction.`;
+      const change = q.ok ? r3(q.value - stockOf(st, it, su)) : null;
+      if (diff) diff.textContent = change == null ? '' : change === 0 ? 'Count matches. Nothing to change.' : `This records ${signedText(change, su)} as a count correction.`;
       const short = root.querySelector('[data-slot="pick-short"]');
-      if (short) short.hidden = !(q.ok && q.value > stockOf(st, it));
+      if (short) short.hidden = !(q.ok && q.value > stockOf(st, it, su));
     }
   }
   function onKey(e) {

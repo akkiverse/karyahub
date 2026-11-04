@@ -37,6 +37,7 @@ function fingerprint(kind, e) {
   if (kind === 'item') { // the quantity in stock is the server's: it changes only through stock moves
     const rest = { ...e };
     delete rest.qty;
+    if (rest.sells) rest.sells = rest.sells.map(({ qty, ...others }) => others); // each unit's quantity is the server's too (CR-0014)
     return canon(rest);
   }
   return canon(e);

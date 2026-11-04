@@ -5,6 +5,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **An item sold in several units, and Cut.** See [CR-0014](docs/changes/CR-0014-selling-units-and-cut.md) and [ADR-0018](docs/adr/0018-selling-units-in-the-item-and-cut-as-one-move.md).
+- **Also sold as:** an item can be sold in other units (up to 49 besides the main one), each with its own sale price, cost price, low-stock level, opening stock and its own stock count; stock in, stock out and count ask which unit; the list and the item page show every unit; History can be shown one unit at a time.
+- **Cut:** a button on an item with two or more units. Cut a coil into loose metres (the usual 90 is filled in and can be changed); one move, with who and when, shown in both units' history.
+- A **Unit** menu on a bill or estimate line; choosing one changes the unit name and the price; a saved bill takes and returns stock in the unit sold.
+- **CSV:** one row for each unit of an item (same code), with `cut_from` and `cut_gives`.
+
+### Fixed
+- The item form is no longer emptied by a redraw while you fill it in (a redraw from the server could also swallow a tap on Add a unit); the rows of "Also sold as" and every row of boxes on the item form are aligned.
+- Importing a CSV file over an existing item no longer turns a service item into a stocked one or drops "price includes GST".
+- Choosing "cut from" or a unit on the item form shows its boxes at once.
+
 ## [0.9.0] - 2026-11-04
 
 ### Added

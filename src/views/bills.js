@@ -5,8 +5,9 @@ import { escapeHtml as e, rupees, rupeesExact } from '../format.js';
 import { W } from '../words.js';
 import { STATES, stateLabel, GST_RATES } from '../domain/tax.js';
 import {
-  billList, CHIPS, docWord, figuresOf, isBill, isV2, lookOf, numberText, saveProblem, sellerOf, statusOf, STATUS_WORDS, totalOf, LAYOUTS, COLOURS,
+  billList, CHIPS, docWord, figuresOf, isBill, isV2, lookOf, numberText, saveProblem, sellerOf, statusOf, STATUS_WORDS, totalOf, LAYOUTS, COLOURS, unitText,
 } from '../domain/bills.js';
+import { unitsOf } from '../domain/inventory.js';
 
 const rp = (paise) => (Number(paise) < 0 ? `−${rupeesExact(-Number(paise) / 100)}` : rupeesExact((Number(paise) || 0) / 100));
 const rw = (paise) => rupees((Number(paise) || 0) / 100);
@@ -85,14 +86,16 @@ export function itemRows(state, q, doc) {
   return doc ? rows + typed : '';
 }
 
-function lineCard(l, i, taxed, figures) {
+function lineCard(l, i, taxed, figures, state) {
+  const item = state && l.item_id ? (state.items || []).find((x) => x.id === l.item_id) : null;
+  const units = item && !l.from_job_parts ? unitsOf(item) : [];
   const f = figures && figures.lines ? figures.lines[i] : null;
   const disc = l.discount || {};
   return `<li class="bill-line" data-line="${i}">
     <div class="bill-line-top"><label class="field grow"><span class="sr-only">${W.description} ${i + 1}</span><input data-line-key="description" data-index="${i}" data-k="d${i}" value="${e(l.description)}" placeholder="${W.description}"></label>
       <button type="button" class="icon-btn" data-action="bill-remove-line" data-index="${i}" aria-label="${W.removeLine} ${i + 1}">${icon('x', { size: 18 })}</button></div>
     <div class="bill-line-nums">
-      <label class="field"><span>${W.quantity}${l.unit ? ` (${e(l.unit)})` : ''}</span><input inputmode="decimal" data-line-key="qty" data-index="${i}" data-k="q${i}" value="${e(l.qty)}"></label>
+      ${units.length > 1 ? `<label class="field"><span>Unit</span><select data-line-key="unit_id" data-index="${i}" data-k="u${i}" data-testid="line-unit">${units.map((u) => `<option value="${e(u.unit)}" ${(l.unit_id || item.unit) === u.unit ? 'selected' : ''}>${e(unitText(state, u.unit))}</option>`).join('')}</select></label>` : ''}<label class="field"><span>${W.quantity}${l.unit ? ` (${e(l.unit)})` : ''}</span><input inputmode="decimal" data-line-key="qty" data-index="${i}" data-k="q${i}" value="${e(l.qty)}"></label>
       <label class="field"><span>${W.rate} ₹${l.last_price ? ` <span class="badge" data-testid="last-price">${W.lastPrice}</span>` : ''}</span><input inputmode="decimal" data-line-key="rate" data-index="${i}" data-k="r${i}" value="${e(rupeeInput(l.rate))}"></label>
       ${taxed ? `<label class="field"><span>GST %</span><select data-line-key="gst_rate" data-index="${i}" data-k="g${i}">${GST_RATES.map((r) => `<option value="${r}" ${String(l.gst_rate) === r ? 'selected' : ''}>${r}%</option>`).join('')}</select></label>` : ''}
       <p class="line-taxable"><span class="muted small">${taxed ? W.taxable : W.total}</span><strong data-slot="line-taxable-${i}">${f ? rp(f.taxable) : '–'}</strong></p>
@@ -142,7 +145,7 @@ export function billEditor({ state, ui, me, params }) {
     <h2 class="section-title">${W.items}</h2>
     <label class="search"><span class="sr-only">${W.searchItems}</span>${icon('search', { size: 18 })}<input type="search" data-item-search data-k="item-search" placeholder="${W.searchItems}" value="${e((ui.billEd && ui.billEd.itemQ) || '')}" autocomplete="off"></label>
     <ul class="pick-list" data-slot="item-results">${itemRows(state, (ui.billEd && ui.billEd.itemQ) || '', doc)}</ul>
-    ${doc.lines.length ? `<ol class="bill-lines" data-testid="bill-lines">${doc.lines.map((l, i) => lineCard(l, i, taxed, f)).join('')}</ol>` : `<p class="empty" data-testid="no-lines">${W.addLine}</p>`}
+    ${doc.lines.length ? `<ol class="bill-lines" data-testid="bill-lines">${doc.lines.map((l, i) => lineCard(l, i, taxed, f, state)).join('')}</ol>` : `<p class="empty" data-testid="no-lines">${W.addLine}</p>`}
     <details class="more-options" data-testid="more-options" ${ui.billEd && ui.billEd.more ? 'open' : ''}><summary data-action="bill-more">${W.moreOptions}</summary>
       <div class="stack">
         <div class="disc-row"><label class="field grow"><span>${W.billDiscount}</span><input inputmode="decimal" data-bill-key="bill_discount" data-k="bd" value="${e(bd.kind === 'amount' ? rupeeInput(bd.value) : bd.value ?? '')}" placeholder="0"></label>

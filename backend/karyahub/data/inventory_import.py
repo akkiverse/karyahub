@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from karyahub.accounts import service as accounts
-from karyahub.data import inventory, rls
+from karyahub.data import inventory, item_fields, rls
 from karyahub.data.item_fields import MAX_TEXT, norm, similar
 from karyahub.data.service import _business, bump
 from karyahub.db.models import Record
@@ -38,6 +38,8 @@ COLUMNS = (
     "gst_rate",
     "low_stock_at",
     "opening_stock",
+    "cut_from",
+    "cut_gives",
 )
 COMPARED = ("code", "name", "unit", "sale", "cost", "hsn", "gst", "low")
 IGNORED = frozenset({"sno", "s no", "sr", "sr no", "serial", "serial no", "no", "#", "id"})
@@ -258,6 +260,7 @@ async def import_csv(
     by_name = {str(i.body.get("name") or "").lower(): i for i in items}
 
     seen: dict[str, int] = {}
+    groups: dict[str, dict[str, Any]] = {}  # an item's first row, by its code or name (CR-0014)
     rows: list[dict[str, Any]] = []
     for index, cells in enumerate(data):
         number = index + 2  # the spreadsheet's row number: the column names are row 1
@@ -265,22 +268,38 @@ async def import_csv(
         fields, details, problems, notes, opening = _check_row(book, r)
         code, row_name = r.get("code", ""), r.get("name", "")
         key = f"c:{code.lower()}" if code else f"n:{row_name.lower()}" if row_name else ""
-        if key and key in seen:
+        first = groups.get(key) if key else None
+        another_unit = (
+            first is not None
+            and fields is not None
+            and first["_fields"] is not None
+            and fields["unit"] != first["_fields"]["unit"]
+            and fields["unit"] not in [sold["unit"] for sold in first["_fields"]["sells"]]
+        )
+        if another_unit and first is not None and fields is not None:
+            sold = _sold_unit(book, r, fields, problems, notes)
+            if sold is None:
+                fields = None
+            else:
+                sold["_row"] = number
+                first["_fields"]["sells"].append(sold)
+                first["_opens"].append((fields["unit"], opening))
+        elif key and key in seen:
             what = f"code {code}" if code else "this name"
             problems.append(f"{what} is also in row {seen[key]}")
             fields = None
         elif key:
             seen[key] = number
         existing = None
-        if fields is not None:
+        if fields is not None and not another_unit:
             existing = by_code.get(code.lower()) if code else by_name.get(row_name.lower())
-        status = "problem" if fields is None else "update" if existing is not None else "new"
-        if status == "update" and existing is not None and fields is not None:
-            if opening:
-                notes.append("opening stock ignored for an existing item: use Stock in")
-            same_attrs = (existing.body.get("attrs") or {}) == fields["attrs"]
-            if same_attrs and all(existing.body.get(k) == fields[k] for k in COMPARED):
-                status = "same"
+        status = "problem" if fields is None else "unit" if another_unit else "update" if existing else "new"
+        if status == "update" and opening:
+            notes.append("opening stock ignored for an existing item: use Stock in")
+        if fields is not None and not another_unit:
+            fields["sells"] = []
+            if r.get("cut_from") or r.get("cut_gives"):
+                notes.append("cut_from and cut_gives are read on the rows after the first of an item")
         rows.append(
             {
                 "row": number,
@@ -295,10 +314,16 @@ async def import_csv(
                 "details": details,
                 "_fields": fields,
                 "_opening": opening,
+                "_opens": [],
                 "_existing": existing,
             }
         )
+        if status in {"new", "update"} and key:
+            groups[key] = rows[-1]
+    _finish_groups(rows)
     counts = {s: sum(1 for x in rows if x["status"] == s) for s in ("new", "update", "same", "problem")}
+    if any(x["status"] == "unit" for x in rows):
+        counts["unit"] = sum(1 for x in rows if x["status"] == "unit")
     public_rows = [{k: v for k, v in x.items() if not k.startswith("_")} for x in rows]
     good = [x for x in rows if x["status"] in {"new", "update"}]
     used = {v for x in good for v in _values(x["_fields"]) if isinstance(v, str)}
@@ -318,7 +343,12 @@ async def import_csv(
     added = updated = 0
     if good:
         extra = len(adds["units"]) + sum(len(x["values"]) for x in adds["lists"])
-        need = sum(4 if x["status"] == "new" else 1 for x in good) + extra
+        need = (
+            sum(
+                4 + 2 * len(x["_opens"]) if x["status"] == "new" else 1 for x in good if x["status"] != "unit"
+            )
+            + extra
+        )
         top = await bump(db, business_id, "seq", need)
         cursor = top - need
 
@@ -332,19 +362,44 @@ async def import_csv(
         for x in good:
             fields = dict(x["_fields"])
             fields["unit"] = made.get(fields["unit"], fields["unit"])
+            fields["sells"] = [
+                {
+                    **{k: v for k, v in sold.items() if k != "_row"},
+                    "unit": made.get(sold["unit"], sold["unit"]),
+                    "cut_from": made.get(sold["cut_from"], sold["cut_from"]),
+                }
+                for sold in fields.get("sells", [])
+            ]
             fields["attrs"] = {
                 k: made.get(v, v) if isinstance(v, str) else v for k, v in fields["attrs"].items()
             }
             if x["status"] == "update":
                 existing: Record = x["_existing"]
                 fields["stopped"] = bool(existing.body.get("stopped", False))
+                for flag in ("service", "price_includes_gst"):  # an update keeps what the file doesn't say
+                    fields[flag] = bool(existing.body.get(flag, False))
+                fields["sells"] = await item_fields.check_sells(batch, fields, existing.body)
                 await batch.put_item(existing.id, {**fields, "id": existing.id}, existing)
                 updated += 1
                 continue
             item_id = f"it-{uuid.uuid4().hex[:16]}"
             fields.update(id=item_id, stopped=False)
+            fields["sells"] = await item_fields.check_sells(batch, fields, {})
             await batch.put_item(item_id, fields, None)
             added += 1
+            for unit_token, qty in x["_opens"]:
+                if qty > 0:
+                    await batch.apply_move(
+                        f"mv-{uuid.uuid4().hex[:16]}",
+                        {
+                            "kind": "opening",
+                            "item_id": item_id,
+                            "unit": made.get(unit_token, unit_token),
+                            "qty": qty,
+                            "note": "From CSV import",
+                        },
+                        None,
+                    )
             if x["_opening"] > 0:
                 await batch.apply_move(
                     f"mv-{uuid.uuid4().hex[:16]}",
@@ -376,7 +431,65 @@ async def import_csv(
 
 
 def _values(fields: dict[str, Any]) -> list[Any]:
-    return [fields.get("unit"), *fields.get("attrs", {}).values()]
+    sold = fields.get("sells", [])
+    return [
+        fields.get("unit"),
+        *fields.get("attrs", {}).values(),
+        *[s["unit"] for s in sold],
+        *[s["cut_from"] for s in sold],
+    ]
+
+
+def _sold_unit(
+    book: Book, r: dict[str, str], fields: dict[str, Any], problems: list[str], notes: list[str]
+) -> dict[str, Any] | None:
+    """A later row of the same item is another unit it is sold in, with its own price (CR-0014)."""
+    cut_from = ""
+    gives = None
+    if r.get("cut_from"):
+        cut_from = _unit(book, r["cut_from"], problems, notes) or ""
+        gives = inventory._number(r.get("cut_gives", ""))
+        if gives is None or gives <= 0:
+            problems.append("cut_gives must be a number above 0 when cut_from is given")
+    elif r.get("cut_gives"):
+        notes.append("cut_gives ignored: there is no cut_from")
+    if problems:
+        return None
+    return {
+        "unit": fields["unit"],
+        "sale": fields["sale"],
+        "cost": fields["cost"],
+        "low": fields["low"],
+        "cut_from": cut_from,
+        "cut_gives": None if gives is None else inventory.r3(gives),
+    }
+
+
+def _finish_groups(rows: list[dict[str, Any]]) -> None:
+    """After every row is read: a cut must start from a unit of the same item, and an update that changes
+    nothing is 'same'."""
+    by_row = {x["row"]: x for x in rows}
+    for first in rows:
+        fields = first["_fields"]
+        if first["status"] not in {"new", "update"} or fields is None:
+            continue
+        units = [fields["unit"], *[s["unit"] for s in fields["sells"]]]
+        for sold in list(fields["sells"]):
+            if sold["cut_from"] and sold["cut_from"] not in units:
+                fields["sells"].remove(sold)
+                bad = by_row[sold["_row"]]
+                bad["status"] = "problem"
+                bad["problems"].append("cut_from must be another unit of this same item (in an earlier row)")
+        existing = first["_existing"]
+        if first["status"] == "update" and existing is not None:
+            kept = [
+                {k: v for k, v in s.items() if k not in {"qty", "_row"}}
+                for s in existing.body.get("sells") or []
+            ]
+            now = [{k: v for k, v in s.items() if k != "_row"} for s in fields["sells"]]
+            same_attrs = (existing.body.get("attrs") or {}) == fields["attrs"]
+            if same_attrs and kept == now and all(existing.body.get(k) == fields[k] for k in COMPARED):
+                first["status"] = "same"
 
 
 def _make_lists(batch: inventory.Batch, book: Book, used: set[str]) -> dict[str, str]:

@@ -6,7 +6,7 @@ import { today as demoToday, deviceToday } from './clock.js';
 import { uid } from './ids.js';
 import { norm, partsOnJob, words } from './domain/inventory.js';
 import {
-  addDays, demoSave, isBill, isV2, lastPrice, lineFromItem, lookOf, messageText, newDraft, saveProblem, waLink,
+  addDays, demoSave, isBill, isV2, lastPrice, lineFromItem, lineInUnit, lookOf, messageText, newDraft, saveProblem, waLink,
 } from './domain/bills.js';
 import { stateOfGstin } from './domain/tax.js';
 import { billRows, customerRows, itemRows, totalsBar, billPaper } from './views/bills.js';
@@ -396,6 +396,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
       if (!l) return;
       const key = t.dataset.lineKey;
       if (key === 'rate') { l.rate = paiseOf(t.value); l.last_price = false; }
+      else if (key === 'unit_id') Object.assign(l, lineInUnit(store.get(), l, t.value));
       else if (key === 'discount') {
         const kind = (l.discount && l.discount.kind) || 'percent';
         l.discount = t.value.trim() === '' ? null : { kind, value: kind === 'amount' ? paiseOf(t.value) : t.value.trim() };

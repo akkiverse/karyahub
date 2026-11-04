@@ -6,7 +6,7 @@
 import { today, deviceNow, deviceToday } from '../clock.js';
 import { can } from './access.js';
 import { isSynced, uid } from '../ids.js';
-import { UNITS, parseQty, parseRupees, isoFromDmy, qtyText, stockOf, partsOnJob, validateItem, r3 } from './inventory.js';
+import { UNITS, parseQty, parseRupees, isoFromDmy, qtyText, stockOf, partsOnJob, validateItem, unitsOf, r3 } from './inventory.js';
 
 export const DENIED = "Your access doesn't include this. Ask your business owner.";
 export const JOB_CLOSED = "This job is closed, so its parts can't change.";
@@ -18,19 +18,31 @@ export function createStockActions({ store, currentUser = () => null }) {
   const dateOf = (s) => (isSynced(s) ? deviceToday() : today());
   const who = () => (currentUser() ? currentUser().name : 'Owner');
 
+  /** Add to the quantity the device holds for one unit of an item (the demo business only; a real business waits for the server). */
+  function addTo(item, unit, qty) {
+    if (unit === item.unit) { item.qty = r3((item.qty || 0) + qty); return item.qty; }
+    const sold = item.sells.find((x) => x.unit === unit);
+    sold.qty = r3((sold.qty || 0) + qty);
+    return sold.qty;
+  }
+
   /** Write one move down. For the demo business also apply it on the device, as the server would. */
   function pushMove(s, spec) {
     const item = s.items.find((i) => i.id === spec.item_id);
-    const shown = stockOf(s, item);
-    const qty = spec.kind === 'count' ? r3(spec.counted - shown) : r3(SIGN[spec.kind] * spec.qty);
+    const unit = spec.unit || item.unit;
+    const shown = stockOf(s, item, unit);
+    const cut = spec.kind === 'cut';
+    const qty = cut ? r3(-spec.count) : spec.kind === 'count' ? r3(spec.counted - shown) : r3(SIGN[spec.kind] * spec.qty);
     const move = {
       id: `mv-${uid()}`, item_id: item.id, kind: spec.kind, qty, date: spec.date || dateOf(s), at: stamp(s), who: who(),
       note: spec.note || '', ...(spec.kind === 'count' ? { counted: spec.counted } : {}), ...(spec.job_id ? { job_id: spec.job_id } : {}),
       ...(spec.kind === 'in' ? { supplier: spec.supplier || '', bill: spec.bill || '', cost: spec.cost ?? null } : {}),
+      ...(unit !== item.unit || cut ? { unit } : {}),
+      ...(cut ? { to_unit: spec.to_unit, gave: spec.gives, count: spec.count, gives: spec.gives } : {}), // count and gives are what the server reads; gave is what it keeps
     };
     if (!isSynced(s)) {
-      item.qty = r3(item.qty + qty);
-      move.after = item.qty;
+      move.after = addTo(item, unit, qty);
+      if (cut) move.to_after = addTo(item, spec.to_unit, spec.gives);
       if (spec.job_id) {
         const job = s.jobs.find((j) => j.id === spec.job_id);
         const parts = { ...(job.parts_used || {}) };
@@ -51,7 +63,7 @@ export function createStockActions({ store, currentUser = () => null }) {
   function saveItem(values, id = null) {
     const no = denied('manage_inventory');
     if (no) return no;
-    const { errors, item, opening, pending = [], newUnit = null } = validateItem(values, store.get(), id);
+    const { errors, item, opening, openings = [], pending = [], newUnit = null } = validateItem(values, store.get(), id);
     if (Object.keys(errors).length) return { errors };
     let savedId = id;
     store.update((s) => {
@@ -59,6 +71,7 @@ export function createStockActions({ store, currentUser = () => null }) {
       if (newUnit) {
         item.unit = `un-${uid()}`;
         s.units = [...(s.units || []), { id: item.unit, name: newUnit.name, whole: newUnit.whole, stopped: false }];
+        for (const x of item.sells || []) if (x.cut_from === '__new__') x.cut_from = item.unit; // a cut from the unit being made now
       }
       for (const p of pending) {
         const entryId = `le-${uid()}`;
@@ -66,12 +79,16 @@ export function createStockActions({ store, currentUser = () => null }) {
         item.attrs[p.field_id] = entryId;
       }
       if (id) {
-        Object.assign(s.items.find((i) => i.id === id), item);
+        const found = s.items.find((i) => i.id === id);
+        // Each unit keeps the quantity the item holds for it; the server owns it (CR-0014).
+        item.sells = (item.sells || []).map((x) => ({ ...x, qty: ((found.sells || []).find((o) => o.unit === x.unit) || {}).qty || 0 }));
+        Object.assign(found, item);
         return;
       }
       savedId = `it-${uid()}`;
-      s.items.push({ id: savedId, qty: 0, stopped: false, ...item });
+      s.items.push({ id: savedId, qty: 0, stopped: false, ...item, sells: (item.sells || []).map((x) => ({ ...x, qty: 0 })) });
       if (opening > 0) pushMove(s, { item_id: savedId, kind: 'opening', qty: opening });
+      for (const o of openings) pushMove(s, { item_id: savedId, kind: 'opening', qty: o.qty, unit: o.unit });
     });
     return { id: savedId, opening, unit: store.get().items.find((i) => i.id === savedId).unit };
   }
@@ -93,11 +110,12 @@ export function createStockActions({ store, currentUser = () => null }) {
     if (!item) return { error: "That item isn't in your inventory." };
     if (item.stopped) return { error: `${item.name} is not in use. Use it again first.` };
     const errors = {};
-    const shown = stockOf(s0, item);
-    const q = parseQty(v.qty, item.unit);
+    const unit = v.unit && unitsOf(item).some((u) => u.unit === v.unit) ? v.unit : item.unit;
+    const shown = stockOf(s0, item, unit);
+    const q = parseQty(v.qty, unit);
     if (!q.ok) errors.qty = q.message;
     else if (type !== 'count' && q.value === 0) errors.qty = 'The quantity must be more than 0.';
-    const spec = { item_id: itemId, kind: type, note: String(v.note || '').trim() };
+    const spec = { item_id: itemId, kind: type, note: String(v.note || '').trim(), ...(unit !== item.unit ? { unit } : {}) };
     if (type === 'in') {
       const iso = isoFromDmy(v.date || '');
       if (!iso) errors.date = 'Use a real date as dd-mm-yyyy, for example 01-11-2026.';
@@ -111,7 +129,7 @@ export function createStockActions({ store, currentUser = () => null }) {
     if (type === 'out') {
       if (!['supplier', 'lost', 'other'].includes(v.reason)) errors.reason = 'Pick a reason.';
       if (v.reason === 'other' && !spec.note) errors.note = 'Say what it was used for.';
-      if (q.ok && !errors.qty && q.value > shown) errors.qty = `Only ${qtyText(Math.max(shown, 0), item.unit)} in stock. If that's wrong, count the stock first.`;
+      if (q.ok && !errors.qty && q.value > shown) errors.qty = `Only ${qtyText(Math.max(shown, 0), unit)} in stock. If that's wrong, count the stock first.`;
       const label = { supplier: 'Returned to supplier', lost: 'Damaged or lost', other: 'Used without a job' }[v.reason];
       spec.note = [label, spec.note].filter(Boolean).join(': ');
     }
@@ -119,11 +137,38 @@ export function createStockActions({ store, currentUser = () => null }) {
     if (type === 'count') {
       spec.counted = q.value;
       if (r3(q.value - shown) === 0) return { same: true };
-      if (!spec.note) spec.note = `Counted ${qtyText(q.value, item.unit)} on the shelf`;
+      if (!spec.note) spec.note = `Counted ${qtyText(q.value, unit)} on the shelf`;
     } else spec.qty = q.value;
     let made;
     store.update((s) => { made = pushMove(s, spec); });
-    return { move: made, item, shown: stockOf(store.get(), item) };
+    return { move: made, item, unit, shown: stockOf(store.get(), item, unit) };
+  }
+
+  /** Cut some of one unit into another: a coil into loose metres (CR-0014). */
+  function cut(itemId, v) {
+    const no = denied('manage_inventory');
+    if (no) return no;
+    const s0 = store.get();
+    const item = s0.items.find((i) => i.id === itemId);
+    if (!item) return { error: "That item isn't in your inventory." };
+    if (item.stopped) return { error: `${item.name} is not in use. Use it again first.` };
+    const units = unitsOf(item);
+    const errors = {};
+    const from = units.find((u) => u.unit === v.from);
+    const to = units.find((u) => u.unit === v.to);
+    if (!from) errors.from = 'Pick the unit you are cutting.';
+    if (!to || to.unit === v.from) errors.to = 'Pick the unit it makes.';
+    const count = from ? parseQty(v.count, from.unit) : { ok: false, message: 'Pick the unit first.' };
+    if (!count.ok) errors.count = count.message;
+    else if (count.value === 0) errors.count = 'Cut at least 1.';
+    else if (from && count.value > stockOf(s0, item, from.unit)) errors.count = `Only ${qtyText(Math.max(stockOf(s0, item, from.unit), 0), from.unit)} in stock. If that's wrong, count the stock first.`;
+    const gives = to ? parseQty(v.gives, to.unit) : { ok: false, message: 'Pick the unit it makes first.' };
+    if (!gives.ok) errors.gives = gives.message;
+    else if (gives.value === 0) errors.gives = 'A cut must give more than 0.';
+    if (Object.keys(errors).length) return { errors };
+    let made;
+    store.update((s) => { made = pushMove(s, { item_id: itemId, kind: 'cut', unit: from.unit, to_unit: to.unit, count: count.value, gives: gives.value, note: String(v.note || '').trim() }); });
+    return { move: made, item, from: from.unit, to: to.unit, count: count.value, gives: gives.value };
   }
 
   function takePart(jobId, itemId, qty, fromNote = null) {
@@ -158,5 +203,5 @@ export function createStockActions({ store, currentUser = () => null }) {
     return { item, qty: on.qty };
   }
 
-  return { saveItem, setStopped, move, takePart, removePart, UNITS };
+  return { saveItem, setStopped, move, cut, takePart, removePart, UNITS };
 }

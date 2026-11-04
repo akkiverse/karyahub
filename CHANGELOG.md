@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-04
+
 ### Added
 - **An item sold in several units, and Cut.** See [CR-0014](docs/changes/CR-0014-selling-units-and-cut.md) and [ADR-0018](docs/adr/0018-selling-units-in-the-item-and-cut-as-one-move.md).
 - **Also sold as:** an item can be sold in other units (up to 49 besides the main one), each with its own sale price, cost price, low-stock level, opening stock and its own stock count; stock in, stock out and count ask which unit; the list and the item page show every unit; History can be shown one unit at a time.
@@ -175,6 +177,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Renewals by 30, 60 or 90 days or lapsed, with a preview of the customer's WhatsApp reminder.
   - Settings with demo mode, each service's status and key, a failure simulator, theme and Reset demo.
 
+[0.10.0]: https://github.com/akkiverse/karyahub/pull/19
 [0.9.0]: https://github.com/akkiverse/karyahub/pull/17
 [0.8.0]: https://github.com/akkiverse/karyahub/pull/15
 [0.7.0]: https://github.com/akkiverse/karyahub/pull/13

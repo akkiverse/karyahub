@@ -42,7 +42,7 @@ export function renewals({ state, ui }) {
   </section>`;
 }
 
-function sheetHtml(sh, state) {
+export function sheetHtml(sh, state) {
   const c = state.customers.find((x) => x.id === sh.customerId);
   if (!c) return '';
   return `<div class="sheet-backdrop" data-action="close-sheet"></div>

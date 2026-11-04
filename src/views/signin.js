@@ -1,6 +1,7 @@
 import { icon } from '../ui/icons.js';
 import { escapeHtml, prettyPhone } from '../format.js';
 import { roleName, initials } from '../domain/access.js';
+import { themeToggle } from '../theme.js';
 
 const POINTS = [
   ['mic', 'Job reports straight from WhatsApp', 'Technicians send a voice note or a photo of the job sheet. KaryaHub types it up for the office.'],
@@ -9,17 +10,18 @@ const POINTS = [
 ];
 
 export function logo() {
-  return '<svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M9 8v16M9 16l9-8M12.5 13l7.5 11" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  return '<span class="kh-mark">K</span>';
 }
 
 function frame(inner, hubUrl, sideNote = '') {
   return `
   <div class="auth">
+    <div class="auth-theme">${themeToggle()}</div>
     <section class="auth-brand" aria-label="About KaryaHub">
       <a class="brand brand-light" href="#/" aria-label="KaryaHub"><span class="logo" aria-hidden="true">${logo()}</span><span class="brand-name">KaryaHub</span></a>
       <div class="auth-pitch">
-        <p class="auth-kicker">Operations for AMC service firms</p>
-        <p class="auth-title">Your field team on WhatsApp. Your office on KaryaHub.</p>
+        <p class="auth-kicker">Operations and billing for service firms</p>
+        <p class="auth-title"><span>Your field team on WhatsApp.</span> <span>Your office on KaryaHub.</span></p>
         <ul class="auth-points">${POINTS.map(([ic, t, d]) => `<li><span class="auth-point-icon">${icon(ic, { size: 20 })}</span><span><strong>${t}</strong><span>${d}</span></span></li>`).join('')}</ul>
       </div>
       <p class="auth-foot">${escapeHtml(sideNote || 'Made for service firms across India.')}</p>

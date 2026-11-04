@@ -30,6 +30,10 @@ import { splitCsv } from './domain/csv.js';
 import { qtyText, signedText, stockOf, matches as itemMatches, nameOf, parseQty, r3, applyUnits } from './domain/inventory.js';
 import { billsList, billEditor, billView, setupScreen as businessSetup, newMenu } from './views/bills.js';
 import { createBills } from './bills-app.js';
+import { applyTheme, setThemePref, toggleTheme, themeToggle, themePref, watchSystemTheme } from './theme.js';
+import { searchBox, searchResults } from './views/search.js';
+import { W } from './words.js';
+import { dmy } from './domain/inventory.js';
 
 const HUB_URL = 'https://idea-studio-akkiverse.vercel.app';
 // [route, label, href, icon, section, on the phone tab bar]
@@ -80,7 +84,8 @@ const TITLES = { bills: 'Bills', estimates: 'Estimates', bill: 'Bill', 'bill-edi
 
 const PERMISSION_LABELS = PERMISSIONS;
 // The one + New button (AC-26.5) sits on the main screens, not where a bottom bar or form needs the corner.
-const NEW_ON = new Set(['home', 'bills', 'estimates', 'jobs', 'inventory', 'renewals']);
+// From 900 px it is the button at the right of the top bar, on these screens too (the corner is free there, CR-0015).
+const NEW_ON = new Set(['home', 'bills', 'estimates', 'jobs', 'inventory', 'renewals', 'admin', 'settings']);
 // What the submit button says while the server is working (the button is switched off meanwhile).
 const WORKING = { 'add-staff': 'Adding…', 'import-staff': 'Importing…', 'add-business': 'Creating…', 'business-profile': 'Saving…', 'account-pin': 'Changing…' };
 function showWorking(form, label) {
@@ -132,7 +137,10 @@ export function mountApp(root, options = {}) {
     onIdle: () => { if (route.name === 'chat') render(); },
   });
   const logoImage = options.logoImage || resizeLogo;
+  const remembered = (key) => { try { return win.localStorage.getItem(key); } catch { return null; } };
+  const remember = (key, value) => { try { win.localStorage.setItem(key, value); } catch { /* it still works for this visit */ } };
   const ui = {
+    homeView: remembered('kh-home-view') === 'kanban' ? 'kanban' : 'table', heroHidden: remembered('kh-home-hero') === 'hidden', homeTeam: 0,
     boot: 'loading', auth: {}, authState: null, admin: {}, businesses: {}, account: {}, profile: {},
     streaming: {}, warmedAt: 0, inv: { dismissed: {} }, fields: {},
     renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
@@ -209,6 +217,7 @@ export function mountApp(root, options = {}) {
     }
     bills.load(route);
     if (route.name === 'chat') warmAi(me);
+    if (route.name === 'home' && can(me, 'manage_team') && typeof api.team === 'function') loadHomeTeam(); // the checklist's "Add your team"
     if (route.name === 'job') loadPlan(route.params.id);
     if (route.name === 'admin' && can(me, 'manage_team') && !ui.admin.data) loadAdmin();
     if (route.name === 'businesses' && can(me, 'manage_businesses') && !ui.businesses.list) loadBusinesses();
@@ -221,6 +230,12 @@ export function mountApp(root, options = {}) {
     if (ui.warmedAt && Date.now() - ui.warmedAt < WARM_EVERY_MS) return;
     ui.warmedAt = Date.now();
     api.warmAi().catch(() => { ui.warmedAt = 0; });
+  }
+  async function loadHomeTeam() {
+    try {
+      const count = (await api.team()).members.length;
+      if (count !== ui.homeTeam) { ui.homeTeam = count; if (alive && route.name === 'home') render(); }
+    } catch { /* offline: the checklist just doesn't tick it yet */ }
   }
   async function loadAdmin(extra = {}) {
     if (extra.credentials && extra.credentials.length) ui.focusNext = '[data-testid="admin-credentials"]';
@@ -255,12 +270,29 @@ export function mountApp(root, options = {}) {
   }
   let route = parseRoute(win.location.hash);
   let lastRouteName = null;
+  let lastEntered = null;
 
-  function applyTheme() {
-    const t = store.get().settings.theme;
-    const el = root.ownerDocument.documentElement;
-    if (t === 'system') delete el.dataset.theme;
-    else el.dataset.theme = t;
+  // ---------- theme, side menu and search in the top bar (CR-0015): changed in place, so nothing being typed is redrawn ----------
+  function paintTheme() {
+    root.querySelectorAll('[data-slot="theme-toggle"]').forEach((el) => { el.outerHTML = themeToggle(win); });
+    root.querySelectorAll('input[name="theme"]').forEach((el) => { el.checked = el.value === themePref(win); });
+  }
+  function setNav(open, { focusBack = true } = {}) {
+    ui.navOpen = open;
+    root.querySelector('.shell')?.classList.toggle('nav-open', open);
+    const btn = root.querySelector('.nav-toggle');
+    if (btn) { btn.setAttribute('aria-expanded', String(open)); btn.setAttribute('aria-label', open ? W.closeMenu : W.openMenu); }
+    if (open) root.querySelector('#side-nav a')?.focus();
+    else if (focusBack) btn?.focus();
+  }
+  function paintSearch(open = true) {
+    const panel = root.querySelector('[data-slot="gs-results"]');
+    const me = meOf();
+    if (!panel || !me) return;
+    const st = store.get();
+    const html = searchResults(st, me, ui.gs, st.settings.is_demo ? today() : deviceToday());
+    panel.innerHTML = html;
+    panel.hidden = !(open && html);
   }
 
   function shell(me, html) {
@@ -271,13 +303,18 @@ export function mountApp(root, options = {}) {
     const biz = me.business ? me.business.name : 'KaryaHub platform';
     return `
     <a class="skip" href="#main">Skip to content</a>
-    <div class="shell route-${route.name}">
+    <div class="shell route-${route.name} ${ui.navOpen ? 'nav-open' : ''}">
       <header class="topbar">
-        <a class="brand" href="${landingFor(me)}" aria-label="KaryaHub, start page"><span class="logo" aria-hidden="true">${logo()}</span><span class="brand-name">KaryaHub</span></a>
-        <span class="topbar-biz"><strong>${escapeHtml(biz)}</strong></span>
+        <button type="button" class="icon-btn nav-toggle" data-action="toggle-nav" aria-controls="side-nav" aria-expanded="${ui.navOpen ? 'true' : 'false'}" aria-label="${ui.navOpen ? W.closeMenu : W.openMenu}">${icon('menu', { size: 22 })}</button>
+        <div class="crumbs">
+          <span class="topbar-biz"><strong>${escapeHtml(biz)}</strong></span>
+          <nav class="crumb" aria-label="Breadcrumb" data-testid="breadcrumb"><span class="crumb-root">${W.crumbWorkspace}</span><span class="crumb-sep" aria-hidden="true">/</span><span class="crumb-here" aria-current="page">${escapeHtml(TITLES[route.name] || '')}</span></nav>
+        </div>
+        ${searchBox(ui)}
         <span class="topbar-right">
           ${demo ? `<span class="demo-pill" title="All data is dummy demo data">Demo · ${prettyDate(today())}</span>` : ''}
           <span data-slot="sync-chip">${syncChip(sync.status())}</span>
+          ${themeToggle(win)}
           <details class="account" data-testid="account-menu">
             <summary aria-label="Account: ${escapeHtml(me.name)}, ${escapeHtml(roleName(me.role))}"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><span class="account-name">${escapeHtml(me.name.split(' ')[0])}</span></summary>
             <div class="account-menu">
@@ -291,14 +328,15 @@ export function mountApp(root, options = {}) {
           </details>
         </span>
       </header>
-      <nav class="tabs" aria-label="Main">
+      <div class="nav-backdrop" data-action="close-nav"></div>
+      <nav class="tabs" id="side-nav" aria-label="Main">
         <a class="brand nav-brand" href="${landingFor(me)}" aria-label="KaryaHub, start page"><span class="logo" aria-hidden="true">${logo()}</span><span class="brand-name">KaryaHub</span></a>
         <div class="nav-biz"><span class="nav-biz-mark" aria-hidden="true">${escapeHtml(initials(biz))}</span><span><strong>${escapeHtml(biz)}</strong><span class="small">${demo ? 'Demo workspace' : me.business ? 'Business workspace' : 'Platform admin'}</span></span></div>
         ${sections.map((sec) => `<div class="nav-group"><span class="nav-label">${sec}</span>${allowed.filter((n) => n[4] === sec).map(link).join('')}</div>`).join('')}
-        <div class="nav-user"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><span class="nav-user-main"><strong>${escapeHtml(me.name)}</strong><span class="muted small">${escapeHtml(roleName(me.role))}</span></span><button type="button" class="icon-btn" data-action="sign-out" aria-label="Sign out" title="Sign out">${icon('logout', { size: 18 })}</button></div>
+        <div class="nav-user"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><a class="nav-user-main" href="#/account" title="My account"><strong>${escapeHtml(me.name)}</strong><span class="muted small">${escapeHtml(roleName(me.role))}</span></a><button type="button" class="icon-btn" data-action="sign-out" aria-label="Sign out" title="Sign out">${icon('logout', { size: 18 })}</button></div>
       </nav>
       <nav class="bottom-tabs" aria-label="Main (phone)">${allowed.filter((n) => n[5]).map(link).join('')}</nav>
-      <main id="main" class="main"><div data-slot="sync-banner">${syncBanner(sync.status())}${storageBanner(store.storage())}</div>${html}
+      <main id="main" class="main"><div data-slot="sync-banner">${syncBanner(sync.status())}${storageBanner(store.storage())}</div><div class="view" data-slot="view">${html}</div>
         ${NEW_ON.has(route.name) ? newMenu(me, ui.newOpen) : ''}
         <footer class="site-foot no-print"><a href="${HUB_URL}">Part of Idea Studio by AkkiVerse</a>${demo ? '<span>Sample data only. No real messages are sent.</span>' : ''}</footer>
       </main>
@@ -362,6 +400,12 @@ export function mountApp(root, options = {}) {
         target.focus({ preventScroll: true });
       }
     }
+    // Page and tab change: the entrance plays only when the screen changes, never on a redraw of the same screen (CR-0015).
+    const entering = routeKey(route);
+    if (entering !== lastEntered) {
+      if (lastEntered !== null) root.querySelector('[data-slot="view"]')?.classList.add('view-enter');
+      lastEntered = entering;
+    }
     if (name !== lastRouteName) {
       root.ownerDocument.title = `${TITLES[name]} · KaryaHub${me && me.business && me.business.is_demo ? ' demo' : ''}`;
       const h = root.querySelector('#page-title');
@@ -374,6 +418,8 @@ export function mountApp(root, options = {}) {
     if (win.location.hash !== hash) win.location.hash = hash;
     route = parseRoute(hash);
     ui.newOpen = false;
+    ui.navOpen = false;
+    ui.gs = '';
     ui.toast = null;
     ui.sheet = null;
     ui.wfNote = null;
@@ -391,18 +437,17 @@ export function mountApp(root, options = {}) {
     if (route.name !== 'item-form') ui.inv.form = null; // a form left unsaved is not kept for next time
     if (ui.inv.notice && ui.inv.notice.at !== noticeKey(route)) ui.inv.notice = null;
   }
-  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.newOpen = false; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
+  const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.newOpen = false; ui.navOpen = false; ui.gs = ''; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
   win.addEventListener('hashchange', onHash);
   // Something that arrived from the server must not redraw the page under a finger that is typing.
   let renderWhenDone = false;
   const typing = () => {
     const a = root.ownerDocument.activeElement;
-    return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && (a.closest('form') || a.matches('[data-inv-search], [data-pick-search]')));
+    return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && (a.closest('form') || a.matches('[data-inv-search], [data-pick-search], [data-global-search]')));
   };
   applyUnits(store.get().units);
   const unsub = store.subscribe((st, meta) => {
     applyUnits(st.units);
-    applyTheme();
     // The item form and the item details screen are where a person is typing: what arrives from the server must not redraw them (CR-0014).
     if (meta && meta.remote && ['item-form', 'inventory-fields'].includes(route.name) && root.querySelector('form[data-form^="inv-"]')) return; // (a screen still waiting for its data is drawn when it arrives)
     if (meta && meta.remote && typing()) { renderWhenDone = true; return; }
@@ -414,6 +459,9 @@ export function mountApp(root, options = {}) {
   const setNotice = (target, text, error = false) => { target.notice = { text, error }; };
 
   async function onClick(e) {
+    if (ui.navOpen && e.target.closest('#side-nav a')) setNav(false, { focusBack: false });
+    if (e.target.closest('.gs-panel a')) { ui.gs = ''; const box = root.querySelector('[data-global-search]'); if (box) box.value = ''; paintSearch(false); }
+    else if (ui.gs && !e.target.closest('.gs')) paintSearch(false); // a press elsewhere closes the results and keeps what was typed
     const el = e.target.closest('[data-action]');
     if (!el || !root.contains(el)) return;
     const a = el.dataset.action;
@@ -433,6 +481,24 @@ export function mountApp(root, options = {}) {
       return;
     }
     if (a === 'retry-boot') { boot(); return; }
+    if (a === 'toggle-theme') { toggleTheme(win); paintTheme(); root.querySelector('[data-slot="theme-toggle"]')?.focus(); return; }
+    if (a === 'toggle-nav') { setNav(!ui.navOpen); return; }
+    if (a === 'close-nav') { setNav(false); return; }
+    if (a === 'home-view') {
+      ui.homeView = el.dataset.view === 'kanban' ? 'kanban' : 'table';
+      remember('kh-home-view', ui.homeView);
+      render();
+      if (el.dataset.scroll) root.querySelector('#home-recent')?.scrollIntoView?.({ block: 'start', behavior: win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      root.querySelector(`#home-recent [data-view="${ui.homeView}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    if (a === 'home-hero') {
+      ui.heroHidden = el.dataset.hide === 'true';
+      remember('kh-home-hero', ui.heroHidden ? 'hidden' : 'shown');
+      render();
+      root.querySelector(ui.heroHidden ? '[data-testid="hero-show"]' : '[data-testid="hero-hide"]')?.focus({ preventScroll: true });
+      return;
+    }
     if (a.startsWith('inv-')) { await onInventoryAction(a, el); return; }
     if (a.startsWith('bill-') && (await bills.onClick(a, el))) return;
     if (a === 'dismiss-sync-notice') { sync.dismissNotice(); return; }
@@ -606,6 +672,18 @@ export function mountApp(root, options = {}) {
     const stock = actions.stock;
     const itemId = route.params && route.params.id;
     if (a === 'inv-filter') { ui.inv.filter = el.dataset.filter; paintInv(); return; }
+    if (a === 'inv-step') {
+      // − and + in the table (CR-0015): an ordinary stock move of one, written in the item's history like any other.
+      const { item: id, dir } = el.dataset;
+      const res = dir === 'in'
+        ? stock.move(id, 'in', { qty: '1', date: dmy(store.get().settings.is_demo ? today() : deviceToday()), note: 'Added with + in the list' })
+        : stock.move(id, 'out', { qty: '1', reason: 'other', note: 'Taken with − in the list' });
+      const problem = res.error || (res.errors && Object.values(res.errors)[0]);
+      if (problem) invNotice('inventory', problem, true);
+      ui.inv.focusNext = `[data-inv-step="${id}:${dir}"]`;
+      render();
+      return;
+    }
     if (a === 'inv-add') { ui.inv.prefill = el.dataset.name || ''; ui.inv.form = null; navigate('#/inventory/new'); return; }
     if (a === 'inv-sheet') { openSheet({ type: el.dataset.type, item: itemId, values: {}, errors: {} }); return; }
     if (a === 'inv-close-sheet') { ui.inv.sheet = null; render(); return; }
@@ -989,7 +1067,7 @@ export function mountApp(root, options = {}) {
     if (el.matches('[data-unit-select]')) { const box = root.querySelector('[data-slot="new-unit"]'); if (box) box.hidden = el.value !== '__new__'; if (el.value === '__new__') root.querySelector('input[name="new_unit"]')?.focus(); return; }
     if (a === 'edit-line') actions.updateDocumentLine(el.dataset.doc, Number(el.dataset.index), { [el.dataset.key]: el.value === '' ? NaN : Number(el.value) });
     else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
-    else if (a === 'set-theme') actions.setSetting('theme', el.value);
+    else if (a === 'set-theme') { setThemePref(el.value, win); paintTheme(); }
     else if (a === 'toggle-failure') actions.setSetting('simulate_failure', el.checked);
     else if (a === 'pick-logo') {
       const file = el.files && el.files[0];
@@ -1031,6 +1109,7 @@ export function mountApp(root, options = {}) {
   function onInput(e) {
     const t = e.target;
     rememberItemForm(t);
+    if (t.matches('[data-global-search]')) { ui.gs = t.value; paintSearch(); return; }
     if (bills.onInput(e)) return;
     if (t.id === 'composer-input') ui.draft = t.value;
     else if (t.matches('[data-inv-search]')) { ui.inv.q = t.value; paintInv(); }
@@ -1052,6 +1131,11 @@ export function mountApp(root, options = {}) {
     }
   }
   function onKey(e) {
+    const box = root.querySelector('[data-global-search]');
+    if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k' && box) { e.preventDefault(); box.focus(); box.select(); paintSearch(); return; }
+    if (e.target === box && e.key === 'ArrowDown') { e.preventDefault(); root.querySelector('.gs-panel a')?.focus(); return; }
+    if (e.key === 'Escape' && root.querySelector('[data-slot="gs-results"]:not([hidden])')) { paintSearch(false); box?.focus(); return; }
+    if (e.key === 'Escape' && ui.navOpen) { setNav(false); return; }
     if (e.key === 'Escape' && ui.sheet) { ui.sheet = null; render(); }
     else if (e.key === 'Escape' && ui.inv.sheet) { ui.inv.sheet = null; render(); }
   }
@@ -1063,7 +1147,8 @@ export function mountApp(root, options = {}) {
   // More options stays open across redraws while a bill is being made.
   root.addEventListener('toggle', (e) => { if (e.target.matches?.('.more-options') && ui.billEd) ui.billEd.more = e.target.open; }, true);
   root.ownerDocument.addEventListener('keydown', onKey);
-  applyTheme();
+  applyTheme(win);
+  const stopWatchingTheme = watchSystemTheme(win, () => paintTheme());
 
   // Tests hand in who is signed in; the real app asks the server.
   let ready;
@@ -1081,6 +1166,6 @@ export function mountApp(root, options = {}) {
   return {
     store, actions, session, ui, navigate, render, ready,
     sync,
-    unmount() { alive = false; bills.stop(); if (timerTick) win.clearInterval(timerTick); sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
+    unmount() { alive = false; stopWatchingTheme(); bills.stop(); if (timerTick) win.clearInterval(timerTick); sync.stop(); win.removeEventListener('hashchange', onHash); unsub(); root.innerHTML = ''; root.ownerDocument.removeEventListener('keydown', onKey); },
   };
 }

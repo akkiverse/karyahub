@@ -40,8 +40,9 @@ Each step is one change request (CR) and one pull request, approved by the found
 | **4. K5** | **Phase 1 "Bills that are right"**: business type and packs; + New; GST bills with line and bill discounts, several rates, CGST and SGST or IGST, MRP prices, Composition and Not registered; numbers per business and financial year with no gaps and an optional prefix; Draft, Saved, Sent, Paid, Overdue, Cancelled; estimate to bill; 3 layouts with a PDF link; Send on WhatsApp through the sender layer; bills take stock | CR-0012 | v0.8.0 | This change |
 | **5. K5c** | **Your own item details, lists and units** (founder, 4 Nov 2026: before the CA and the trial owners): fields, brands and units of the business's own, per-business CSV template, details on bills. Part 1 | CR-0013 | v0.9.0 | Live |
 | 6. K5d | Selling one item in several units (coil and loose metres), each with its own stock and price; Cut; units on bills and counts and the CSV (job parts stay in the main unit). Part 2 | CR-0014 | v0.10.0 | In review |
-| 7. K5b | Getting paid: payments (cash, UPI, card, bank; part payments), UPI QR on every bill, payment reminders and the daily AMC renewals list, bill-wise profit | next | v0.11.0 | Planned |
-| 8. D1 | Owner dashboard | next | v0.12.0 | Planned |
+| 6b. K9 | The Deep Ocean Teal look (founder, 4 Nov 2026: before Getting paid): Aurora Dark and Clean Light, new shell and layouts; no logic change | CR-0015 | v0.11.0 | In review |
+| 7. K5b | Getting paid: payments (cash, UPI, card, bank; part payments), UPI QR on every bill, payment reminders and the daily AMC renewals list, bill-wise profit | next | v0.12.0 | Planned |
+| 8. D1 | Owner dashboard | next | v0.13.0 | Planned |
 | 7. K6 | WhatsApp for every business: stage A Studio test account *(founder)*, stage B "Use our own WhatsApp number", stage C one-click Connect WhatsApp *(founder: Meta Tech Provider)* | one CR per stage | | Planned |
 | 7. K4 | Forgot-PIN codes to real numbers, through the sender layer | with K6 | | Planned |
 | 8. K7 | Voice notes to text *(founder decision: Whisper on the Mac or Sarvam AI)* | | | Planned |

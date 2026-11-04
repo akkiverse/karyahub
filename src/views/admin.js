@@ -77,12 +77,13 @@ export function admin({ ui, me }) {
       <a class="btn btn-secondary btn-small" download="karyahub-new-pins.csv" href="data:text/csv;charset=utf-8,${encodeURIComponent(`name,phone,role,pin\n${a.credentials.map((c) => [c.name, c.phone, c.role || '', c.pin].join(',')).join('\n')}\n`)}">${icon('download', { size: 16 })} Download as CSV</a>
     </section>` : ''}
 
+    <div class="split-12 admin-split">
+      <div class="col-5 stack">
     <section class="panel" aria-labelledby="team-title">
       <div class="panel-head"><h2 class="panel-title" id="team-title">Team</h2><span class="muted small">${members.length} people</span></div>
       <ul class="team" data-testid="team-list">${members.map((m) => memberRow(m, data, me, locked)).join('')}</ul>
     </section>
 
-    <div class="admin-grid">
       <section class="panel" id="admin-add" aria-labelledby="add-title">
         <div class="panel-head"><h2 class="panel-title" id="add-title">Add a person</h2></div>
         <form data-form="add-staff" class="stack" novalidate>
@@ -106,8 +107,8 @@ export function admin({ ui, me }) {
         </form>
         ${imp && imp.errors && imp.errors.length ? `<div class="import-errors" data-testid="import-errors"><h3 class="section-title">Rows we couldn't add</h3><ul>${imp.errors.map((e) => `<li>Row ${e.row}: ${escapeHtml(e.message)}</li>`).join('')}</ul></div>` : ''}
       </section>
-    </div>
-
+      </div>
+      <div class="col-7 stack">
     <section class="panel" aria-labelledby="roles-title">
       <div class="panel-head"><h2 class="panel-title" id="roles-title">What each role can do</h2></div>
       <p class="muted small">Tick or untick to change what everyone with that role can do, straight away. Owners always keep everything. You can also change one person under their name above.</p>
@@ -126,6 +127,8 @@ export function admin({ ui, me }) {
       <div class="panel-head"><h2 class="panel-title" id="log-title">Activity log</h2><span class="muted small">Latest 15</span></div>
       ${(a.audit || []).length ? `<ol class="log" data-testid="access-log">${a.audit.slice(0, 15).map((l) => `<li><span class="log-when muted small">${escapeHtml(when(l.at))}</span><span><strong>${escapeHtml(l.who)}</strong> ${escapeHtml(l.text ? l.text.charAt(0).toLowerCase() + l.text.slice(1) : l.action)}</span></li>`).join('')}</ol>` : '<p class="muted">No sign-ins or team changes yet.</p>'}
     </section>
+      </div>
+    </div>
   </section>`;
 }
 

@@ -322,7 +322,17 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
         render();
         return true;
       }
-      case 'bill-send': await send(id); return true;
+      case 'bill-send':
+        await send(id);
+        if (el.matches('.row-act, .row-send')) {
+          // Sent from a row of the list (CR-0015): the answer shows on the list, for as long as an undo would.
+          const notice = ui.billView.notice;
+          ui.billView = {};
+          ui.bills = { ...ui.bills, notice };
+          timers.push(setTimeout(() => { if (ui.bills.notice === notice) { ui.bills = { ...ui.bills, notice: null }; render(); } }, UNDO_MS));
+          render();
+        }
+        return true;
       case 'bill-copy-link': await copyLink(id); return true;
       case 'bill-share': await share(id); return true;
       case 'bill-mark-sent':
@@ -363,7 +373,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
       const kind = root.querySelector('.bills-page h1')?.textContent === W.estimates ? 'quote' : 'invoice';
       const { rows, counts } = billList(store.get().documents, { kind, q: t.value, chip: ui.bills.chip || 'all' }, today());
       const slot = root.querySelector('[data-slot="bill-rows"]');
-      if (slot) slot.innerHTML = rows.length ? billRows(rows, today()) : `<p class="empty" data-testid="bills-empty">${W.noBillsMatch}</p>`;
+      if (slot) slot.innerHTML = rows.length ? billRows(rows, today(), { jobs: store.get().jobs, make: (me().permissions || []).includes('create_documents'), demo: demo() }) : `<p class="empty" data-testid="bills-empty">${W.noBillsMatch}</p>`;
       for (const [k, n] of Object.entries(counts)) { const c = root.querySelector(`[data-chip-count="${k}"]`); if (c) c.textContent = String(n); }
       return true;
     }

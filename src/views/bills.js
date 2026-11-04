@@ -8,6 +8,7 @@ import {
   billList, CHIPS, docWord, figuresOf, isBill, isV2, lookOf, numberText, saveProblem, sellerOf, statusOf, STATUS_WORDS, totalOf, LAYOUTS, COLOURS, unitText,
 } from '../domain/bills.js';
 import { unitsOf } from '../domain/inventory.js';
+import { SAMPLES } from '../data/demo.js';
 
 const rp = (paise) => (Number(paise) < 0 ? `−${rupeesExact(-Number(paise) / 100)}` : rupeesExact((Number(paise) || 0) / 100));
 const rw = (paise) => rupees((Number(paise) || 0) / 100);
@@ -28,18 +29,47 @@ export function billsList({ state, ui, me, today, kind = 'invoice' }) {
   const any = state.documents.some((d) => d.type === kind && !d.deleted);
   const empty = !any ? (kind === 'quote' ? W.noEstimates : W.noBills) : W.noBillsMatch;
   const tab = (k, label, href) => `<a class="seg ${kind === k ? 'is-active' : ''}" href="${href}" ${kind === k ? 'aria-current="page"' : ''}>${label}</a>`;
-  return `<section class="page bills-page">
-    <header class="page-head"><h1 id="page-title" tabindex="-1">${kind === 'quote' ? W.estimates : W.bills}</h1>
-      <nav class="segs" aria-label="${W.bills}">${tab('invoice', W.bills, '#/bills')}${tab('quote', W.estimates, '#/estimates')}</nav></header>
+  return `<section class="page page-wide bills-page">
+    <header class="page-head"><h1 id="page-title" tabindex="-1">${kind === 'quote' ? W.estimates : W.bills}</h1></header>
     ${b.notice ? `<p class="notice ${b.notice.error ? 'notice-error' : ''}" role="status" data-testid="bills-notice">${e(b.notice.text)}${b.notice.undo ? ` <button type="button" class="btn btn-ghost btn-small" data-action="bill-undo-delete">${W.undo}</button>` : ''}</p>` : ''}
-    <label class="search"><span class="sr-only">${W.searchBills}</span>${icon('search', { size: 18 })}<input type="search" data-bill-search placeholder="${W.searchBillsShort}" value="${e(q)}"></label>
+    <div class="panel bills-tools">
+    <div class="bills-tools-top"><nav class="segs" aria-label="${W.bills}">${tab('invoice', W.bills, '#/bills')}${tab('quote', W.estimates, '#/estimates')}</nav>
+    <label class="search"><span class="sr-only">${W.searchBills}</span>${icon('search', { size: 18 })}<input type="search" data-bill-search placeholder="${W.searchBillsShort}" value="${e(q)}"></label></div>
     <div class="chips chips-scroll" role="group" aria-label="${W.bills}">${CHIPS.filter(([k]) => kind === 'invoice' || !['unpaid', 'overdue', 'paid'].includes(k)).map(([k, label]) => `<button type="button" class="chip ${chip === k ? 'is-on' : ''}" aria-pressed="${chip === k}" data-action="bill-chip" data-chip="${k}">${label} <span class="chip-count" data-chip-count="${k}">${counts[k]}</span></button>`).join('')}</div>
-    <div data-slot="bill-rows">${rows.length ? billRows(rows, today) : `<p class="empty" data-testid="bills-empty">${e(empty)}</p>`}</div>
+    </div>
+    <div data-slot="bill-rows">${rows.length ? billRows(rows, today, { jobs: state.jobs, make: can(me, 'create_documents'), demo: Boolean(state.settings.is_demo) }) : `<p class="empty" data-testid="bills-empty">${e(empty)}</p>`}</div>
   </section>`;
 }
 
-export function billRows(rows, today) {
-  const href = (d) => (isV2(d) ? (d.status === 'draft' ? `#/bills/${encodeURIComponent(d.id)}/edit` : `#/bills/${encodeURIComponent(d.id)}`) : `#/doc/${encodeURIComponent(d.id)}`);
+export const billHref = (d) => (isV2(d) ? (d.status === 'draft' ? `#/bills/${encodeURIComponent(d.id)}/edit` : `#/bills/${encodeURIComponent(d.id)}`) : `#/doc/${encodeURIComponent(d.id)}`);
+
+/** Where a bill came from (CR-0015): a technician's WhatsApp report through its job, or made at the counter. */
+function sourceOf(d, jobs) {
+  if (!d.job_id) return ['file', W.sourceCounter, 'counter'];
+  const job = (jobs || []).find((j) => j.id === d.job_id);
+  const sample = job && job.source_sample_id ? SAMPLES.find((x) => x.id === job.source_sample_id) : null;
+  if (sample && sample.kind === 'voice') return ['mic', W.sourceVoice, 'whatsapp'];
+  if (sample && sample.kind === 'photo') return ['image', W.sourcePhoto, 'whatsapp'];
+  return ['chat', W.sourceText, 'whatsapp'];
+}
+function taxCell(d) {
+  const t = d.totals;
+  if (!t) return '<span class="muted">–</span>';
+  const tax = t.igst ? `IGST ${rw(t.igst)}` : t.cgst || t.sgst ? `CGST ${rw(t.cgst)} + SGST ${rw(t.sgst)}` : '';
+  return `<span class="cell-main mono">${rw(t.taxable)}</span>${tax ? `<span class="cell-sub mono">${e(tax)}</span>` : ''}`;
+}
+function rowActions(d, s, ctx) {
+  const live = isV2(d) && d.number && ['saved', 'sent', 'paid', 'overdue'].includes(s);
+  const name = e(numberText(d));
+  const send = live && ctx.make ? `<button type="button" class="icon-btn row-act" data-action="bill-send" data-doc="${e(d.id)}" data-testid="row-send" aria-label="${W.sendOn} ${name}" title="${W.sendWhatsApp}">${icon('send', { size: 18 })}</button>` : '';
+  const paper = live && d.link_token && !ctx.demo
+    ? `<a class="icon-btn row-act" href="/b/${e(d.link_token)}/pdf" target="_blank" rel="noopener" data-testid="row-pdf" aria-label="${W.previewOf} ${name}" title="${W.downloadPdf}">${icon('file', { size: 18 })}</a>`
+    : `<a class="icon-btn row-act" href="${billHref(d)}" data-testid="row-open" aria-label="${W.openBill}: ${name}" title="${W.openBill}">${icon('file', { size: 18 })}</a>`;
+  return `<span class="row-actions">${send}${paper}</span>`;
+}
+
+export function billRows(rows, today, ctx = {}) {
+  const href = billHref;
   const cards = rows.map((d) => {
     const s = statusOf(d, today);
     const t = totalOf(d);
@@ -48,10 +78,12 @@ export function billRows(rows, today) {
   const table = rows.map((d) => {
     const s = statusOf(d, today);
     const t = totalOf(d);
-    return `<tr><td><a href="${href(d)}">${e(numberText(d))}</a></td><td>${ddmmyyyy(d.date)}</td><td>${e((d.customer || {}).name || '')}</td><td class="num">${t === null ? '' : rw(t)}</td><td>${statusChip(s)}</td></tr>`;
+    const c = d.customer || {};
+    const [srcIcon, srcText, srcKind] = sourceOf(d, ctx.jobs);
+    return `<tr data-doc="${e(d.id)}"><td><a class="cell-main mono row-name" href="${href(d)}">${e(numberText(d))}</a><span class="cell-sub">${ddmmyyyy(d.date)}</span></td><td><span class="cell-main">${e(c.name || '')}</span><span class="cell-sub ${c.gstin ? 'mono' : ''}">${e(c.gstin || W.noGstin)}</span></td><td><span class="source source-${srcKind}" data-testid="bill-source">${icon(srcIcon, { size: 14 })} ${srcText}</span></td><td>${taxCell(d)}</td><td class="num"><strong class="total-cell mono">${t === null ? '' : rw(t)}</strong></td><td>${statusChip(s)}</td><td class="num">${rowActions(d, s, ctx)}</td></tr>`;
   }).join('');
   return `<ul class="list bill-cards">${cards}</ul>
-    <table class="bill-table"><thead><tr><th scope="col">Number</th><th scope="col">${W.billDate}</th><th scope="col">${W.customer}</th><th scope="col" class="num">${W.total}</th><th scope="col">Status</th></tr></thead><tbody>${table}</tbody></table>`;
+    <div class="table-wrap bill-table-wrap"><table class="bill-table"><thead><tr><th scope="col">${W.colBill}</th><th scope="col">${W.colCustomer}</th><th scope="col">${W.colSource}</th><th scope="col">${W.colTax}</th><th scope="col" class="num">${W.total}</th><th scope="col">Status</th><th scope="col" class="num"><span class="sr-only">${W.colActions}</span></th></tr></thead><tbody>${table}</tbody></table></div>`;
 }
 
 // ---------- the editor (AC-27.1 to AC-27.3) ----------
@@ -190,7 +222,8 @@ export function billPaper(doc, { business, settings = {}, sample = false, look =
   const bank = lk.bank || {};
   const cancelled = doc.status === 'cancelled';
   const place = doc.place_of_supply || c.state_code || seller.state_code;
-  return `<article class="doc bill-paper layout-${e(lk.layout)}" style="--bill-accent:${e(lk.colour)}" data-testid="bill-paper" aria-label="${e(heading)} ${e(doc.number || '')}">
+  const ocean = String(lk.colour).toUpperCase() === COLOURS[0]; // the default colour prints as the brand gradient (CR-0015)
+  return `<article class="doc bill-paper layout-${e(lk.layout)} ${ocean ? 'is-ocean' : ''}" style="--bill-accent:${e(lk.colour)}" data-testid="bill-paper" aria-label="${e(heading)} ${e(doc.number || '')}">
     ${sample ? `<div class="watermark" data-testid="sample-mark">${W.sample}</div>` : ''}
     ${cancelled ? `<div class="stamp" data-testid="cancelled-stamp" aria-hidden="true"><span>CANCELLED</span></div><p class="notice notice-error" role="status">${W.cancelled}</p>` : ''}
     <header class="doc-head"><div>
@@ -317,17 +350,12 @@ export function setupScreen({ me, ui }) {
   </section>`;
 }
 
-export function lookPanel({ me, ui, state }) {
+export function lookPanel({ me, ui }) {
   const b = me.business || {};
   const lk = { ...lookOf(b), ...((ui.lookForm && ui.lookForm.draft) || {}) };
   const f = ui.lookForm || {};
   const locked = Boolean(b.is_demo);
   const dis = locked ? 'disabled' : '';
-  const sample = {
-    id: 'sample', doc_version: 2, type: 'invoice', status: 'saved', number: `${lk.prefix || ''}${lk.prefix && !'/-'.includes(lk.prefix.at(-1)) ? '/' : ''}26-27/0001`, date: '2026-11-02', due_date: '2026-11-02',
-    customer: { name: 'Mehta Clinic', address: 'Kothrud, Pune', state_code: b.state_code || '27' },
-    lines: [{ description: 'AC service, split 1.5 ton', qty: 1, unit: 'nos', rate: 89900, gst_rate: '18' }, { description: 'Copper pipe', qty: '2.5', unit: 'metre', rate: 25000, gst_rate: '18' }],
-  };
   return `<section class="panel" aria-labelledby="look-title" data-testid="look-panel">
     <div class="panel-head"><h2 class="panel-title" id="look-title">${W.lookTitle}</h2></div>
     ${f.notice ? `<p class="notice ${f.notice.error ? 'notice-error' : ''}" role="status" data-testid="look-notice">${e(f.notice.text)}</p>` : ''}
@@ -347,9 +375,24 @@ export function lookPanel({ me, ui, state }) {
         <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${b.signature_version ? W.replaceSignature : W.addSignature}<input class="sr-only" type="file" accept="image/png,image/jpeg" data-action="pick-signature"></label>${b.signature_version ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-signature">${W.removeSignature}</button>` : ''}</div></div>
         <button type="submit" class="btn btn-primary">${icon('check', { size: 18 })} ${W.saveLook}</button>`}
     </form>
-    <h3 class="section-title">${W.preview}</h3>
-    <div class="look-preview" data-slot="look-preview" data-testid="look-preview">${billPaper(sample, { business: b, settings: state.settings, sample: true, look: lk })}</div>
   </section>`;
+}
+
+/** The live A4 paper of Settings (CR-0015): its own column beside the forms. */
+export function lookPreview({ me, ui, state }) {
+  const b = me.business || {};
+  const lk = { ...lookOf(b), ...((ui.lookForm && ui.lookForm.draft) || {}) };
+  return `<section class="preview-card" aria-labelledby="preview-title">
+    <h2 class="panel-title" id="preview-title">${W.preview}</h2>
+    <div class="look-preview" data-slot="look-preview" data-testid="look-preview">${billPaper(lookSample(lk, b), { business: b, settings: state.settings, sample: true, look: lk })}</div>
+  </section>`;
+}
+function lookSample(lk, b) {
+  return {
+    id: 'sample', doc_version: 2, type: 'invoice', status: 'saved', number: `${lk.prefix || ''}${lk.prefix && !'/-'.includes(lk.prefix.at(-1)) ? '/' : ''}26-27/0001`, date: '2026-11-02', due_date: '2026-11-02',
+    customer: { name: 'Mehta Clinic', address: 'Kothrud, Pune', state_code: b.state_code || '27' },
+    lines: [{ description: 'AC service, split 1.5 ton', qty: 1, unit: 'nos', rate: 89900, gst_rate: '18' }, { description: 'Copper pipe', qty: '2.5', unit: 'metre', rate: 25000, gst_rate: '18' }],
+  };
 }
 
 // ---------- + New (AC-26.5) ----------
@@ -366,14 +409,32 @@ export function newMenu(me, open) {
 }
 
 /** Home's bill figures (Screens and flows): billed today, unpaid total, overdue count. */
-export function homeBills(fig, demo) {
+export function homeBills(fig, demo, stock = null) {
   return `<section class="today" aria-labelledby="bills-today-title" data-testid="home-bills">
-    <div class="panel-head"><h2 class="section-title" id="bills-today-title">${W.bills}</h2>${demo ? `<span class="muted small">${W.sample}</span>` : ''}</div>
-    <ul class="kpis">
-      <li class="kpi"><span class="kpi-label">${icon('file', { size: 16 })} ${W.billedToday}</span><span class="kpi-value money" data-kpi="billed-today">${rw(fig.billedToday)}</span><a class="kpi-sub" href="#/bills">${W.bills}</a></li>
-      <li class="kpi"><span class="kpi-label">${icon('trend', { size: 16 })} ${W.unpaidTotal}</span><span class="kpi-value" data-kpi="unpaid">${rw(fig.unpaid)}</span></li>
-      <li class="kpi"><span class="kpi-label">${icon('alert', { size: 16 })} ${W.overdueCount}</span><span class="kpi-value ${fig.overdue ? 'is-lapsed' : ''}" data-kpi="overdue">${fig.overdue}</span></li>
+    <h2 class="sr-only" id="bills-today-title">${W.bills}${demo ? ` (${W.sample})` : ''}</h2>
+    <ul class="kpis kpis-home">
+      <li class="kpi kpi-home"><span class="kpi-badge tone-ok" aria-hidden="true">${icon('file', { size: 20 })}</span><span class="kpi-label">${W.billedToday}</span><span class="kpi-value money" data-kpi="billed-today">${rw(fig.billedToday)}</span><a class="kpi-sub" href="#/bills">${W.billsMadeToday(fig.madeToday)}</a></li>
+      <li class="kpi kpi-home"><span class="kpi-badge tone-warn" aria-hidden="true">${icon('trend', { size: 20 })}</span><span class="kpi-label">${W.unpaidBalance}</span><span class="kpi-value is-soon" data-kpi="unpaid">${rw(fig.unpaid)}</span><span class="kpi-sub muted">${W.awaitingPayment(fig.unpaidCount)}</span></li>
+      <li class="kpi kpi-home"><span class="kpi-badge tone-bad" aria-hidden="true">${icon('alert', { size: 20 })}</span><span class="kpi-label">${W.overdueTitle}</span><span class="kpi-value ${fig.overdue ? 'is-lapsed' : ''}" data-kpi="overdue-amount">${rw(fig.overdueAmount)}</span><span class="kpi-sub muted">${fig.overdue ? `<span data-kpi="overdue">${fig.overdue}</span> ${W.followUps(fig.overdue)}` : `<span data-kpi="overdue" hidden>0</span>${W.nothingOverdue}`}</span></li>
+      ${stock ? `<li class="kpi kpi-home"><span class="kpi-badge tone-info" aria-hidden="true">${icon('box', { size: 20 })}</span><span class="kpi-label">${W.stockValuation}</span><span class="kpi-value is-info" data-kpi="stock-value">${rw(stock.value)}</span><a class="kpi-sub" href="#/inventory">${W.itemsLow(stock.low)}</a></li>` : ''}
     </ul>
+  </section>`;
+}
+
+/** Home's GST card (CR-0015): what this month's saved bills come to, with the next step. */
+export function gstCard(g, demo) {
+  const row = (label, value, cls = '') => `<div class="${cls}"><dt>${label}</dt><dd class="mono">${rp(value)}</dd></div>`;
+  return `<section class="panel gst-card" aria-labelledby="gst-title" data-testid="gst-card">
+    <div class="panel-head"><h2 class="panel-title" id="gst-title">${W.gstTitle}</h2>${demo ? `<span class="muted small">${W.sample}</span>` : ''}</div>
+    <p class="muted small">${g.count ? W.gstBills(g.count) : W.gstNone}</p>
+    <dl class="gst-lines">
+      ${row(W.taxable, g.taxable)}
+      ${g.igst ? row('IGST', g.igst) : ''}
+      ${row('CGST', g.cgst)}
+      ${row('SGST', g.sgst)}
+      ${row(W.gstTotal, g.total, 'gst-total')}
+    </dl>
+    <div class="actions"><a class="btn btn-primary btn-small" href="#/bills/new">${icon('plus', { size: 16 })} ${W.gstMake}</a><a class="btn btn-ghost btn-small" href="#/bills">${W.gstAll}</a></div>
   </section>`;
 }
 

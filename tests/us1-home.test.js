@@ -7,9 +7,9 @@ let t;
 afterEach(() => t?.app.unmount());
 
 describe('US-1 Problem story', () => {
-  it('AC-1.1: Home shows the headline and three problem cards', () => {
+  it('AC-1.1 (changed CR-0015): the demo Home shows the banner headline and three problem cards', () => {
     t = setup();
-    expect(t.$('h1').textContent).toBe('Never miss an AMC renewal again');
+    expect(t.$('h1').textContent).toBe('Bill, track stock, and manage field jobs all in one place.');
     const cards = t.$$('[data-testid="problem-cards"] h3').map((h) => h.textContent);
     expect(cards).toEqual(['Lapsed renewals', 'Re-typing job sheets', 'No view of field work']);
   });

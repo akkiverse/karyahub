@@ -57,3 +57,17 @@ How work is tracked on GitHub, so anyone can see what is planned, what is being 
 | Background for a large piece of work | `docs/product/` (for example `PHASE-ALPHA.md`) |
 | Where it stands | GitHub issues, labels and milestones |
 | What shipped in a version | `CHANGELOG.md`, tags and GitHub Releases |
+
+## Repository settings to turn on (the founder's call)
+
+Checked on 4 Nov 2026. This repository is **public**, so these protections are free. None of them is a change an agent makes.
+
+| Setting | Today | Why it matters |
+|---|---|---|
+| Secret scanning and push protection | Off | Blocks a pushed key or token before it lands in a public repo |
+| Dependabot alerts and security updates | Off | Tells the founder when a library has a known hole |
+| Protect `main` (pull request required, `test-and-build` must pass, no force-push) | No protection | Today only habit stops a direct push to the live branch |
+| Delete head branches after merge | Off (27 old branches) | Keeps the branch list to work in progress |
+| Allow only squash merge | Merge, squash and rebase all allowed | One commit per change keeps tags and history readable |
+| A `SECURITY.md` | None | Says where to report a problem |
+| A project board over the status labels | None | An optional Pipeline / In progress / In review / Merged view |

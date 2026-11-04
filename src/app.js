@@ -388,6 +388,7 @@ export function mountApp(root, options = {}) {
   function leaveInventoryRoute() {
     ui.inv.sheet = null;
     if (route.name !== 'inventory-fields') ui.fields = {};
+    if (route.name !== 'item-form') ui.inv.form = null; // a form left unsaved is not kept for next time
     if (ui.inv.notice && ui.inv.notice.at !== noticeKey(route)) ui.inv.notice = null;
   }
   const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.newOpen = false; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
@@ -402,6 +403,8 @@ export function mountApp(root, options = {}) {
   const unsub = store.subscribe((st, meta) => {
     applyUnits(st.units);
     applyTheme();
+    // The item form and the item details screen are where a person is typing: what arrives from the server must not redraw them (CR-0014).
+    if (meta && meta.remote && ['item-form', 'inventory-fields'].includes(route.name) && root.querySelector('form[data-form^="inv-"]')) return; // (a screen still waiting for its data is drawn when it arrives)
     if (meta && meta.remote && typing()) { renderWhenDone = true; return; }
     render();
   });
@@ -660,6 +663,12 @@ export function mountApp(root, options = {}) {
     render();
     if (removeAt === 'keep') root.querySelector(`[name="${was}"]`)?.focus(); // only a redraw: the cursor stays where it was
     else root.querySelector(`[name="sell_unit_${removeAt == null ? kept.length - 1 : Math.max(0, Math.min(removeAt, kept.length - 1))}"]`)?.focus();
+  }
+  // What is typed on the item form is kept in step as it is typed, so a redraw (or a tap that lands on a redrawn button) never empties it.
+  function rememberItemForm(field) {
+    const form = field && field.closest ? field.closest('form[data-form="inv-item"]') : null;
+    if (!form) return;
+    ui.inv.form = { key: form.dataset.item || 'new', values: Object.fromEntries(new FormData(form).entries()), errors: (ui.inv.form && ui.inv.form.key === (form.dataset.item || 'new') && ui.inv.form.errors) || {} };
   }
   // The item details screen: a notice after each change, an error stays on its form.
   function fieldsNote(text, error = false) { ui.fields = { notice: { text, error } }; ui.inv.focusNext = '[data-testid="fields-notice"]'; ui.inv.scrollNext = true; }
@@ -962,6 +971,7 @@ export function mountApp(root, options = {}) {
 
   async function onChange(e) {
     const el = e.target;
+    rememberItemForm(el);
     const a = el.dataset.action;
     if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0]); return; }
     if (bills.onChange(e)) return;
@@ -1020,6 +1030,7 @@ export function mountApp(root, options = {}) {
   }
   function onInput(e) {
     const t = e.target;
+    rememberItemForm(t);
     if (bills.onInput(e)) return;
     if (t.id === 'composer-input') ui.draft = t.value;
     else if (t.matches('[data-inv-search]')) { ui.inv.q = t.value; paintInv(); }

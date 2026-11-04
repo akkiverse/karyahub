@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-04 · **Branch:** `cr/0014-selling-units-and-cut` (CR-0014, part 2) · **Result:** 540 of 540 tests passing (283 server + 1 Postgres-only test skipped without its database, 257 web), covering all 205 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-04 · **Branch:** `cr/0014-selling-units-and-cut` (CR-0014, part 2) · **Result:** 543 of 543 tests passing (283 server + 1 Postgres-only test skipped without its database, 260 web), covering all 205 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
@@ -482,7 +482,7 @@ Fixes made after looking at the screenshots:
 - Moving between screens now starts at the top of the page.
 
 ## Releases
-- v0.10.0 (planned): CR-0014 in review; 540 of 540 tests passing (283 server, 257 web), plus the Postgres-only test (not run: no schema change).
+- v0.10.0 (planned): CR-0014 in review; 543 of 543 tests passing (283 server, 260 web), plus the Postgres-only test (not run: no schema change). Three fixes after the founder's first check of the preview (the form emptied by a redraw, a tap on Add a unit lost, the unit rows scattered) have tests.
 - v0.9.0 (planned): CR-0013 part 1 in review; 496 of 496 tests passing (264 server, 232 web), plus the Postgres-only test (not run for this change: no schema change, the records table is the one the v0.8.0 run used).
 - v0.8.0 (2026-11-04): CR-0012 released; 443 of 443 tests passing (241 server, 202 web), plus the Postgres-only test (run on PostgreSQL 16.2). Founder merged PR #15 after its preview built; production deployment `dpl_3x9GBr7kYuxXQSqee7AK9fvZ549Y` (commit `100b0af`) is READY and serves `/api/health`, the app and the public bill page (wrong token answers 404, noindex).
 - v0.7.0 (2026-11-01): CR-0011 released; 289 of 289 tests passing (151 server, 138 web), plus the Postgres-only test (run on PostgreSQL 16.2). Founder merged PR #13 after its preview built; the same 289 pass again on `main`.

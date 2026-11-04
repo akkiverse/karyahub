@@ -178,17 +178,19 @@ function sellRows(state, v, errors, manage, isNew) {
   const items = rows.map((i) => {
     const mine = v[k('unit', i)];
     const from = [v.unit, ...rows.map((j) => v[k('unit', j)])].filter((u, at, all) => u && u !== mine && all.indexOf(u) === at);
+    const cut = v[k('cut_from', i)];
     return `<li class="sell-row" data-sell="${i}">
-      <div class="form-grid">
+      <div class="sell-head"><strong>${mine ? e((pickableUnits(state, mine).find((u) => u.id === mine) || { name: UNITS[mine] }).name) : `Unit ${i + 2}`}</strong><button type="button" class="btn btn-ghost btn-small" data-action="inv-remove-unit" data-i="${i}">Take this unit off</button></div>
+      <div class="sell-grid">
         <label class="field">Unit<select name="${k('unit', i)}" ${inv(errors, k('unit', i))}><option value="">Choose a unit</option>${pickableUnits(state, mine).map((u) => `<option value="${e(u.id)}" ${mine === u.id ? 'selected' : ''}>${e(u.name)}</option>`).join('')}</select>${fieldErr(errors, k('unit', i))}</label>
-        ${field('Sale price (₹)', 'sale', i, 'for one of this unit', 'inputmode="decimal"')}
+        ${field('Sale price (₹)', 'sale', i, '', 'inputmode="decimal"')}
         ${manage ? field('Cost price (₹)', 'cost', i, 'optional', 'inputmode="decimal"') : ''}
         ${field('Low-stock level', 'low', i, 'optional', 'inputmode="decimal"')}
-        <label class="field">Made by cutting <span class="field-hint">optional</span><select name="${k('cut_from', i)}" ${inv(errors, k('cut_from', i))}><option value="">Not cut from another unit</option>${from.map((u) => `<option value="${e(u)}" ${v[k('cut_from', i)] === u ? 'selected' : ''}>Cut from ${e(unitName(u))}</option>`).join('')}</select>${fieldErr(errors, k('cut_from', i))}</label>
-        ${v[k('cut_from', i)] ? field(`One ${e(unitName(v[k('cut_from', i)]))} gives`, 'cut_gives', i, 'the usual amount, you can change it when cutting', 'inputmode="decimal"') : ''}
+        <label class="field">Made by cutting <span class="field-hint">optional</span><select name="${k('cut_from', i)}" ${inv(errors, k('cut_from', i))}><option value="">Not cut from another unit</option>${from.map((u) => `<option value="${e(u)}" ${cut === u ? 'selected' : ''}>Cut from ${e(unitName(u))}</option>`).join('')}</select>${fieldErr(errors, k('cut_from', i))}</label>
+        ${cut ? field(`One ${e(unitName(cut))} gives`, 'cut_gives', i, 'the usual amount', 'inputmode="decimal"') : ''}
         ${isNew ? field('Opening stock', 'opening', i, 'optional', 'inputmode="decimal"') : ''}
       </div>
-      <button type="button" class="btn btn-ghost btn-small" data-action="inv-remove-unit" data-i="${i}">Take this unit off</button></li>`;
+    </li>`;
   }).join('');
   return `<fieldset class="sells" data-testid="sells"><legend>Also sold as</legend>
     <p class="muted small">Sold in another unit too, for example loose metres as well as coils? Each unit has its own price and its own stock.</p>
@@ -231,8 +233,8 @@ export function itemForm({ state, ui, params, allow }) {
         ${activeFields(state).map((x) => detailInput(state, x, v, errors, manage)).join('')}
         ${input('hsn', 'HSN code', 'optional, 4, 6 or 8 digits', 'inputmode="numeric"')}
         <label class="field">GST rate<select name="gst" ${inv(errors, 'gst')}>${GST_RATES.map((g) => `<option value="${g}" ${String(v.gst) === String(g) ? 'selected' : ''}>${g} %</option>`).join('')}</select>${fieldErr(errors, 'gst')}</label>
-        <label class="check-line"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}> ${W.priceIncludesGst} <span class="muted small">(MRP)</span></label>
-        <label class="check-line"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}> ${W.service} <span class="muted small">(for example Gas refill)</span></label>
+        <label class="check-line"><input type="checkbox" name="price_includes_gst" ${v.price_includes_gst ? 'checked' : ''}><span>${W.priceIncludesGst} <span class="muted small">(MRP)</span></span></label>
+        <label class="check-line"><input type="checkbox" name="service" ${v.service ? 'checked' : ''}><span>${W.service} <span class="muted small">(for example Gas refill)</span></span></label>
         ${input('low', 'Low-stock level', 'optional; marked Low at or below this', 'inputmode="decimal"')}
         ${it ? '' : input('opening', 'Opening stock', 'optional; what is on the shelf today', 'inputmode="decimal"')}
       </div>

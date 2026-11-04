@@ -801,6 +801,10 @@ tr.is-stopped td { opacity: 0.65; }
 .sells { border: 0; padding: 0; margin: 8px 0 0; display: grid; gap: 10px; min-width: 0; }
 .sells legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .sell-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.sell-row { display: grid; gap: 8px; justify-items: start; border: 1px solid var(--c-line); border-radius: 12px; padding: 12px; background: var(--c-surface); }
-.sell-row .form-grid { width: 100%; }
+.sell-row { display: grid; gap: 12px; border: 1px solid var(--c-line); border-radius: 12px; padding: 14px; background: var(--c-surface); }
+.sell-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sell-grid { display: grid; gap: 12px 14px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+/* Boxes in one row line up along their bottom edge, however many lines their labels and hints take. */
+.form-grid > .field, .sell-grid > .field { align-content: end; min-width: 0; }
+.sell-grid select, .sell-grid input { min-width: 0; }
 .qty-extras { display: block; text-align: right; }

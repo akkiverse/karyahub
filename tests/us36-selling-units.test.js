@@ -104,6 +104,49 @@ describe('US-36 An item sold in several units: the form', () => {
   });
 });
 
+describe('US-36 The item form is never emptied by a redraw', () => {
+  it('AC-36.1: what is typed stays when the screen is drawn again, and a form that was left is empty next time', () => {
+    t = demo('#/inventory/new');
+    let f = t.$('[data-form="inv-item"]');
+    type(f.elements.name, 'Copper wire');
+    type(f.elements.sale, '920');
+    t.click('[data-action="inv-add-unit"]');
+    type(t.$('[data-form="inv-item"]').elements.sell_sale_0, '12');
+    t.app.store.update((s) => { s.settings.theme = 'dark'; }); // something redraws the page
+    f = t.$('[data-form="inv-item"]');
+    expect(f.elements.name.value).toBe('Copper wire');
+    expect(f.elements.sale.value).toBe('920');
+    expect(f.elements.sell_sale_0.value).toBe('12');
+    expect(t.$$('[data-sell]')).toHaveLength(1);
+    t.app.navigate('#/inventory');
+    t.app.navigate('#/inventory/new');
+    expect(t.$('[data-form="inv-item"]').elements.name.value).toBe(''); // not kept for next time
+    expect(t.$$('[data-sell]')).toHaveLength(0);
+  });
+
+  it('AC-36.1: what arrives from the server while the form is open does not redraw it', async () => {
+    const api = fakeApi();
+    t = open({ api, hash: '#/inventory/new' });
+    await until(() => t.$('[data-form="inv-item"]') && chip(t)?.textContent.includes('All saved'));
+    const f = t.$('[data-form="inv-item"]');
+    type(f.elements.name, 'Copper wire');
+    t.click('[data-action="inv-add-unit"]');
+    const row = t.$('[data-sell="0"]');
+    t.app.store.update((s) => { s.customers = [...s.customers]; }, { remote: true }); // an answer from the server
+    expect(t.$('[data-sell="0"]')).toBe(row); // the same element: nothing was drawn again
+    expect(t.$('[data-form="inv-item"]').elements.name.value).toBe('Copper wire');
+  });
+
+  it('AC-36.1: the rows of "Also sold as" are cards with a heading, so the form stays in line on a phone and a laptop', () => {
+    t = demo('#/inventory/new');
+    t.click('[data-action="inv-add-unit"]');
+    expect(t.$('.sell-row .sell-head strong').textContent).toBe('Unit 2');
+    expect(t.$('.sell-row .sell-grid').querySelectorAll('.field')).toHaveLength(6); // unit, sale, cost, low, made by cutting, opening stock (a new item)
+    change(t.$('select[name="sell_unit_0"]'), 'metre');
+    expect(t.$('.sell-row .sell-head strong').textContent).toBe('metre (m)');
+  });
+});
+
 describe('US-36 Stock in each unit', () => {
   it('AC-36.2: the list and the item page show every unit\'s quantity with its own price', () => {
     t = demo();

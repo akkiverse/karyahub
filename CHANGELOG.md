@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **CSV:** one row for each unit of an item (same code), with `cut_from` and `cut_gives`.
 
 ### Fixed
+- The item form is no longer emptied by a redraw while you fill it in (a redraw from the server could also swallow a tap on Add a unit); the rows of "Also sold as" and every row of boxes on the item form are aligned.
 - Importing a CSV file over an existing item no longer turns a service item into a stocked one or drops "price includes GST".
 - Choosing "cut from" or a unit on the item form shows its boxes at once.
 

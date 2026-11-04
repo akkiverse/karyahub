@@ -21,6 +21,7 @@ What people see:
 - **Bills and estimates:** a Unit menu on a line when the item has several units; choosing one changes the unit name and the price; a saved bill takes and returns stock in the unit sold.
 - **Inventory list:** other units' quantities under the main one; Low and Out chips count an item with any unit low.
 - **CSV:** one row for each unit (same code), with `cut_from` and `cut_gives`; the check counts unit rows apart.
+- **Fixed (after the founder's first check):** what is typed on the item form is kept as it is typed, and what arrives from the server no longer redraws the form (a redraw emptied it and could swallow a tap on Add a unit); a form that was left is empty next time; "Also sold as" rows are cards with a heading and aligned boxes on a phone, a tablet and a laptop; boxes in one row of any item form line up along their bottom edge.
 - **Fixed:** a CSV update of an existing item no longer turns a service item into a stocked one or drops "price includes GST".
 
 What changes underneath:

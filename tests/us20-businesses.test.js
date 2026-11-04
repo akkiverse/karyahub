@@ -75,6 +75,25 @@ describe('US-20 Businesses (platform admin screens, CR-0005)', () => {
     expect(t.$('form[data-form="add-business"]')).toBeNull();
   });
 
+  it('AC-22.12: Add a business at the top stays on Businesses and puts the cursor in the form', async () => {
+    await open();
+    const button = t.$('[data-testid="add-business-top"]');
+    expect(button.tagName).toBe('BUTTON'); // it used to be a link to "#biz-add", which the app read as a page and refused
+    button.click();
+    expect(window.location.hash).toBe('#/businesses');
+    expect(t.$('h1').textContent).toBe('Businesses');
+    expect(t.$('[data-testid="access-denied"]')).toBeNull();
+    expect(document.activeElement).toBe(t.$('#biz-add input[name="name"]'));
+  });
+
+  it('AC-22.12: Skip to content stays on the same page and moves to the main area', async () => {
+    await open();
+    t.$('a.skip').click();
+    expect(window.location.hash).toBe('#/businesses');
+    expect(t.$('h1').textContent).toBe('Businesses');
+    expect(document.activeElement).toBe(t.$('#main'));
+  });
+
   it('AC-22.10: pressing Create business shows progress, a second press is ignored, and the new PIN is brought into view', async () => {
     Element.prototype.scrollIntoView = vi.fn();
     await open();

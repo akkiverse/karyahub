@@ -210,6 +210,8 @@ As any signed-in person I want clear screens for signing in, my account, my team
 
 - **AC-22.11** Given I'm on Admin, then the **Add a person** button at the top takes me to the form below it and puts the cursor in the name box, without leaving Admin (it used to be a link that the app read as an unknown page and sent to Home). *(added CR-0009)*
 
+- **AC-22.12** Given I'm the platform admin on Businesses, then the **Add a business** button at the top takes me to the form below it and puts the cursor in the business name box, without leaving Businesses; and a link to a place on the same page (such as Skip to content) moves there and keeps the page, instead of being read as an unknown page and sent Home. *(added CR-0017)*
+
 ### US-23: Business data on the server
 As an owner I want my firm's customers, jobs, quotes, invoices and chat kept on the server for my business only, so that my whole team sees the same work on any phone, even from a weak signal. *(added CR-0009)*
 - **AC-23.1** Given a real business, when its people create or change customers, jobs, documents or chat messages, then they are saved on the server under that business, and another phone signed in to the same business gets them. *(added CR-0009)*

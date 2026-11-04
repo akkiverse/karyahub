@@ -498,6 +498,19 @@ export function mountApp(root, options = {}) {
     if (ui.navOpen && e.target.closest('#side-nav a')) setNav(false, { focusBack: false });
     if (e.target.closest('.gs-panel a')) { ui.gs = ''; const box = root.querySelector('[data-global-search]'); if (box) box.value = ''; paintSearch(false); }
     else if (ui.gs && !e.target.closest('.gs')) paintSearch(false); // a press elsewhere closes the results and keeps what was typed
+    const jump = e.target.closest('a[href^="#"]');
+    const jumpTo = jump && root.contains(jump) ? jump.getAttribute('href') : '';
+    if (jumpTo.length > 1 && !jumpTo.startsWith('#/')) {
+      // A link to a place on this page ("#main") would be read as a page address and sent Home; move there instead.
+      e.preventDefault();
+      const to = root.ownerDocument.getElementById(jumpTo.slice(1));
+      if (to) {
+        if (!to.hasAttribute('tabindex')) to.setAttribute('tabindex', '-1');
+        to.scrollIntoView?.({ block: 'start' });
+        to.focus({ preventScroll: true });
+      }
+      return;
+    }
     const el = e.target.closest('[data-action]');
     if (!el || !root.contains(el)) return;
     const a = el.dataset.action;
@@ -542,6 +555,11 @@ export function mountApp(root, options = {}) {
     if (a.startsWith('bill-') && (await bills.onClick(a, el))) return;
     if (a === 'dismiss-sync-notice') { sync.dismissNotice(); return; }
     if (a === 'dismiss-sync-rejected') { sync.dismissRejected(); return; }
+    if (a === 'goto-add-business') {
+      root.querySelector('#biz-add')?.scrollIntoView?.({ block: 'start', behavior: win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      root.querySelector('#biz-add input[name="name"]')?.focus({ preventScroll: true });
+      return;
+    }
     if (a === 'goto-add-person') {
       // A link to "#admin-add" would be read as a page address and sent Home; scroll to the form instead.
       const section = root.querySelector('#admin-add');

@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+- **Add a business** on Businesses no longer opens "You don't have access to Home" for the platform admin; it takes you to the form. Links to a place on the same page, like Skip to content, also stay on the page. See [CR-0017](docs/changes/CR-0017-add-business-link.md).
+
 ## [0.11.0] - 2026-11-04
 
 ### Added

@@ -6,7 +6,7 @@
 - **Kind:** Feature (minor version)
 - **Release:** v0.11.0 (planned; Getting paid moves to v0.12.0)
 - **Branch:** `cr/0015-deep-ocean-teal`
-- **Pull request:** see `TASKS.md`, K9
+- **Pull request:** [#21](https://github.com/akkiverse/karyahub/pull/21)
 - **References:** [ADR-0019](../adr/0019-design-tokens-self-hosted-fonts-and-a-per-device-theme.md), [DESIGN](../design/DESIGN.md)
 
 ## Why

@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-04 · **Branch:** `cr/0015-deep-ocean-teal` (CR-0015) · **Result:** 568 of 568 tests passing (283 server + 1 Postgres-only test skipped without its database, 285 web), covering all 205 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-04 · **Branch:** `cr/0015-deep-ocean-teal` (CR-0015) · **Result:** 568 of 568 tests passing (283 server + 1 Postgres-only test skipped without its database, 285 web), covering all 227 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 

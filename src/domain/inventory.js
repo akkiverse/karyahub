@@ -4,9 +4,33 @@
 // stock moves it made that the server has not answered yet (a move without `after`). What a screen shows is the two
 // added together, so a part taken with no signal shows at once and is never counted twice once the server has it.
 
-export const UNITS = { nos: 'nos', kg: 'kg', metre: 'm', litre: 'litre', set: 'set', roll: 'roll' };
-export const UNIT_NAMES = { nos: 'nos (pieces)', kg: 'kg', metre: 'metre (m)', litre: 'litre', set: 'set', roll: 'roll' };
-export const WHOLE_UNITS = new Set(['nos', 'set', 'roll']);
+import { detailWords, readDetails, unitNameProblem } from './fields.js';
+
+const BUILT_IN_UNITS = { nos: 'nos', kg: 'kg', metre: 'm', litre: 'litre', set: 'set', roll: 'roll' };
+const BUILT_IN_NAMES = { nos: 'nos (pieces)', kg: 'kg', metre: 'metre (m)', litre: 'litre', set: 'set', roll: 'roll' };
+const BUILT_IN_WHOLE = ['nos', 'set', 'roll'];
+export const BUILT_IN_UNIT_IDS = Object.keys(BUILT_IN_UNITS);
+// The units as the screens use them. The six built-in ones are always here; the business's own (CR-0013) are put in
+// by applyUnits() whenever the on-device copy changes, so every screen that writes a quantity shows their names.
+export const UNITS = { ...BUILT_IN_UNITS };
+export const UNIT_NAMES = { ...BUILT_IN_NAMES };
+export const WHOLE_UNITS = new Set(BUILT_IN_WHOLE);
+export function applyUnits(list = []) {
+  for (const k of Object.keys(UNITS)) if (!BUILT_IN_UNITS[k]) delete UNITS[k];
+  for (const k of Object.keys(UNIT_NAMES)) if (!BUILT_IN_NAMES[k]) delete UNIT_NAMES[k];
+  WHOLE_UNITS.clear();
+  BUILT_IN_WHOLE.forEach((u) => WHOLE_UNITS.add(u));
+  for (const u of list) {
+    UNITS[u.id] = u.name;
+    UNIT_NAMES[u.id] = `${u.name}${u.whole ? '' : ' (decimals allowed)'}`;
+    if (u.whole) WHOLE_UNITS.add(u.id);
+  }
+}
+/** The units a person may pick for an item: the built-in ones and the business's own that are in use, plus `keep`. */
+export function pickableUnits(state, keep = null) {
+  const own = (state.units || []).filter((u) => !u.alias_of && (!u.stopped || u.id === keep));
+  return [...BUILT_IN_UNIT_IDS.map((id) => ({ id, name: UNIT_NAMES[id] })), ...own.map((u) => ({ id: u.id, name: u.name }))];
+}
 export const GST_RATES = [0, 0.25, 3, 5, 18, 40]; // 0.25 % and 3 % added by CR-0012 (AC-27.6)
 const UNIT_ALIASES = { m: 'metre', mtr: 'metre', mtrs: 'metre', meter: 'metre', meters: 'metre', metres: 'metre', kgs: 'kg', l: 'litre', ltr: 'litre', ltrs: 'litre', litres: 'litre', liter: 'litre', pcs: 'nos', pc: 'nos', piece: 'nos', pieces: 'nos', no: 'nos', sets: 'set', rolls: 'roll' };
 export const MOVE_LABELS = { opening: 'Opening stock', in: 'Stock in', out: 'Stock out', used: 'Used on job', returned: 'Put back from job', count: 'Count correction' };
@@ -25,8 +49,8 @@ export const parseUnit = (text) => {
 /** Lower case, µ read as u, and spaces, dots, dashes and slashes ignored: "cap 45" finds "Capacitor 45 µF". */
 export const norm = (s) => String(s || '').toLowerCase().replace(/µ/g, 'u').replace(/[\s.\-_/()]+/g, '');
 export const words = (s) => String(s || '').toLowerCase().replace(/µ/g, 'u').split(/[\s,]+/).map(norm).filter(Boolean);
-export const matches = (item, query) => {
-  const hay = `${norm(item.name)} ${norm(item.code)}`;
+export const matches = (item, query, state = null) => {
+  const hay = `${norm(item.name)} ${norm(item.code)}${state ? ` ${norm(detailWords(state, item))}` : ''}`;
   return words(query).every((w) => hay.includes(w));
 };
 
@@ -60,16 +84,18 @@ export function summary(state) {
   }
   return { all: live.length, low, out, stopped: (state.items || []).length - live.length, value: Math.round(value) };
 }
-export function listItems(state, { filter = 'all', q = '' } = {}) {
+export function listItems(state, { filter = 'all', q = '', f = {} } = {}) {
+  const picked = Object.entries(f).filter(([, v]) => v);
   return (state.items || [])
     .filter((i) => (filter === 'stopped' ? i.stopped : !i.stopped))
+    .filter((i) => picked.every(([fid, entry]) => (i.attrs || {})[fid] === entry))
     .filter((i) => {
       const m = i.service ? null : markOf(stockOf(state, i), i.low);
       if (filter === 'low') return m && m.kind === 'low';
       if (filter === 'out') return m && (m.kind === 'out' || m.kind === 'short');
       return true;
     })
-    .filter((i) => !String(q).trim() || matches(i, q))
+    .filter((i) => !String(q).trim() || matches(i, q, state))
     .sort(nameOf);
 }
 /** An item's moves, newest first, each with the quantity left after it. */
@@ -126,13 +152,13 @@ export function partLines(state, job) {
 }
 
 // ---------- reading what people type ----------
-export function parseQty(text, unit) {
+export function parseQty(text, unit, whole = WHOLE_UNITS.has(unit), label = UNITS[unit]) {
   const t = String(text ?? '').trim();
   if (!t) return { ok: false, message: 'Type a quantity.' };
   if (!/^\d+(\.\d{1,3})?$/.test(t)) return { ok: false, message: 'Use a number, for example 2 or 1.5.' };
   const value = Number(t);
   if (value > 1_000_000) return { ok: false, message: 'That is too large. Use up to 1,000,000.' };
-  if (WHOLE_UNITS.has(unit) && !Number.isInteger(value)) return { ok: false, message: `Use a whole number for ${UNITS[unit]}.` };
+  if (whole && !Number.isInteger(value)) return { ok: false, message: `Use a whole number for ${label}.` };
   return { ok: true, value };
 }
 /** "450" or "1,250.50" -> paise. Empty is allowed (value null). */
@@ -151,7 +177,8 @@ export const isoFromDmy = (s) => {
 };
 export const dmy = (iso) => { const [y, m, d] = String(iso || '').slice(0, 10).split('-'); return y ? `${d}-${m}-${y}` : ''; };
 
-/** Check the add or edit form. Returns the item to save (prices in paise) or the message for each wrong field. */
+/** Check the add or edit form. Returns the item to save (prices in paise) or the message for each wrong field.
+ *  `pending` are list values typed that the list doesn't have yet; `newUnit` is a unit typed for this item. */
 export function validateItem(v, state, editingId = null) {
   const errors = {};
   const name = String(v.name || '').trim();
@@ -164,7 +191,13 @@ export function validateItem(v, state, editingId = null) {
       if (other) errors.code = `Code ${code} is already used by ${other.name}.`;
     }
   }
-  if (!UNITS[v.unit]) errors.unit = 'Pick a unit.';
+  let unit = v.unit;
+  let newUnit = null;
+  if (unit === '__new__') {
+    const problem = unitNameProblem(state, v.new_unit, BUILT_IN_UNIT_IDS);
+    if (problem) errors.new_unit = problem;
+    else { newUnit = { name: String(v.new_unit).trim(), whole: v.new_unit_whole === 'on' || v.new_unit_whole === true }; unit = null; }
+  } else if (!UNITS[unit]) errors.unit = 'Pick a unit.';
   const sale = parseRupees(v.sale);
   if (!sale.ok) errors.sale = sale.message;
   else if (sale.value == null) errors.sale = 'Type the sale price, or 0 if you never bill this part.';
@@ -181,11 +214,16 @@ export function validateItem(v, state, editingId = null) {
   }
   let opening = 0;
   if (v.opening !== undefined && String(v.opening).trim()) {
-    const o = parseQty(v.opening, v.unit);
+    const o = newUnit ? parseQty(v.opening, null, newUnit.whole, newUnit.name) : parseQty(v.opening, v.unit);
     if (!o.ok) errors.opening = o.message;
     else opening = o.value;
   }
+  const details = readDetails(state, v);
+  Object.assign(errors, details.errors);
   if (Object.keys(errors).length) return { errors };
   const on = (x) => x === true || x === 'on' || x === 'true';
-  return { errors, opening, item: { name, code, unit: v.unit, sale: sale.value, cost: cost.value, hsn, gst: Number(v.gst), low, price_includes_gst: on(v.price_includes_gst), service: on(v.service) } };
+  return {
+    errors, opening, pending: details.pending, newUnit,
+    item: { name, code, unit, sale: sale.value, cost: cost.value, hsn, gst: Number(v.gst), low, price_includes_gst: on(v.price_includes_gst), service: on(v.service), attrs: details.attrs },
+  };
 }

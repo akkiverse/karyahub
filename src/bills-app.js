@@ -87,7 +87,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
       if (!p.item) continue;
       const hay = `${norm(p.item.name)} ${norm(p.item.code)}`; // the same test as partLines (AC-25.13)
       if ((job.lines || []).some((l) => { const w = words(l.description); return w.length > 1 && w.every((x) => hay.includes(x)); })) continue; // AC-25.13
-      lines.push({ ...lineFromItem(p.item), qty: p.qty, from_job_parts: true, last_price: false });
+      lines.push({ ...lineFromItem(p.item, null, store.get()), qty: p.qty, from_job_parts: true, last_price: false });
     }
     const customer = { id: job.customer_id || '', name: job.customer_name || W.walkIn, phone: job.phone || '', address: job.area || '', gstin: '', state_code: '' };
     return { doc: openNew(type, { customer, lines, jobId }) };
@@ -298,7 +298,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
       }
       case 'bill-add-item': {
         const it = store.get().items.find((x) => x.id === el.dataset.item);
-        ed.doc.lines.push(lineFromItem(it, lastPrice(store.get().documents, ed.doc.customer, it.id)));
+        ed.doc.lines.push(lineFromItem(it, lastPrice(store.get().documents, ed.doc.customer, it.id), store.get()));
         ed.itemQ = '';
         persist();
         root.querySelector(`[data-k="q${ed.doc.lines.length - 1}"]`)?.focus();

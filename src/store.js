@@ -17,13 +17,19 @@ function read(key) {
     return null;
   }
 }
+/** Save on this device; answers how many characters it took, or -1 when the browser would not keep it (CR-0013). */
 function write(key, value) {
   try {
-    globalThis.localStorage?.setItem(key, JSON.stringify(value));
+    const text = JSON.stringify(value);
+    globalThis.localStorage?.setItem(key, text);
+    return text.length;
   } catch {
     /* storage may be full or blocked; KaryaHub keeps working in memory */
+    return -1;
   }
 }
+/** A browser keeps about 5 million characters for a site; past this the phone is told before anything is lost. */
+export const STORAGE_WARN_AT = 3_000_000;
 const savedTheme = () => {
   try { return JSON.parse(globalThis.localStorage?.getItem(PREFS_KEY) || '{}').theme || 'system'; } catch { return 'system'; }
 };
@@ -33,13 +39,21 @@ export function createStore() {
   let state = demoState();
   state.settings.theme = savedTheme();
   const listeners = new Set();
+  let size = 0; // characters this business's data takes on the device
+  let refused = false; // the browser would not keep the last save
   const notify = (meta = {}) => listeners.forEach((l) => l(state, meta));
   const persist = () => {
     write(PREFS_KEY, { theme: state.settings.theme });
-    if (key) write(key, state);
+    if (key) {
+      const n = write(key, state);
+      refused = n < 0;
+      if (n >= 0) size = n;
+    }
   };
   return {
     get: () => state,
+    /** How full this phone is for this business: {size, full} where full means a save was refused. */
+    storage: () => ({ size, refused, warn: refused || size > STORAGE_WARN_AT }),
     /** A change made on this device. `remote: true` marks what came from the server, which must not be sent back. */
     update(fn, { remote = false } = {}) {
       const next = JSON.parse(JSON.stringify(state));

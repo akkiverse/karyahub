@@ -3,7 +3,7 @@
 import { ApiError, ApiUnreachable } from '../src/api/client.js';
 import { figuresOf, fyOf, numberOf, saveProblem, sellerOf, addDays, messageText, waLink } from '../src/domain/bills.js';
 
-const KINDS = ['customer', 'job', 'document', 'message', 'item', 'stock_move'];
+const KINDS = ['customer', 'job', 'document', 'message', 'item', 'stock_move', 'item_field', 'list_entry', 'unit'];
 const SIGNED = { opening: 1, in: 1, returned: 1, out: -1, used: -1 };
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const pad = (n, w = 4) => String(n).padStart(w, '0');
@@ -115,6 +115,7 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
     server,
     network,
     syncCalls: calls.sync,
+    csvCalls: () => calls.csv || [],
     importCalls: calls.import,
     sync: async (since, ops) => {
       calls.sync.push({ since, ops: clone(ops) });
@@ -216,12 +217,12 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
       const counts = { new: 0, update: 0, same: 0, problem: 0 };
       rows.forEach((r) => { counts[r.status] += 1; });
       const out = rows.map(({ _r, _hit, ...rest }) => rest);
-      if (check) return { checked: true, file: name, rows: out, counts };
+      if (check) return { checked: true, file: name, rows: out, counts, adds: { units: [], lists: [] }, unknown_columns: [] };
       for (const r of rows.filter((x) => x.status === 'new')) {
         const id = `it-csv-${r.row}`;
         put('item', id, { id, name: r._r.name, code: r._r.code, unit: r._r.unit, sale: Math.round(Number(r._r.sale_price || 0) * 100), cost: null, hsn: '', gst: 18, low: null, stopped: false });
       }
-      return { checked: false, file: name, rows: out, counts, imported: { added: counts.new, updated: counts.update, skipped: counts.problem } };
+      return { checked: false, file: name, rows: out, counts, adds: { units: [], lists: [] }, unknown_columns: [], imported: { added: counts.new, updated: counts.update, skipped: counts.problem } };
     },
     saveLogo: async (dataUrl) => {
       if (network.offline) throw new ApiUnreachable();

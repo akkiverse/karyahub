@@ -171,6 +171,18 @@ flowchart LR
 - **Sending.** `sender.sender_for(business)` returns the business's connected sender (K6) or the link sender; each send, copy, share or mark as sent adds to the `msg:<yyyy-mm>` counter and the bill's history.
 - See [ADR-0016](../adr/0016-one-tax-engine-and-pdf-with-fpdf2.md).
 
+## Own item details, lists and units (CR-0013)
+```mermaid
+flowchart LR
+  Ph[Phone: Item details screen and item form] -- item_field, list_entry, unit first, then item --> Q[(sync queue)]
+  Q -- POST /api/v1/sync --> IF[data/item_fields.py]
+  IF -- checks unit and each detail against --> R[(records: item_field, list_entry, unit)]
+  IF -- duplicate name: alias_of, items rewritten --> R
+  CSV[CSV file, in parts of 500] -- /inventory/import --> Imp[data/inventory_import.py]
+  Imp -- reads the business's columns, adds new entries first --> R
+```
+A business's own fields, the entries of its pick-lists and its units are ordinary records of the shared `records` table (ADR-0017): no migration, the same business wall and row-level security. An item stores `attrs` (field id to value; a pick-list value is an entry id). The phone keeps the unit names in one table refreshed from the business's units, so every screen that shows a quantity uses them.
+
 ## Key flows
 **Voice note to job:** pick sample → technician bubble → process card → API transcribe → API extract → draft card → Edit (optional) → Approve → Job saved at "Work done, waiting for customer check", Customer updated, totals update.
 

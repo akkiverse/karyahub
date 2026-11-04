@@ -511,11 +511,12 @@ def test_ac_25_6_the_check_lists_every_row_and_saves_nothing(firm):
     r = check(owner, CSV_BAD)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["checked"] is True and body["counts"] == {"new": 4, "update": 0, "same": 0, "problem": 7}
+    assert body["checked"] is True and body["counts"] == {"new": 5, "update": 0, "same": 0, "problem": 6}
+    assert body["adds"]["units"] == ["box"]  # CR-0013: a unit the business doesn't have is added at import
     rows = {x["row"]: x for x in body["rows"]}
     assert rows[2]["status"] == "new" and rows[4]["status"] == "new"
     reasons = {n: " ".join(x["problems"]) for n, x in rows.items() if x["problems"]}
-    assert 'unit "box"' in reasons[5] and 'sale price "12O0"' in reasons[6]
+    assert rows[5]["status"] == "new" and 'sale price "12O0"' in reasons[6]
     assert "GST rate 12 %" in reasons[7] and "also in row 2" in reasons[8] and "name is empty" in reasons[9]
     assert 'HSN "ABC1"' in reasons[10] and "opening stock 2.5: use a whole number for nos" in reasons[11]
     assert rows[12]["status"] == "new" and 'unit "pcs" read as nos' in rows[12]["notes"][0]
@@ -527,15 +528,22 @@ def test_ac_25_6_import_saves_the_good_rows_with_their_opening_stock(firm):
     owner = firm["owner"]
     r = check(owner, CSV_BAD, commit=True)
     assert r.status_code == 200, r.text
-    assert r.json()["imported"] == {"added": 4, "updated": 0, "skipped": 7}
+    assert r.json()["imported"] == {"added": 5, "updated": 0, "skipped": 6}
     got = {i["body"]["name"]: i["body"] for i in sync(owner)["changes"]["item"]}
-    assert set(got) == {"Capacitor 35 µF", "R410A refrigerant gas", "Wall bracket set", "Filter"}
+    assert set(got) == {
+        "Capacitor 35 µF",
+        "R410A refrigerant gas",
+        "Wall bracket set",
+        "Filter",
+        "Copper pipe",
+    }
     assert got["Capacitor 35 µF"]["qty"] == 10 and got["R410A refrigerant gas"]["qty"] == 6.5
     assert got["Wall bracket set"]["code"] == "" and got["Wall bracket set"]["gst"] == 18
     assert got["Capacitor 35 µF"]["sale"] == 38000 and got["Capacitor 35 µF"]["cost"] == 17000
-    assert len(sync(owner)["changes"]["stock_move"]) == 4  # an opening move for each
+    assert len(sync(owner)["changes"]["stock_move"]) == 5  # an opening move for each
     assert any(
-        "Imported inventory from stock.csv: 4 new, 0 updated, 7 skipped" in x for x in log_lines(owner)
+        "Imported inventory from stock.csv: 5 new, 0 updated, 6 skipped, 1 new list entry" in x
+        for x in log_lines(owner)
     )
 
 

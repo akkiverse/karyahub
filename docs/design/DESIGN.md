@@ -109,3 +109,10 @@ Design record: the clickable mockup `docs/design/mockups/inventory.html` (uses `
 - **First sign-in of a new business:** one screen, "What kind of business do you run?", with the four types, GST registration and state, and Save and start.
 - **Public bill page** (`/b/<token>`): served by the server, one bill in the business's layout and colour, a Download PDF button, noindex; PDFs use Noto Sans so ₹ prints.
 - New classes: `segs`, `search`, `chip-status`, `status-*`, `bill-*`, `cust-card`, `pick-row`, `totals-bar`, `more-options`, `more-actions`, `fab*`, `radio-card`, `swatch*`, `look-preview`, `stamp`. No new colours or fonts; every control is 44 px or taller.
+
+## Additions in CR-0013 (item details, lists and units)
+- **Item details and lists** (`#/inventory/fields`, from the Inventory page's "Item details" button): panels in this order: the details (one row each: name, kind and where it shows on a second line; Change and Stop using), the Add or Change form, one list panel for each pick-list (entries as rows with Rename and Stop, an "Add to Brand" line), and Units (built-in ones named, the business's own as rows, a "New unit" line). Read-only for people who may not change details, with one plain sentence.
+- **Item form:** the business's details come after the cost price; a list detail is a box that suggests entries and says it accepts a new word; the unit menu ends with "New unit…", which shows a name box and a whole-numbers checkbox.
+- **Inventory list:** chosen details sit under the name on a phone and become columns from 760 px; a menu for each filterable pick-list sits under the chips.
+- **Plain checkboxes:** `.check-line` is a visible 22 px checkbox with its label (the older `.check` is the invisible-input toggle used by the permission grid; using it for labelled checkboxes hid them in v0.8.0).
+- **Phone full:** a red notice at the top ("This phone is nearly full for KaryaHub...") in the same place as the sync notices.

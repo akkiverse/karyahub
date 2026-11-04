@@ -58,6 +58,7 @@ MOVE_PERMISSION = {
     "used": "use_parts",
     "returned": "use_parts",
 }
+UNIT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 CODE_RE = re.compile(r"^[A-Za-z0-9._/-]{1,24}$")
 HSN_RE = re.compile(r"^(\d{4}|\d{6}|\d{8})$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -101,10 +102,11 @@ def parse_rupees(text: Any) -> tuple[bool, int | None]:
     return True, round(float(raw) * 100)
 
 
-def quantity_problem(unit: str, value: float) -> str | None:
+def quantity_problem(unit: str, value: float, whole: bool | None = None) -> str | None:
+    """Why a quantity can't be used, or None. ``whole`` is set for a unit the business made (CR-0013)."""
     if value < 0 or value > MAX_QTY:
         return "Use a quantity between 0 and 1,000,000."
-    if unit in WHOLE_UNITS and abs(value - round(value)) > 1e-9:
+    if (unit in WHOLE_UNITS if whole is None else whole) and abs(value - round(value)) > 1e-9:
         return f"Use a whole number for {unit}."
     return None
 
@@ -134,8 +136,8 @@ def clean_item(item_id: str, body: Any) -> dict[str, Any]:
             "validation_error", "A code has up to 24 letters, numbers, dots, dashes or slashes.", 422
         )
     unit = body.get("unit")
-    if unit not in UNITS:
-        raise AppError("validation_error", "Pick a unit: nos, kg, metre, litre, set or roll.", 422)
+    if not isinstance(unit, str) or not UNIT_ID_RE.match(unit):
+        raise AppError("validation_error", "Pick a unit from your list.", 422)
     hsn = str(body.get("hsn") or "").strip()
     if hsn and not HSN_RE.match(hsn):
         raise AppError("validation_error", "An HSN code has 4, 6 or 8 digits.", 422)
@@ -159,6 +161,8 @@ def clean_item(item_id: str, body: Any) -> dict[str, Any]:
         "service": bool(body.get("service", False)),
         "low": None if low is None else r3(low),
         "stopped": bool(body.get("stopped", False)),
+        # CR-0013: the business's own details (field id -> value); checked against its fields by item_fields.
+        "attrs": body.get("attrs") if isinstance(body.get("attrs"), dict) else {},
     }
 
 
@@ -196,6 +200,7 @@ class Batch:
         self.db, self.p, self.business_id = db, p, business_id
         self.take_seq, self.found, self.audits = take_seq, found, audits
         self.now = accounts.utcnow()
+        self._loaded: set[str] = set()
 
     async def record(self, kind: str, rid: str) -> Record | None:
         key = (kind, rid)
@@ -211,6 +216,28 @@ class Batch:
                 return None
             self.found[key] = row
         return self.found[key]
+
+    async def all_of(self, kind: str) -> list[Record]:
+        """Every record of one kind in the business, loaded once, with this batch's own changes."""
+        if kind not in self._loaded:
+            rows = await self.db.execute(
+                select(Record).where(Record.business_id == self.business_id, Record.kind == kind)
+            )
+            for row in rows.scalars():
+                self.found.setdefault((kind, row.id), row)
+            self._loaded.add(kind)
+        return [rec for (k, _), rec in self.found.items() if k == kind]
+
+    async def unit_info(self, unit_id: str) -> tuple[str, bool]:
+        """(name, whole numbers only) of a unit: one of the six built-in units or the business's own."""
+        if unit_id in UNITS:
+            return unit_id, unit_id in WHOLE_UNITS
+        rec = await self.record("unit", unit_id)
+        if rec is None:
+            return unit_id, False
+        if rec.body.get("alias_of"):
+            return await self.unit_info(str(rec.body["alias_of"]))
+        return str(rec.body.get("name") or unit_id), bool(rec.body.get("whole"))
 
     # ---------- items ----------
     async def put_item(self, item_id: str, clean: dict[str, Any], existing: Record | None) -> Record:
@@ -283,7 +310,8 @@ class Batch:
         item = await self.record("item", str(raw.get("item_id") or ""))
         if item is None:
             raise AppError("not_found", "That item isn't in your inventory.", 404)
-        name, unit = item.body["name"], item.body["unit"]
+        name = item.body["name"]
+        unit, whole = await self.unit_info(item.body["unit"])
         have = float(item.body.get("qty", 0))
         if item.body.get("service"):
             raise AppError("service_item", f"{name} is a service, so it has no stock.", 409)
@@ -294,7 +322,7 @@ class Batch:
             counted = _number(raw.get("counted"))
             if counted is None:
                 raise AppError("validation_error", "Type what is on the shelf.", 422)
-            if problem := quantity_problem(unit, counted):
+            if problem := quantity_problem(unit, counted, whole):
                 raise AppError("validation_error", problem, 422)
             qty, after = r3(counted - have), r3(counted)
         else:
@@ -302,7 +330,7 @@ class Batch:
             magnitude = abs(magnitude) if magnitude is not None else None
             if magnitude is None or magnitude <= 0:
                 raise AppError("validation_error", "The quantity must be more than 0.", 422)
-            if problem := quantity_problem(unit, magnitude):
+            if problem := quantity_problem(unit, magnitude, whole):
                 raise AppError("validation_error", problem, 422)
             qty = r3(magnitude if kind in {"opening", "in", "returned"} else -magnitude)
             after = r3(have + qty)
@@ -348,7 +376,7 @@ class Batch:
             move["cost"] = _paise(raw.get("cost"))
 
         if job is not None:
-            self._job_parts(job, move, item, magnitude or 0)
+            self._job_parts(job, move, item, magnitude or 0, unit)
         item.body = {**item.body, "qty": after}
         item.seq = self.take_seq()
         item.updated_at = self.now
@@ -419,11 +447,13 @@ class Batch:
             raise AppError("validation_error", "The date can't be in the future.", 422)
         return value
 
-    def _job_parts(self, job: Record, move: dict[str, Any], item: Record, magnitude: float) -> None:
+    def _job_parts(
+        self, job: Record, move: dict[str, Any], item: Record, magnitude: float, unit: str
+    ) -> None:
         """Keep the job's list of parts (server-owned) and its history in step with the move."""
         body = deepcopy(job.body)
         parts = dict(body.get("parts_used") or {})
-        item_id, unit, name = item.id, item.body["unit"], item.body["name"]
+        item_id, name = item.id, item.body["name"]
         used_now = float(parts.get(item_id, 0))
         if move["kind"] == "returned":
             if magnitude > used_now + 1e-9:

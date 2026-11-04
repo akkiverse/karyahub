@@ -21,10 +21,13 @@ import { businesses } from './views/businesses.js';
 import { account } from './views/account.js';
 import { jobsheetImage } from './data/jobsheet.js';
 import { createSync } from './sync.js';
-import { syncChip, syncBanner } from './views/syncstatus.js';
+import { syncChip, syncBanner, storageBanner } from './views/syncstatus.js';
 import { resizeLogo } from './data/logo.js';
-import { inventory, itemPage, itemForm, inventoryImport, resultsHtml, chipsHtml, pickRows, CSV_TEMPLATE } from './views/inventory.js';
-import { qtyText, signedText, stockOf, matches as itemMatches, nameOf, parseQty, r3 } from './domain/inventory.js';
+import { inventory, itemPage, itemForm, inventoryImport, resultsHtml, chipsHtml, filtersHtml, pickRows, csvTemplate } from './views/inventory.js';
+import { fieldsScreen } from './views/fields.js';
+import { STARTER_FIELDS } from './domain/fields.js';
+import { splitCsv } from './domain/csv.js';
+import { qtyText, signedText, stockOf, matches as itemMatches, nameOf, parseQty, r3, applyUnits } from './domain/inventory.js';
 import { billsList, billEditor, billView, setupScreen as businessSetup, newMenu } from './views/bills.js';
 import { createBills } from './bills-app.js';
 
@@ -48,6 +51,7 @@ export function parseRoute(hash) {
   if (a === 'inventory') {
     if (b === 'new') return { name: 'item-form', tab: 'inventory', params: {} };
     if (b === 'import') return { name: 'inventory-import', tab: 'inventory' };
+    if (b === 'fields') return { name: 'inventory-fields', tab: 'inventory' };
     if (b === 'item' && c && d === 'edit') return { name: 'item-form', tab: 'inventory', params: { id: decodeURIComponent(c) } };
     if (b === 'item' && c) return { name: 'item', tab: 'inventory', params: { id: decodeURIComponent(c) } };
     return { name: 'inventory', tab: 'inventory' };
@@ -71,8 +75,8 @@ export function parseRoute(hash) {
   return { name: 'home', tab: 'home' };
 }
 const billNew = () => '<section class="page"><h1 id="page-title" tabindex="-1">New</h1></section>';
-const VIEWS = { bills: (p) => billsList({ ...p, kind: 'invoice' }), estimates: (p) => billsList({ ...p, kind: 'quote' }), bill: billView, 'bill-edit': billEditor, 'bill-new': billNew, home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account, inventory, item: itemPage, 'item-form': itemForm, 'inventory-import': inventoryImport };
-const TITLES = { bills: 'Bills', estimates: 'Estimates', bill: 'Bill', 'bill-edit': 'Bill', 'bill-new': 'New', setup: 'Your business', home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in', inventory: 'Inventory', item: 'Item', 'item-form': 'Item', 'inventory-import': 'Import items' };
+const VIEWS = { bills: (p) => billsList({ ...p, kind: 'invoice' }), estimates: (p) => billsList({ ...p, kind: 'quote' }), bill: billView, 'bill-edit': billEditor, 'bill-new': billNew, home, chat, jobs, job, doc: documentView, renewals, settings, admin, businesses, account, inventory, item: itemPage, 'item-form': itemForm, 'inventory-import': inventoryImport, 'inventory-fields': fieldsScreen };
+const TITLES = { bills: 'Bills', estimates: 'Estimates', bill: 'Bill', 'bill-edit': 'Bill', 'bill-new': 'New', setup: 'Your business', home: 'Home', chat: 'Chat', jobs: 'Jobs', job: 'Job', doc: 'Document', renewals: 'Renewals', settings: 'Settings', admin: 'Admin', businesses: 'Businesses', account: 'My account', signin: 'Sign in', inventory: 'Inventory', item: 'Item', 'item-form': 'Item', 'inventory-import': 'Import items', 'inventory-fields': 'Item details' };
 
 const PERMISSION_LABELS = PERMISSIONS;
 // The one + New button (AC-26.5) sits on the main screens, not where a bottom bar or form needs the corner.
@@ -130,7 +134,7 @@ export function mountApp(root, options = {}) {
   const logoImage = options.logoImage || resizeLogo;
   const ui = {
     boot: 'loading', auth: {}, authState: null, admin: {}, businesses: {}, account: {}, profile: {},
-    streaming: {}, warmedAt: 0, inv: { dismissed: {} },
+    streaming: {}, warmedAt: 0, inv: { dismissed: {} }, fields: {},
     renewalsFilter: '30', editingCard: null, cardErrors: {}, sheet: null, toast: null, playing: null, draft: '', meta: null, plans: {}, wfBusy: null, wfNote: null, openTimeline: null,
   };
   let alive = true;
@@ -157,7 +161,7 @@ export function mountApp(root, options = {}) {
     const chip = root.querySelector('[data-slot="sync-chip"]');
     const banner = root.querySelector('[data-slot="sync-banner"]');
     if (chip) chip.innerHTML = syncChip(st);
-    if (banner) banner.innerHTML = syncBanner(st);
+    if (banner) banner.innerHTML = syncBanner(st) + storageBanner(store.storage());
   }
   async function loadAuthState() {
     try { ui.authState = await api.authState(); } catch { ui.authState = { needs_setup: false, demo_accounts: [] }; }
@@ -294,7 +298,7 @@ export function mountApp(root, options = {}) {
         <div class="nav-user"><span class="avatar avatar-${me.role}" aria-hidden="true">${escapeHtml(initials(me.name))}</span><span class="nav-user-main"><strong>${escapeHtml(me.name)}</strong><span class="muted small">${escapeHtml(roleName(me.role))}</span></span><button type="button" class="icon-btn" data-action="sign-out" aria-label="Sign out" title="Sign out">${icon('logout', { size: 18 })}</button></div>
       </nav>
       <nav class="bottom-tabs" aria-label="Main (phone)">${allowed.filter((n) => n[5]).map(link).join('')}</nav>
-      <main id="main" class="main"><div data-slot="sync-banner">${syncBanner(sync.status())}</div>${html}
+      <main id="main" class="main"><div data-slot="sync-banner">${syncBanner(sync.status())}${storageBanner(store.storage())}</div>${html}
         ${NEW_ON.has(route.name) ? newMenu(me, ui.newOpen) : ''}
         <footer class="site-foot no-print"><a href="${HUB_URL}">Part of Idea Studio by AkkiVerse</a>${demo ? '<span>Sample data only. No real messages are sent.</span>' : ''}</footer>
       </main>
@@ -342,7 +346,9 @@ export function mountApp(root, options = {}) {
     if (ui.inv.focusNext) {
       const target = root.querySelector(ui.inv.focusNext);
       ui.inv.focusNext = null;
-      target?.focus({ preventScroll: true });
+      target?.focus({ preventScroll: !ui.inv.scrollNext });
+      if (ui.inv.scrollNext && target) target.scrollIntoView({ block: 'center' }); // the item details screen is long: bring the form or the answer into view
+      ui.inv.scrollNext = false;
     }
     const t2 = root.querySelector('.thread');
     if (t2) t2.scrollTop = nearBottom || name !== lastRouteName ? t2.scrollHeight : oldTop;
@@ -381,6 +387,7 @@ export function mountApp(root, options = {}) {
   const noticeKey = (r) => (r.name === 'inventory' ? 'inventory' : r.name === 'item' ? `item:${r.params.id}` : r.name === 'job' ? `job:${r.params.id}` : '');
   function leaveInventoryRoute() {
     ui.inv.sheet = null;
+    if (route.name !== 'inventory-fields') ui.fields = {};
     if (ui.inv.notice && ui.inv.notice.at !== noticeKey(route)) ui.inv.notice = null;
   }
   const onHash = () => { const r = parseRoute(win.location.hash); if (routeKey(r) === routeKey(route)) return; route = r; ui.newOpen = false; ui.toast = null; ui.sheet = null; ui.wfNote = null; leaveInventoryRoute(); render(); loadForRoute(); };
@@ -391,7 +398,9 @@ export function mountApp(root, options = {}) {
     const a = root.ownerDocument.activeElement;
     return Boolean(a && root.contains(a) && a.matches('input, textarea, select') && (a.closest('form') || a.matches('[data-inv-search], [data-pick-search]')));
   };
+  applyUnits(store.get().units);
   const unsub = store.subscribe((st, meta) => {
+    applyUnits(st.units);
     applyTheme();
     if (meta && meta.remote && typing()) { renderWhenDone = true; return; }
     render();
@@ -536,18 +545,38 @@ export function mountApp(root, options = {}) {
   function openSheet(sheet) { ui.inv.sheet = sheet; ui.inv.focusNext = '.sheet [data-autofocus]'; render(); }
   function downloadTemplate() {
     const a = root.ownerDocument.createElement('a');
-    a.href = win.URL.createObjectURL(new win.Blob([`﻿${CSV_TEMPLATE}`], { type: 'text/csv' }));
+    a.href = win.URL.createObjectURL(new win.Blob([`﻿${csvTemplate(store.get())}`], { type: 'text/csv' }));
     a.download = 'karyahub-inventory-template.csv';
     a.click();
     setTimeout(() => win.URL.revokeObjectURL(a.href), 1000);
+  }
+  // A file of more than 500 rows is sent in parts of 500 (the server takes that many at once); the answers are joined.
+  async function runCsv(text, name, check) {
+    const parts = splitCsv(text, 500);
+    const join = { rows: [], counts: { new: 0, update: 0, same: 0, problem: 0 }, adds: { units: [], lists: [] }, unknown: [], imported: { added: 0, updated: 0, skipped: 0 } };
+    let offset = 0;
+    for (const part of parts) {
+      const res = await api.inventoryImport({ text: part.text, name, check });
+      join.rows.push(...res.rows.map((r) => ({ ...r, row: r.row + offset })));
+      for (const k of Object.keys(join.counts)) join.counts[k] += res.counts[k] || 0;
+      for (const u of (res.adds && res.adds.units) || []) if (!join.adds.units.includes(u)) join.adds.units.push(u);
+      for (const l of (res.adds && res.adds.lists) || []) {
+        const at = join.adds.lists.find((x) => x.field === l.field);
+        if (at) at.values.push(...l.values.filter((v) => !at.values.includes(v))); else join.adds.lists.push({ field: l.field, values: [...l.values] });
+      }
+      for (const u of res.unknown_columns || []) if (!join.unknown.includes(u)) join.unknown.push(u);
+      if (res.imported) for (const k of Object.keys(join.imported)) join.imported[k] += res.imported[k] || 0;
+      offset += part.rows;
+    }
+    return join;
   }
   async function checkCsv(file, text) {
     ui.inv.csv = { file, text, checking: true };
     ui.inv.csvResult = '';
     render();
     try {
-      const res = await api.inventoryImport({ text, name: file, check: true });
-      ui.inv.csv = { file, text, rows: res.rows, counts: res.counts };
+      const res = await runCsv(text, file, true);
+      ui.inv.csv = { file, text, rows: res.rows, counts: res.counts, adds: res.adds, unknown: res.unknown };
     } catch (err) {
       ui.inv.csv = { file, text, error: err instanceof ApiUnreachable ? SHORT_SIGNAL : msg(err) };
     }
@@ -559,9 +588,9 @@ export function mountApp(root, options = {}) {
     ui.inv.csv = { ...c, saving: true };
     render();
     try {
-      const res = await api.inventoryImport({ text: c.text, name: c.file, check: false });
+      const res = await runCsv(c.text, c.file, false);
       const done = res.imported;
-      ui.inv.csvResult = `Imported from ${escapeHtml(c.file)}: <strong>${done.added} new</strong>, <strong>${done.updated} updated</strong>${res.counts.same ? `, ${res.counts.same} already up to date` : ''}.${done.skipped ? ` ${done.skipped} row${done.skipped === 1 ? ' was' : 's were'} skipped: fix ${done.skipped === 1 ? 'it' : 'them'} in the file and import it again.` : ''} <a href="#/inventory">See the inventory</a>`;
+      ui.inv.csvResult = `Imported from ${escapeHtml(c.file)}: <strong>${done.added} new</strong>, <strong>${done.updated} updated</strong>${res.counts.same ? `, ${res.counts.same} already up to date` : ''}.${done.skipped ? ` ${done.skipped} ${done.skipped === 1 ? 'row was' : 'rows were'} skipped: fix ${done.skipped === 1 ? 'it' : 'them'} in the file and import again.` : ''}`;
       ui.inv.csv = null;
       sync.flush(); // bring the new items to this phone now
     } catch (err) {
@@ -604,10 +633,68 @@ export function mountApp(root, options = {}) {
       render();
       return;
     }
+    // ----- the business's own item details (CR-0013)
+    if (a.startsWith('inv-field') || a.startsWith('inv-entry') || a.startsWith('inv-unit')) { onFieldAction(a, el); return; }
     if (a === 'inv-template') { downloadTemplate(); return; }
     if (a === 'inv-do-import') { await importCsv(); return; }
     if (a === 'inv-clear-csv') { ui.inv.csv = null; ui.inv.csvResult = ''; render(); return; }
     if (a === 'inv-check-again' && ui.inv.csv) await checkCsv(ui.inv.csv.file, ui.inv.csv.text);
+  }
+  // The item details screen: a notice after each change, an error stays on its form.
+  function fieldsNote(text, error = false) { ui.fields = { notice: { text, error } }; ui.inv.focusNext = '[data-testid="fields-notice"]'; ui.inv.scrollNext = true; }
+  function onFieldAction(a, el) {
+    const fa = actions.fields;
+    const me = meOf();
+    if (a === 'inv-field-edit') ui.fields = { editing: el.dataset.id };
+    else if (a === 'inv-field-cancel' || a === 'inv-entry-cancel') ui.fields = {};
+    else if (a === 'inv-field-stop') {
+      const r = fa.setFieldStopped(el.dataset.id, el.dataset.stopped === 'true');
+      const f = store.get().item_fields.find((x) => x.id === el.dataset.id);
+      fieldsNote(r.error || (f.stopped ? `${f.name} is stopped. Its values stay on the items, and you can use it again.` : `${f.name} is in use again.`), Boolean(r.error));
+    } else if (a === 'inv-field-starters') {
+      const kind = (me && me.business && me.business.business_type) || '';
+      const r = fa.addStarters(STARTER_FIELDS[kind] || STARTER_FIELDS.other);
+      fieldsNote(r.error || `Added ${r.added} ${r.added === 1 ? 'detail' : 'details'}. Add the entries of each list below, or type them on an item.`, Boolean(r.error));
+    } else if (a === 'inv-entry-rename') ui.fields = { renaming: el.dataset.id };
+    else if (a === 'inv-entry-stop') {
+      const r = fa.setEntryStopped(el.dataset.id, el.dataset.stopped === 'true');
+      fieldsNote(r.error || 'Saved.', Boolean(r.error));
+    } else if (a === 'inv-unit-change') ui.fields = { renamingUnit: el.dataset.id };
+    else if (a === 'inv-unit-stop') {
+      const r = fa.setUnitStopped(el.dataset.id, el.dataset.stopped === 'true');
+      fieldsNote(r.error || 'Saved.', Boolean(r.error));
+    }
+    const goTo = { 'inv-field-edit': '[data-form="inv-field"] input[name="name"]', 'inv-entry-rename': '[data-autofocus]', 'inv-unit-change': '[data-autofocus]' };
+    if (goTo[a]) { ui.inv.focusNext = goTo[a]; ui.inv.scrollNext = true; }
+    render();
+  }
+  function submitFields(form) {
+    const kind = form.dataset.form;
+    const v = Object.fromEntries(new FormData(form).entries());
+    const fa = actions.fields;
+    if (kind === 'inv-field') {
+      const id = form.dataset.field || null;
+      const r = fa.saveField(v, id);
+      if (r.errors) { ui.fields = { editing: id, values: v, errors: r.errors }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
+      fieldsNote(id ? 'Saved.' : `Added ${String(v.name).trim()}. ${v.type === 'list' ? 'Add its entries below, or type them on an item.' : 'It is on the item form now.'}`);
+    } else if (kind === 'inv-entry') {
+      const r = fa.addEntry(form.dataset.field, v.name);
+      if (r.error) { ui.fields = { addTo: form.dataset.field, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
+      fieldsNote(`Added ${String(v.name).trim()}.`);
+    } else if (kind === 'inv-entry-rename') {
+      const r = fa.renameEntry(form.dataset.id, v.name);
+      if (r.error) { ui.fields = { renaming: form.dataset.id, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
+      fieldsNote('Renamed. Every item that points to it shows the new name.');
+    } else if (kind === 'inv-unit') {
+      const r = fa.addUnit(v.name, v.whole === 'on');
+      if (r.error) { ui.fields = { addUnit: true, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
+      fieldsNote(`Added the unit ${String(v.name).trim()}.`);
+    } else if (kind === 'inv-unit-change') {
+      const r = fa.changeUnit(form.dataset.id, v.name, v.whole === 'on');
+      if (r.error) { ui.fields = { renamingUnit: form.dataset.id, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
+      fieldsNote('Saved.');
+    }
+    render();
   }
   function submitInventory(form) {
     const kind = form.dataset.form;
@@ -626,7 +713,7 @@ export function mountApp(root, options = {}) {
       ui.inv.prefill = '';
       const name = String(v.name).trim();
       if (id) { invNotice(`item:${id}`, `Saved ${name}.`); navigate(`#/inventory/item/${encodeURIComponent(id)}`); }
-      else { invNotice('inventory', `Added ${name}${res.opening ? ` with ${qtyText(res.opening, v.unit)} in stock` : ''}.`); navigate('#/inventory'); }
+      else { invNotice('inventory', `Added ${name}${res.opening ? ` with ${qtyText(res.opening, res.unit)} in stock` : ''}.`); navigate('#/inventory'); }
       return;
     }
     const sh = ui.inv.sheet;
@@ -824,6 +911,7 @@ export function mountApp(root, options = {}) {
       return;
     }
     if (kind === 'inv-sheet' || kind === 'inv-item') { submitInventory(form); return; }
+    if (['inv-field', 'inv-entry', 'inv-entry-rename', 'inv-unit', 'inv-unit-change'].includes(kind)) { submitFields(form); return; }
     if (kind === 'send-text') {
       const text = form.elements.text.value.trim();
       if (!text) return;
@@ -846,6 +934,8 @@ export function mountApp(root, options = {}) {
     const a = el.dataset.action;
     if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0]); return; }
     if (bills.onChange(e)) return;
+    if (el.matches('[data-inv-filter]')) { ui.inv.f = { ...(ui.inv.f || {}), [el.dataset.invFilter]: el.value }; paintInv(); return; }
+    if (el.matches('[data-unit-select]')) { const box = root.querySelector('[data-slot="new-unit"]'); if (box) box.hidden = el.value !== '__new__'; if (el.value === '__new__') root.querySelector('input[name="new_unit"]')?.focus(); return; }
     if (a === 'edit-line') actions.updateDocumentLine(el.dataset.doc, Number(el.dataset.index), { [el.dataset.key]: el.value === '' ? NaN : Number(el.value) });
     else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
     else if (a === 'set-theme') actions.setSetting('theme', el.value);

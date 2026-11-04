@@ -42,7 +42,7 @@ export const roleShort = (role) => (role === PLATFORM_ROLE.id ? PLATFORM_ROLE.sh
 export const ROUTE_PERMISSION = {
   home: 'view_dashboard', chat: 'use_chat', jobs: 'view_jobs', job: 'view_jobs', doc: 'create_documents',
   renewals: 'manage_renewals', settings: 'manage_settings', admin: 'manage_team', businesses: 'manage_businesses',
-  inventory: 'view_inventory', item: 'view_inventory', 'item-form': 'manage_inventory', 'inventory-import': 'manage_inventory',
+  inventory: 'view_inventory', item: 'view_inventory', 'item-form': 'manage_inventory', 'inventory-import': 'manage_inventory', 'inventory-fields': 'view_inventory',
   bills: 'create_documents', estimates: 'create_documents', bill: 'create_documents', 'bill-edit': 'create_documents', 'bill-new': 'create_documents',
 };
 export const canOpen = (me, routeName) => !ROUTE_PERMISSION[routeName] || can(me, ROUTE_PERMISSION[routeName]);

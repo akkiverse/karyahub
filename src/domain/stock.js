@@ -51,10 +51,20 @@ export function createStockActions({ store, currentUser = () => null }) {
   function saveItem(values, id = null) {
     const no = denied('manage_inventory');
     if (no) return no;
-    const { errors, item, opening } = validateItem(values, store.get(), id);
+    const { errors, item, opening, pending = [], newUnit = null } = validateItem(values, store.get(), id);
     if (Object.keys(errors).length) return { errors };
     let savedId = id;
     store.update((s) => {
+      // A unit or a list entry typed on the form is made first, so the item can point to it (CR-0013).
+      if (newUnit) {
+        item.unit = `un-${uid()}`;
+        s.units = [...(s.units || []), { id: item.unit, name: newUnit.name, whole: newUnit.whole, stopped: false }];
+      }
+      for (const p of pending) {
+        const entryId = `le-${uid()}`;
+        s.list_entries = [...(s.list_entries || []), { id: entryId, field_id: p.field_id, name: p.name, stopped: false }];
+        item.attrs[p.field_id] = entryId;
+      }
       if (id) {
         Object.assign(s.items.find((i) => i.id === id), item);
         return;
@@ -63,7 +73,7 @@ export function createStockActions({ store, currentUser = () => null }) {
       s.items.push({ id: savedId, qty: 0, stopped: false, ...item });
       if (opening > 0) pushMove(s, { item_id: savedId, kind: 'opening', qty: opening });
     });
-    return { id: savedId, opening };
+    return { id: savedId, opening, unit: store.get().items.find((i) => i.id === savedId).unit };
   }
 
   function setStopped(id, stopped) {

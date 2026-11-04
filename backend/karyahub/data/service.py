@@ -17,12 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from karyahub import access
 from karyahub.accounts import service as accounts
-from karyahub.data import bills, inventory, rls
+from karyahub.data import bills, inventory, item_fields, rls
 from karyahub.db.models import Business, Counter, DeviceImport, Record, SyncOp
 from karyahub.domain.workflow import STATES
 from karyahub.errors import AppError
 
-KINDS = ("customer", "job", "document", "message", "item", "stock_move")
+KINDS = ("customer", "job", "document", "message", "item", "stock_move", *item_fields.KINDS)
 # What a phone can move from its old on-device data (inventory is new, so there is nothing to move).
 IMPORT_KINDS = ("customer", "job", "document", "message")
 # What a person needs (any one of these) to read, or to save, each kind of record. The owner decides.
@@ -34,6 +34,10 @@ READ_PERMISSIONS: dict[str, frozenset[str]] = {
     # Inventory (CR-0011): whoever may take parts needs the items; the history is for those who see inventory.
     "item": frozenset({"view_inventory", "use_parts", "manage_inventory"}),
     "stock_move": frozenset({"view_inventory", "manage_inventory"}),
+    # The business's own item details (CR-0013): everyone who sees items needs them.
+    "item_field": frozenset({"view_inventory", "use_parts", "manage_inventory", "manage_settings"}),
+    "list_entry": frozenset({"view_inventory", "use_parts", "manage_inventory", "manage_settings"}),
+    "unit": frozenset({"view_inventory", "use_parts", "manage_inventory", "manage_settings"}),
 }
 WRITE_PERMISSIONS: dict[str, frozenset[str]] = {
     "customer": frozenset({"use_chat", "manage_renewals", "create_documents"}),
@@ -44,6 +48,11 @@ WRITE_PERMISSIONS: dict[str, frozenset[str]] = {
     "stock_move": frozenset(
         {"manage_inventory", "use_parts"}
     ),  # which move needs which one is checked per move
+    "item_field": frozenset({"manage_settings"}),  # what an item carries is the owner's decision
+    "list_entry": frozenset(
+        {"manage_inventory", "manage_settings"}
+    ),  # staff can add a brand while adding an item
+    "unit": frozenset({"manage_inventory", "manage_settings"}),
 }
 ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 MAX_OPS = 100
@@ -153,6 +162,8 @@ def _clean_body(kind: str, item_id: str, body: Any) -> dict[str, Any]:
         raise AppError("validation_error", "That item is too large to save.", 422)
     if kind == "item":
         return inventory.clean_item(item_id, body)
+    if kind in item_fields.KINDS:
+        return item_fields.clean(kind, item_id, body)
     clean = deepcopy(body)
     clean["id"] = item_id
     if kind == "customer" and not str(clean.get("name", "")).strip():
@@ -326,7 +337,14 @@ async def sync(
                     )  # size and shape; the move itself is checked below
                     rec = await batch.apply_move(item_id, op.get("body"), current)
                 elif kind == "item":
-                    rec = await batch.put_item(item_id, _clean_body(kind, item_id, op.get("body")), current)
+                    clean = await item_fields.check_item(
+                        batch, _clean_body(kind, item_id, op.get("body")), current
+                    )
+                    rec = await batch.put_item(item_id, clean, current)
+                elif kind in item_fields.KINDS:
+                    rec = await item_fields.put(
+                        batch, kind, item_id, _clean_body(kind, item_id, op.get("body")), current
+                    )
                 elif kind == "document" and (
                     bills.is_v2(op.get("body")) or (current is not None and bills.is_v2(current.body))
                 ):

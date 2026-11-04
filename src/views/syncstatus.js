@@ -37,3 +37,12 @@ export function syncBanner(st) {
   }
   return parts.join('');
 }
+
+/** The phone is nearly out of room for this business's data (CR-0013). Said once, plainly, before a save is refused. */
+export function storageBanner(st) {
+  if (!st || !st.warn) return '';
+  const text = st.refused
+    ? "This phone has no room left, so your latest changes are not being kept on it. Free some space on the phone (photos, videos, other apps), then open KaryaHub again. Changes already sent to the server are safe."
+    : 'This phone is nearly full for KaryaHub. Free some space on the phone soon, so new items and bills keep saving. Everything already sent to the server is safe.';
+  return `<p class="notice notice-error" role="alert" data-testid="storage-warning">${escapeHtml(text)}</p>`;
+}

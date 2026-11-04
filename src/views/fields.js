@@ -13,7 +13,7 @@ const FLAGS = [['required', 'Needed on every item'], ['in_list', 'Show in the it
 
 function noticeHtml(ui) {
   const n = ui.fields && ui.fields.notice;
-  return n ? `<p class="notice ${n.error ? 'notice-error' : ''}" role="${n.error ? 'alert' : 'status'}" data-testid="fields-notice">${icon(n.error ? 'alert' : 'check', { size: 18 })}<span>${e(n.text)}</span></p>` : '';
+  return n ? `<p class="notice ${n.error ? 'notice-error' : ''}" role="${n.error ? 'alert' : 'status'}" tabindex="-1" data-testid="fields-notice">${icon(n.error ? 'alert' : 'check', { size: 18 })}<span>${e(n.text)}</span></p>` : '';
 }
 
 function fieldForm(state, ui, allow) {

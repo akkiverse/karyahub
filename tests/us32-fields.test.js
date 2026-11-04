@@ -89,6 +89,19 @@ describe('US-32 Your own item details: fields', () => {
     expect(store(t).item_fields[0].stopped).toBe(false);
   });
 
+  it('AC-32.1: pressing Change brings the form for that detail into view and puts the cursor in its name box', () => {
+    t = demo();
+    const brand = addField(t, 'Brand');
+    const scrolled = [];
+    window.HTMLElement.prototype.scrollIntoView = function scroll() { scrolled.push(this); };
+    t.click(`[data-action="inv-field-edit"][data-id="${brand.id}"]`);
+    const name = t.$('[data-form="inv-field"] input[name="name"]');
+    expect(name.value).toBe('Brand');
+    expect(document.activeElement).toBe(name);
+    expect(scrolled).toContain(name);
+    expect(t.$('[data-form="inv-field"] h3').textContent).toBe('Change Brand');
+  });
+
   it('AC-32.2: text and number swap only when every value fits; a pick-list is locked', () => {
     t = demo();
     const size = addField(t, 'Size', 'text');

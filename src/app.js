@@ -346,7 +346,9 @@ export function mountApp(root, options = {}) {
     if (ui.inv.focusNext) {
       const target = root.querySelector(ui.inv.focusNext);
       ui.inv.focusNext = null;
-      target?.focus({ preventScroll: true });
+      target?.focus({ preventScroll: !ui.inv.scrollNext });
+      if (ui.inv.scrollNext && target) target.scrollIntoView({ block: 'center' }); // the item details screen is long: bring the form or the answer into view
+      ui.inv.scrollNext = false;
     }
     const t2 = root.querySelector('.thread');
     if (t2) t2.scrollTop = nearBottom || name !== lastRouteName ? t2.scrollHeight : oldTop;
@@ -639,7 +641,7 @@ export function mountApp(root, options = {}) {
     if (a === 'inv-check-again' && ui.inv.csv) await checkCsv(ui.inv.csv.file, ui.inv.csv.text);
   }
   // The item details screen: a notice after each change, an error stays on its form.
-  function fieldsNote(text, error = false) { ui.fields = { notice: { text, error } }; }
+  function fieldsNote(text, error = false) { ui.fields = { notice: { text, error } }; ui.inv.focusNext = '[data-testid="fields-notice"]'; ui.inv.scrollNext = true; }
   function onFieldAction(a, el) {
     const fa = actions.fields;
     const me = meOf();
@@ -662,7 +664,8 @@ export function mountApp(root, options = {}) {
       const r = fa.setUnitStopped(el.dataset.id, el.dataset.stopped === 'true');
       fieldsNote(r.error || 'Saved.', Boolean(r.error));
     }
-    ui.inv.focusNext = '[data-autofocus]';
+    const goTo = { 'inv-field-edit': '[data-form="inv-field"] input[name="name"]', 'inv-entry-rename': '[data-autofocus]', 'inv-unit-change': '[data-autofocus]' };
+    if (goTo[a]) { ui.inv.focusNext = goTo[a]; ui.inv.scrollNext = true; }
     render();
   }
   function submitFields(form) {
@@ -672,23 +675,23 @@ export function mountApp(root, options = {}) {
     if (kind === 'inv-field') {
       const id = form.dataset.field || null;
       const r = fa.saveField(v, id);
-      if (r.errors) { ui.fields = { editing: id, values: v, errors: r.errors }; ui.inv.focusNext = '[aria-invalid="true"]'; render(); return; }
+      if (r.errors) { ui.fields = { editing: id, values: v, errors: r.errors }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
       fieldsNote(id ? 'Saved.' : `Added ${String(v.name).trim()}. ${v.type === 'list' ? 'Add its entries below, or type them on an item.' : 'It is on the item form now.'}`);
     } else if (kind === 'inv-entry') {
       const r = fa.addEntry(form.dataset.field, v.name);
-      if (r.error) { ui.fields = { addTo: form.dataset.field, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; render(); return; }
+      if (r.error) { ui.fields = { addTo: form.dataset.field, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
       fieldsNote(`Added ${String(v.name).trim()}.`);
     } else if (kind === 'inv-entry-rename') {
       const r = fa.renameEntry(form.dataset.id, v.name);
-      if (r.error) { ui.fields = { renaming: form.dataset.id, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; render(); return; }
+      if (r.error) { ui.fields = { renaming: form.dataset.id, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
       fieldsNote('Renamed. Every item that points to it shows the new name.');
     } else if (kind === 'inv-unit') {
       const r = fa.addUnit(v.name, v.whole === 'on');
-      if (r.error) { ui.fields = { addUnit: true, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; render(); return; }
+      if (r.error) { ui.fields = { addUnit: true, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
       fieldsNote(`Added the unit ${String(v.name).trim()}.`);
     } else if (kind === 'inv-unit-change') {
       const r = fa.changeUnit(form.dataset.id, v.name, v.whole === 'on');
-      if (r.error) { ui.fields = { renamingUnit: form.dataset.id, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; render(); return; }
+      if (r.error) { ui.fields = { renamingUnit: form.dataset.id, values: v, errors: { name: r.error } }; ui.inv.focusNext = '[aria-invalid="true"]'; ui.inv.scrollNext = true; render(); return; }
       fieldsNote('Saved.');
     }
     render();

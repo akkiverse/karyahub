@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 - **Your logo, beside the signature, with its place on the bill.** In Settings → Bill look the owner adds the logo and chooses where it goes: top left, top centre or top right. The preview, the bill page, the link and the PDF follow the choice; the small receipt always centres it and its PDF now shows the logo. Businesses that never chose keep it top left. See [CR-0019](docs/changes/CR-0019-setup-logo-and-state.md).
+- **Transparent, sharp logo and signature of a normal size.** Pictures of up to 10 MB (PNG, JPEG or WebP) can be chosen; the browser scales them to 800 px and keeps see-through backgrounds see-through, the server keeps up to 1 MB each (was 200 KB for the logo and 300 KB for the signature), and the PDF prints them at 300 dpi. A WebP logo now appears in the PDF, and a wide signature stays inside the page.
 - **Add a business asks for the state by name.** The platform admin picks a state from a list and KaryaHub sets the GST state code itself.
 
 ### Changed

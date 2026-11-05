@@ -11,6 +11,8 @@ from karyahub.data import rls, service
 
 PNG = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64).decode()
 PNG_URL = f"data:image/png;base64,{PNG}"
+# a real 1 x 1 picture: since CR-0019 the server decodes what it is given
+REAL_PNG_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 TECH = {
     "name": "Ravi Kale",
     "phone": "9822200002",
@@ -458,13 +460,13 @@ def test_ac_23_12_the_demo_business_never_syncs(client):
 
 
 def test_ac_23_11_the_owner_adds_a_logo_and_only_that_business_can_see_it(two_firms, make_client):
-    """AC-23.11: PNG, JPEG or WebP up to 200 KB; served to the business's people only; each change is logged."""
+    """AC-23.11: PNG, JPEG or WebP up to 1 MB; served to the business's people only; each change is logged."""
     a, b = two_firms
     owner = a["owner"]
     me = owner.get("/api/v1/auth/me").json()
     assert me["business"]["logo_version"] == ""
     assert owner.get("/api/v1/business/logo").status_code == 404
-    r = owner.put("/api/v1/business/logo", json={"data_url": PNG_URL})
+    r = owner.put("/api/v1/business/logo", json={"data_url": REAL_PNG_URL})
     assert r.status_code == 200 and len(r.json()["logo_version"]) == 12
     got = owner.get("/api/v1/business/logo")
     assert got.status_code == 200 and got.headers["content-type"] == "image/png"

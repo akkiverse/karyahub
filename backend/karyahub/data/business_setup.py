@@ -51,8 +51,8 @@ IFSC_RE = re.compile(r"^[A-Z]{4}0[A-Z0-9]{6}$")
 ACCOUNT_RE = re.compile(r"^\d{9,18}$")
 UPI_RE = re.compile(r"^[A-Za-z0-9._-]{2,64}@[A-Za-z]{2,64}$")
 PHONE_RE = re.compile(r"^[0-9 +()-]{0,20}$")
-MAX_SIGNATURE = 300 * 1024
-BAD_SIGNATURE = "Use a PNG or JPEG picture of up to 300 KB for the signature."
+MAX_SIGNATURE = 1024 * 1024  # as stored (CR-0019, US-52); the browser scales a bigger picture down first
+BAD_SIGNATURE = "Use a PNG, JPEG or WebP picture of up to 1 MB for the signature."
 
 
 def look_of(b: Business) -> dict[str, Any]:
@@ -196,9 +196,7 @@ async def put_look(db: AsyncSession, p: accounts.Principal, raw: dict[str, Any])
 async def set_signature(db: AsyncSession, p: accounts.Principal, data_url: str) -> dict[str, Any]:
     business = accounts._require_business(p)
     accounts.assert_editable(business)
-    logo.decode_image(
-        data_url, max_bytes=MAX_SIGNATURE, mimes=("image/png", "image/jpeg"), message=BAD_SIGNATURE
-    )
+    logo.decode_image(data_url, max_bytes=MAX_SIGNATURE, message=BAD_SIGNATURE)
     business.signature_data = data_url.strip()
     business.signature_version = hashlib.sha256(data_url.encode()).hexdigest()[:12]
     await accounts.audit(db, business.id, p.user.name, "bill_look", "Changed the signature on bills")
@@ -220,9 +218,17 @@ async def signature_bytes(db: AsyncSession, business_id: str) -> tuple[str, byte
     data_url = (await db.execute(select(Business.signature_data).where(Business.id == business_id))).scalar()
     if not data_url:
         return None
-    return logo.decode_image(data_url, max_bytes=MAX_SIGNATURE, mimes=("image/png", "image/jpeg"))
+    try:
+        return logo.decode_image(data_url, max_bytes=MAX_SIGNATURE, message=BAD_SIGNATURE)
+    except AppError:  # a damaged picture is left out; it must never stop a bill from being made
+        return None
 
 
 async def logo_bytes(db: AsyncSession, business_id: str) -> tuple[str, bytes] | None:
     data_url = (await db.execute(select(Business.logo_data).where(Business.id == business_id))).scalar()
-    return logo.decode_image(data_url) if data_url else None
+    if not data_url:
+        return None
+    try:
+        return logo.decode_image(data_url)
+    except AppError:  # as above
+        return None

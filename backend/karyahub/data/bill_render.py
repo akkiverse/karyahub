@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fpdf import FPDF
-from PIL import Image
+from PIL import Image, ImageOps
 
 from karyahub.data import bills
 from karyahub.domain import tax
@@ -192,6 +192,8 @@ def page_html(
         return escape(text, quote=False).replace('"', "&quot;")
 
     s, c = m["seller"], m["customer"]
+    logo = prepare_image(logo, 480, 168)  # drawn at most 160 by 56 px, so three times that is plenty
+    signature = prepare_image(signature, 480, 180)
     logo_img = f'<img class="logo" alt="" src="{_data_url(logo)}">' if logo else ""
     logo_at = m["logo_position"]
     logo_html = logo_img if logo_at == "left" else ""  # left: above the name, as it always was
@@ -294,6 +296,48 @@ class _Pdf(FPDF):
         self.c_margin = 1
 
 
+PRINT_DPI = (
+    300  # a picture is printed at this resolution for the size it is drawn at, no more (CR-0019, US-52)
+)
+PDF_PICTURE_BYTES = 150 * 1024  # above this a picture is simplified, so the whole PDF stays small
+
+
+def prepare_image(image: tuple[str, bytes] | None, max_w_px: int, max_h_px: int) -> tuple[str, bytes] | None:
+    """The picture ready to print or show: PNG or JPEG, at most ``max_w_px`` by ``max_h_px`` (never scaled up).
+
+    A transparent picture stays transparent (PNG); WebP and anything else Pillow reads becomes PNG or JPEG, which
+    the PDF library can embed; a photo's rotation is applied. None when the picture can't be read.
+    """
+    if not image:
+        return None
+    try:
+        with Image.open(io.BytesIO(image[1])) as source:
+            picture = ImageOps.exif_transpose(source)
+            alpha = picture.mode in ("RGBA", "LA", "PA") or "transparency" in picture.info
+            picture = picture.convert("RGBA" if alpha else "RGB")
+        scale = min(1.0, max_w_px / picture.width, max_h_px / picture.height)
+        if scale < 1.0:
+            picture = picture.resize(
+                (max(1, round(picture.width * scale)), max(1, round(picture.height * scale))), Image.LANCZOS
+            )
+        out = io.BytesIO()
+        picture.save(out, "PNG", optimize=True)
+        if len(out.getvalue()) > PDF_PICTURE_BYTES:
+            out = io.BytesIO()
+            if alpha:  # keep the transparency, with fewer colours
+                picture.quantize(256, method=Image.Quantize.FASTOCTREE).save(out, "PNG", optimize=True)
+            else:
+                picture.save(out, "JPEG", quality=90, optimize=True)
+                return "image/jpeg", out.getvalue()
+        return "image/png", out.getvalue()
+    except Exception:
+        return None
+
+
+def _mm_px(mm: float) -> int:
+    return round(mm / 25.4 * PRINT_DPI)
+
+
 def _image(pdf: FPDF, image: tuple[str, bytes] | None, x: float, y: float, h: float, w: float = 0) -> None:
     if image:
         try:
@@ -344,6 +388,8 @@ def _cancelled_stamp(pdf: FPDF, w: float, h: float) -> None:
 def pdf_bytes(
     m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple[str, bytes] | None
 ) -> bytes:
+    logo = prepare_image(logo, _mm_px(45), _mm_px(14))
+    signature = prepare_image(signature, _mm_px(40), _mm_px(14))
     if m["layout"] == "receipt_80":
         return _receipt(m, logo, signature)
     pdf = _Pdf(format="A4")
@@ -488,9 +534,10 @@ def pdf_bytes(
         pdf.cell(90, 5, "Terms", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Noto", size=9)
         pdf.multi_cell(100, 4.5, m["terms"], new_x="LMARGIN", new_y="NEXT")
-    if signature:
-        _image(pdf, signature, 160, y, 14)
-    pdf.set_xy(120, y + 16)
+    sign_box = logo_size(signature, 14, 40)
+    if sign_box:
+        _image(pdf, signature, 198 - sign_box[0], y, sign_box[1], sign_box[0])
+    pdf.set_xy(120, y + (sign_box[1] + 2 if sign_box else 16))
     pdf.cell(78, 5, f"For {s['name']}", align="R", new_x="LEFT", new_y="NEXT")
     pdf.set_x(120)
     pdf.cell(78, 5, "Authorised signatory", align="R")
@@ -567,9 +614,10 @@ def _receipt(m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple
     line(m["in_words"], size=7)
     line(f"UPI {m['upi_id']}" if m["upi_id"] else "")
     line(m["terms"], size=7)
-    if signature:
-        _image(pdf, signature, 28, pdf.get_y() + 1, 10)
-        pdf.ln(12)
+    sign_box = logo_size(signature, 10, 30)
+    if sign_box:
+        _image(pdf, signature, (80 - sign_box[0]) / 2, pdf.get_y() + 1, sign_box[1], sign_box[0])
+        pdf.ln(sign_box[1] + 2)
     line("Authorised signatory", size=7)
     if m["cancelled"]:
         _cancelled_stamp(pdf, 80, height)

@@ -165,3 +165,112 @@ describe('US-51 Pick the state by name when adding a business (CR-0019)', () => 
     expect(t.$('form[data-form="add-business"] select[name="state"]').value).toBe('Goa');
   });
 });
+
+// ---------- US-52 ----------
+import { preparePicture, fitSize, MAX_SIDE, MAX_BYTES, PNG_PREFERRED_BYTES } from '../src/data/logo.js';
+
+/** A stand-in for the browser's canvas: its pixels and the size of each encoding are set by the test. */
+function fakeCanvases({ alpha = false, png = () => 1000, jpeg = () => 1000 } = {}) {
+  const made = [];
+  const canvasOf = (width, height) => {
+    const canvas = {
+      width, height, calls: [],
+      getContext: () => ({
+        drawImage: () => {},
+        getImageData: () => ({ data: new Uint8ClampedArray(alpha ? [10, 20, 30, 0, 10, 20, 30, 255] : [10, 20, 30, 255, 10, 20, 30, 255]) }),
+      }),
+      toDataURL(type, quality) {
+        canvas.calls.push([type, quality]);
+        const size = type === 'image/png' ? png(width) : jpeg(width, quality);
+        return `data:${type};base64,${'A'.repeat(Math.ceil(size / 0.75))}`;
+      },
+    };
+    made.push(canvas);
+    return canvas;
+  };
+  return { canvasOf, made };
+}
+const picture = (width, height, bytes = 1000) => ({ file: { size: bytes, type: 'image/png' }, decode: async () => ({ width, height }) });
+
+describe('US-52 A transparent, sharp logo and signature of a normal file size (CR-0019)', () => {
+  it('AC-52.2: a big picture is scaled to at most 800 px on its longest side, a small one is never scaled up', async () => {
+    expect(fitSize(4000, 3000)).toEqual({ width: 800, height: 600 });
+    expect(fitSize(300, 100)).toEqual({ width: 300, height: 100 });
+    const big = fakeCanvases();
+    const a = picture(4000, 3000, 6 * 1024 * 1024);
+    await preparePicture(a.file, { decode: a.decode, canvasOf: big.canvasOf });
+    expect([big.made[0].width, big.made[0].height]).toEqual([MAX_SIDE, 600]);
+    const small = fakeCanvases();
+    const b = picture(300, 100);
+    await preparePicture(b.file, { decode: b.decode, canvasOf: small.canvasOf });
+    expect([small.made[0].width, small.made[0].height]).toEqual([300, 100]);
+  });
+
+  it('AC-52.1: a see-through picture stays a PNG; if it is too big it is made smaller, never turned into a JPEG', async () => {
+    const c = fakeCanvases({ alpha: true, png: (width) => (width > 500 ? MAX_BYTES + 1 : 200 * 1024) });
+    const p = picture(2000, 1000, 8 * 1024 * 1024);
+    const url = await preparePicture(p.file, { decode: p.decode, canvasOf: c.canvasOf });
+    expect(url.startsWith('data:image/png;')).toBe(true);
+    expect(c.made.length).toBeGreaterThan(1); // it tried again, smaller
+    expect(c.made.at(-1).width).toBeLessThanOrEqual(500);
+    expect(c.made.flatMap((x) => x.calls).some(([type]) => type === 'image/jpeg')).toBe(false);
+  });
+
+  it('AC-52.1: a solid picture is a PNG while that is small, and a high-quality JPEG when it is not', async () => {
+    const small = fakeCanvases({ png: () => PNG_PREFERRED_BYTES - 1 });
+    const p = picture(1000, 500);
+    expect((await preparePicture(p.file, { decode: p.decode, canvasOf: small.canvasOf })).startsWith('data:image/png;')).toBe(true);
+    const photo = fakeCanvases({ png: () => 3 * 1024 * 1024, jpeg: (w, q) => (q === 0.92 ? 400 * 1024 : 200 * 1024) });
+    const url = await preparePicture(p.file, { decode: p.decode, canvasOf: photo.canvasOf });
+    expect(url.startsWith('data:image/jpeg;')).toBe(true);
+    expect(photo.made[0].calls).toContainEqual(['image/jpeg', 0.92]);
+  });
+
+  it('AC-52.2: up to 10 MB is accepted; more, or a file that is not a picture, gets a plain message', async () => {
+    const decode = vi.fn(async () => ({ width: 100, height: 100 }));
+    await expect(preparePicture({ size: 11 * 1024 * 1024 }, { decode })).rejects.toThrow('bigger than 10 MB');
+    expect(decode).not.toHaveBeenCalled();
+    await expect(preparePicture({ size: 1000 }, { decode: async () => { throw new Error('nope'); } })).rejects.toThrow('PNG, JPEG or WebP');
+    const ok = fakeCanvases();
+    await expect(preparePicture({ size: 10 * 1024 * 1024 }, { decode, canvasOf: ok.canvasOf })).resolves.toMatch(/^data:image\/png;/);
+  });
+
+  it('AC-52.2: a signature over the old 300 KB limit is accepted, converted like the logo, and keeps what was typed', async () => {
+    const api = fakeApi();
+    const converted = vi.fn(async () => 'data:image/png;base64,iVBORw0KGgo=');
+    api.saveSignature = vi.fn(async () => ({ ...REAL_BUSINESS, signature_version: 'sig123def456', bill_look: {} }));
+    t = open({ api, logoImage: converted });
+    const prefix = t.$('input[name="prefix"]');
+    prefix.value = 'XY';
+    prefix.dispatchEvent(new Event('input', { bubbles: true }));
+    const input = t.$('input[data-action="pick-signature"]');
+    expect(input.getAttribute('accept')).toContain('image/webp');
+    Object.defineProperty(input, 'files', { value: [new File([new Uint8Array(2 * 1024 * 1024)], 'sign.png', { type: 'image/png' })] }); // 2 MB
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => t.$('[data-testid="look-notice"]')?.textContent.includes('signature now shows'));
+    expect(converted).toHaveBeenCalled();
+    expect(api.saveSignature).toHaveBeenCalledWith('data:image/png;base64,iVBORw0KGgo=');
+    expect(t.$('input[name="prefix"]').value).toBe('XY');
+  });
+
+  it('AC-52.2: a picture the browser cannot use is explained and nothing is saved', async () => {
+    const api = fakeApi();
+    api.saveSignature = vi.fn();
+    t = open({ api, logoImage: vi.fn(async () => { throw new Error('That picture is bigger than 10 MB. Choose a smaller one.'); }) });
+    const input = t.$('input[data-action="pick-signature"]');
+    Object.defineProperty(input, 'files', { value: [new File(['x'], 'huge.png', { type: 'image/png' })] });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => t.$('[data-testid="look-notice"]'));
+    expect(t.$('[data-testid="look-notice"]').textContent).toContain('bigger than 10 MB');
+    expect(api.saveSignature).not.toHaveBeenCalled();
+  });
+
+  it('AC-52.1: the logo and signature controls say that a see-through PNG up to 10 MB is welcome', () => {
+    t = open({ business: withLogo() });
+    for (const id of ['logo-picture-hint', 'signature-picture-hint']) {
+      const text = t.$(`[data-testid="${id}"]`).textContent;
+      expect(text).toContain('see-through');
+      expect(text).toContain('10 MB');
+    }
+  });
+});

@@ -245,13 +245,19 @@ export function fakeSync({ deny = [], readable = KINDS, business = 'b-shree' } =
     },
     saveLogo: async (dataUrl) => {
       if (network.offline) throw new ApiUnreachable();
-      if (!/^data:image\/(png|jpeg|webp);base64,/.test(dataUrl)) throw new ApiError('Use a PNG, JPEG or WebP picture of up to 200 KB for the logo.', { code: 'validation_error', status: 422 });
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(dataUrl)) throw new ApiError('Use a PNG, JPEG or WebP picture of up to 1 MB for the logo.', { code: 'validation_error', status: 422 });
       server.logo = dataUrl;
       return { id: business, name: 'Shree Cool AC', address: 'Nashik', gstin: '', is_demo: false, active: true, logo_version: 'abc123def456' };
     },
     removeLogo: async () => {
       server.logo = '';
       return { id: business, name: 'Shree Cool AC', address: 'Nashik', gstin: '', is_demo: false, active: true, logo_version: '' };
+    },
+    saveSignature: async (dataUrl) => {
+      if (network.offline) throw new ApiUnreachable();
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(dataUrl)) throw new ApiError('Use a PNG, JPEG or WebP picture of up to 1 MB for the signature.', { code: 'validation_error', status: 422 });
+      server.signature = dataUrl;
+      return { ...BIZ, signature_version: 'sig123def456' };
     },
   };
 }

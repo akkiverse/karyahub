@@ -359,6 +359,7 @@ function logoBlock(b, lk) {
   const at = LOGO_POSITIONS.some(([v]) => v === lk.logo_position) ? lk.logo_position : 'left';
   return `<div class="logo-field" data-testid="logo-field"><span class="logo-label">${W.logo}</span>${has ? `<img class="logo-preview" data-testid="logo-preview" alt="${W.logo}" src="/api/v1/business/logo?v=${e(b.logo_version)}">` : `<span class="muted small" data-testid="logo-hint">${W.noLogo}</span>`}
     <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${has ? W.replaceLogo : W.addLogo}<input class="sr-only" type="file" name="logo" accept="image/png,image/jpeg,image/webp" data-action="pick-logo"></label>${has ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-logo">${W.removeLogo}</button>` : ''}</div>
+    <small class="muted" data-testid="logo-picture-hint">${W.pictureHint}</small>
   </div>
   ${has ? `<fieldset class="setting" data-testid="logo-position"><legend>${W.logoWhere}</legend>${LOGO_POSITIONS.map(([v, label]) => `<label class="radio"><input type="radio" name="logo_position" value="${v}" data-look-live ${at === v ? 'checked' : ''}> ${label}</label>`).join('')}<small class="muted">${W.logoReceiptNote}</small></fieldset>` : ''}`;
 }
@@ -386,7 +387,7 @@ export function lookPanel({ me, ui }) {
       <label class="field"><span>${W.validDays}</span><input name="estimate_valid_days" type="number" min="1" max="365" value="${e(lk.estimate_valid_days)}" ${dis}></label>
       ${locked ? '' : logoBlock(b, lk)}
       ${locked ? '' : `<div class="logo-field"><span class="logo-label">${W.signature}</span>${b.signature_version ? `<img class="logo-preview" alt="${W.signature}" src="/api/v1/business/signature?v=${e(b.signature_version)}">` : ''}
-        <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${b.signature_version ? W.replaceSignature : W.addSignature}<input class="sr-only" type="file" accept="image/png,image/jpeg" data-action="pick-signature"></label>${b.signature_version ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-signature">${W.removeSignature}</button>` : ''}</div></div>
+        <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${b.signature_version ? W.replaceSignature : W.addSignature}<input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp" data-action="pick-signature"></label>${b.signature_version ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-signature">${W.removeSignature}</button>` : ''}</div><small class="muted" data-testid="signature-picture-hint">${W.pictureHint}</small></div>
         <button type="submit" class="btn btn-primary">${icon('check', { size: 18 })} ${W.saveLook}</button>`}
     </form>
   </section>`;

@@ -3,8 +3,10 @@
 import base64
 import binascii
 import hashlib
+import io
 import re
 
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,14 +14,15 @@ from karyahub.accounts import service as accounts
 from karyahub.db.models import Business
 from karyahub.errors import AppError
 
-MAX_LOGO_BYTES = 200 * 1024
+MAX_LOGO_BYTES = 1024 * 1024  # as stored; the browser scales a bigger picture down first (CR-0019, US-52)
+MAX_SIDE_PX = 4000  # a picture's longest side, so a tiny file can't hide a huge image
 DATA_URL = re.compile(r"^data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$")
 MAGIC = {
     "image/png": lambda b: b.startswith(b"\x89PNG\r\n\x1a\n"),
     "image/jpeg": lambda b: b.startswith(b"\xff\xd8\xff"),
     "image/webp": lambda b: b[:4] == b"RIFF" and b[8:12] == b"WEBP",
 }
-BAD_LOGO = "Use a PNG, JPEG or WebP picture of up to 200 KB for the logo."
+BAD_LOGO = "Use a PNG, JPEG or WebP picture of up to 1 MB for the logo."
 
 
 def decode_image(
@@ -39,6 +42,14 @@ def decode_image(
     except (binascii.Error, ValueError) as exc:
         raise AppError("validation_error", message, 422) from exc
     if not raw or len(raw) > max_bytes or not MAGIC[mime](raw):
+        raise AppError("validation_error", message, 422)
+    try:  # really a picture, not just a file that starts like one, and not a huge image in a small file
+        with Image.open(io.BytesIO(raw)) as picture:
+            width, height = picture.size
+            picture.load()
+    except Exception as exc:
+        raise AppError("validation_error", message, 422) from exc
+    if not 1 <= width <= MAX_SIDE_PX or not 1 <= height <= MAX_SIDE_PX:
         raise AppError("validation_error", message, 422)
     return mime, raw
 

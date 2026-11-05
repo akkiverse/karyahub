@@ -37,11 +37,11 @@ class InventoryImportRequest(BaseModel):
 
 
 class LogoRequest(BaseModel):
-    data_url: str = Field(max_length=300_000)
+    data_url: str = Field(max_length=2_000_000)
 
 
 class SignatureRequest(BaseModel):
-    data_url: str = Field(max_length=420_000)
+    data_url: str = Field(max_length=2_000_000)
 
 
 class SetupRequest(BaseModel):

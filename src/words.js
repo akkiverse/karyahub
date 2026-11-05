@@ -289,6 +289,8 @@ export const W = {
   logoLeft: 'Top left, above the business name',
   logoCentre: 'Top centre',
   logoRight: 'Top right, above the bill heading',
+  pictureHint: 'A PNG with a see-through background looks best. Any PNG, JPEG or WebP up to 10 MB works; it is kept sharp.',
+  signatureSaved: 'Saved. The signature now shows on your estimates and bills.',
   logoReceiptNote: 'On the small receipt the logo is always in the centre.',
   logoSaved: 'Saved. The logo now shows on your estimates and bills.',
   logoRemoved: 'The logo is removed.',

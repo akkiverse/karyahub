@@ -528,11 +528,15 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     ui.focusNext = '[data-testid="look-notice"]';
     render();
   }
-  async function pickSignature(file) {
+  /** The signature or stamp: any picture up to 10 MB, scaled sharp in the browser like the logo (CR-0019, US-52). */
+  async function pickSignature(file, toDataUrl) {
     if (!file) return;
-    if (file.size > 300 * 1024 || !/^image\/(png|jpeg)$/.test(file.type)) { ui.lookForm = { notice: { text: 'Use a PNG or JPEG picture of up to 300 KB for the signature.', error: true } }; render(); return; }
-    const dataUrl = await new Promise((resolve, reject) => { const r = new win.FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); });
-    try { session.set({ ...session.get(), business: await api.saveSignature(dataUrl) }); ui.lookForm = { notice: { text: W.lookSaved } }; } catch (err) { ui.lookForm = { notice: { text: msg(err), error: true } }; }
+    const draft = lookDraft();
+    try {
+      session.set({ ...session.get(), business: await api.saveSignature(await toDataUrl(file)) });
+      ui.lookForm = { draft, notice: { text: W.signatureSaved } };
+    } catch (err) { ui.lookForm = { draft, notice: { text: err && err.message ? msg(err) : W.logoBad, error: true } }; }
+    ui.focusNext = '[data-testid="look-notice"]';
     render();
   }
 

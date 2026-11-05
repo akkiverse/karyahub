@@ -1096,7 +1096,7 @@ export function mountApp(root, options = {}) {
     const el = e.target;
     rememberItemForm(el);
     const a = el.dataset.action;
-    if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0]); return; }
+    if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0], logoImage); return; }
     if (a === 'pick-logo') { await bills.pickLogo(el.files && el.files[0], logoImage); return; }
     if (bills.onChange(e)) return;
     if (el.matches('[data-hist-who]')) { ui.history = { ...ui.history, who: el.value }; loadHistory({ full: false }); return; }

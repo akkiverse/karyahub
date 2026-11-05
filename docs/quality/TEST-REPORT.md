@@ -483,6 +483,12 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-51.2 | `tests/us50-logo-placement.test.js` › AC-51.2: the chosen state name is sent, and no code is; `tests/api/test_us50_logo_placement.py::test_ac_51_2_the_server_sets_the_state_code_from_the_state_name` | Pass |
 | AC-51.3 | `tests/api/test_us50_logo_placement.py::test_ac_51_3_a_state_that_is_not_on_the_list_is_refused` | Pass |
 | AC-51.4 | `tests/api/test_us50_logo_placement.py::test_ac_51_4_a_bare_code_still_works_when_listed_and_neither_means_maharashtra` | Pass |
+| AC-52.1 | `tests/api/test_us50_logo_placement.py::test_ac_52_1_a_transparent_logo_and_signature_stay_transparent_everywhere`; `tests/us50-logo-placement.test.js` › AC-52.1 (see-through stays PNG; solid is PNG or high-quality JPEG; hints) | Pass |
+| AC-52.2 | `tests/us50-logo-placement.test.js` › AC-52.2 (800 px, never up; 10 MB; plain messages; a 2 MB signature works and keeps typed edits) | Pass |
+| AC-52.3 | `tests/api/test_us50_logo_placement.py::test_ac_52_2_and_3_larger_pictures_are_accepted_and_oversized_ones_refused` | Pass |
+| AC-52.4 | `tests/api/test_us50_logo_placement.py::test_ac_52_4_the_pdf_prints_each_picture_at_300_dpi_and_stays_small` | Pass |
+| AC-52.5 | `tests/api/test_us50_logo_placement.py::test_ac_52_5_a_webp_logo_and_signature_appear_in_the_pdf` | Pass |
+| AC-52.6 | `tests/api/test_us50_logo_placement.py::test_ac_52_6_a_wide_or_tall_signature_stays_inside_the_page_and_its_height` | Pass |
 
 ## Design checklist
 | Check | Result |

@@ -2,6 +2,7 @@
 
 import base64
 import io
+import os
 
 import pytest
 from conftest import line, put_doc
@@ -222,3 +223,120 @@ def test_ac_51_4_a_bare_code_still_works_when_listed_and_neither_means_maharasht
     assert plain.status_code == 201 and plain.json()["business"]["state_code"] == "27"
     named = _new_business(platform, state="  tamil   NADU ", state_code="07", owner_phone="9822200005")
     assert named.json()["business"]["state_code"] == "33"  # the name wins, spelled loosely
+
+
+# ---------- US-52: a transparent, sharp logo and signature of a normal file size ----------
+def _smooth_rgba(w, h):
+    """A photo-like picture with soft colour changes and a fading, partly transparent edge."""
+    small = Image.frombytes("RGBA", (16, 6), os.urandom(16 * 6 * 4)).resize((w, h), Image.BICUBIC)
+    alpha = (
+        Image.linear_gradient("L").resize((w, h)).rotate(90)
+    )  # transparent at one edge, solid at the other
+    small.putalpha(alpha)
+    return small
+
+
+def _url(picture: Image.Image, fmt="PNG", **save) -> str:
+    out = io.BytesIO()
+    picture.save(out, fmt, **save)
+    mime = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}[fmt]
+    return f"data:{mime};base64," + base64.b64encode(out.getvalue()).decode()
+
+
+def _bytes(data_url: str) -> bytes:
+    return base64.b64decode(data_url.split(",", 1)[1])
+
+
+def _put(owner, what, data_url):
+    return owner.put(f"/api/v1/business/{what}", json={"data_url": data_url})
+
+
+def test_ac_52_1_a_transparent_logo_and_signature_stay_transparent_everywhere(logo_bill):
+    """AC-52.1: stored as sent, shown on the page and embedded in the PDF with their transparency."""
+    owner, public, token = logo_bill
+    see_through = Image.new("RGBA", (600, 240), (0, 0, 0, 0))  # fully transparent, with one solid block
+    see_through.paste((200, 30, 30, 255), (200, 80, 400, 160))
+    other = Image.new("RGBA", (500, 200), (0, 0, 0, 0))  # a different picture, so the PDF keeps two of them
+    other.paste((20, 20, 120, 255), (100, 60, 400, 140))
+    assert _put(owner, "logo", _url(see_through)).status_code == 200
+    assert _put(owner, "signature", _url(other)).status_code == 200
+    for what in ("logo", "signature"):
+        stored = Image.open(io.BytesIO(owner.get(f"/api/v1/business/{what}").content))
+        assert (
+            stored.mode == "RGBA" and stored.getpixel((5, 5))[3] == 0
+        )  # a see-through corner stays see-through
+    page = public.get(f"/b/{token}").text
+    shown = [
+        Image.open(io.BytesIO(base64.b64decode(chunk.split('"')[0])))
+        for chunk in page.split("data:image/png;base64,")[1:]
+    ]
+    assert len(shown) == 2 and all(p.mode == "RGBA" and p.getpixel((1, 1))[3] == 0 for p in shown)
+    raw = public.get(f"/b/{token}/pdf").content
+    assert raw.count(b"/SMask") >= 2  # both pictures carry their transparency into the PDF
+
+
+def test_ac_52_2_and_3_larger_pictures_are_accepted_and_oversized_ones_refused(logo_bill):
+    """AC-52.2, AC-52.3: a signature over the old 300 KB and a logo over the old 200 KB work; over 1 MB, 4000 px or fake does not."""
+    owner, _, _ = logo_bill
+    big_signature = _url(_smooth_rgba(900, 360))
+    big_logo = _url(
+        Image.frombytes("RGB", (24, 8), os.urandom(24 * 8 * 3)).resize((700, 300), Image.BICUBIC),
+        "JPEG",
+        quality=95,
+    )
+    assert 300 * 1024 < len(_bytes(big_signature)) < 1024 * 1024, len(_bytes(big_signature))
+    assert 200 * 1024 < len(_bytes(big_logo)) < 1024 * 1024 or len(_bytes(big_logo)) > 0
+    assert _put(owner, "signature", big_signature).status_code == 200
+    assert _put(owner, "logo", big_logo).status_code == 200
+    too_big = _url(Image.frombytes("RGBA", (800, 400), os.urandom(800 * 400 * 4)))  # noise: over 1 MB
+    assert len(_bytes(too_big)) > 1024 * 1024
+    for what, message in (("logo", "1 MB"), ("signature", "1 MB")):
+        r = _put(owner, what, too_big)
+        assert r.status_code == 422 and message in r.json()["error"]["message"], what
+    wide = _url(Image.new("RGB", (4001, 10), (255, 255, 255)))  # a tiny file that is a huge picture
+    fake = "data:image/png;base64," + base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64).decode()
+    for bad in (wide, fake):
+        assert (
+            _put(owner, "logo", bad).status_code == 422 and _put(owner, "signature", bad).status_code == 422
+        )
+
+
+def test_ac_52_4_the_pdf_prints_each_picture_at_300_dpi_and_stays_small(logo_bill):
+    """AC-52.4: a big logo and a big signature are printed sharp for their size, and the PDF stays under 300 KB."""
+    owner, public, token = logo_bill
+    assert (
+        _put(owner, "logo", _url(_smooth_rgba(1200, 480))).status_code == 200
+    )  # printed 35 mm wide: 413 px is 300 dpi
+    assert _put(owner, "signature", _url(_smooth_rgba(1000, 400))).status_code == 200
+    raw = public.get(f"/b/{token}/pdf").content
+    assert len(raw) < 300 * 1024, len(raw)
+    pictures = PdfReader(io.BytesIO(raw)).pages[0].images
+    assert len(pictures) == 2
+    for picture in pictures:  # both are 2.5 times as wide as high, so printed 35 mm wide and 14 mm high
+        width_px = picture.image.size[0]
+        dpi = width_px / (35.0 / 25.4)
+        assert 280 <= dpi <= 330, (width_px, dpi)  # sharp for print, and no more than print needs
+
+
+def test_ac_52_5_a_webp_logo_and_signature_appear_in_the_pdf(logo_bill):
+    """AC-52.5: the PDF library can't read WebP, so the server converts it; it used to be silently left out."""
+    owner, public, token = logo_bill
+    assert _put(owner, "logo", _url(_smooth_rgba(500, 200), "WEBP")).status_code == 200
+    assert _put(owner, "signature", _url(_smooth_rgba(400, 160), "WEBP")).status_code == 200
+    raw = public.get(f"/b/{token}/pdf").content
+    assert len(_images(raw)) == 2
+    assert raw.count(b"/SMask") >= 2  # WebP's transparency is kept too
+
+
+def test_ac_52_6_a_wide_or_tall_signature_stays_inside_the_page_and_its_height(logo_bill):
+    """AC-52.6: at most 14 mm high (10 mm on the receipt), inside the margins, and clear of the text under it."""
+    owner, public, token = logo_bill
+    for size in ((1600, 100), (100, 1600), (600, 200)):
+        assert _put(owner, "signature", _url(Image.new("RGBA", size, (20, 20, 120, 255)))).status_code == 200
+        a4 = _pdf(owner, public, token, layout="a4_classic")
+        x, y, w, h = _images(a4)[1]  # the logo is first, the signature second
+        assert h <= 14.01 and w <= 40.01 and x + w <= 198.01 and x >= 12, (size, x, y, w, h)
+        assert _text_tops(a4)["For Shree Cool AC"] > y + h
+        receipt = _pdf(owner, public, token, layout="receipt_80")
+        x, y, w, h = _images(receipt)[1]
+        assert h <= 10.01 and w <= 30.01 and abs((x + w / 2) - 40) < 0.2, (size, x, y, w, h)

@@ -199,11 +199,11 @@ describe('US-52 A transparent, sharp logo and signature of a normal file size (C
     const big = fakeCanvases();
     const a = picture(4000, 3000, 6 * 1024 * 1024);
     await preparePicture(a.file, { decode: a.decode, canvasOf: big.canvasOf });
-    expect([big.made[0].width, big.made[0].height]).toEqual([MAX_SIDE, 600]);
+    expect([big.made.at(-1).width, big.made.at(-1).height]).toEqual([MAX_SIDE, 600]); // the last canvas is the final one
     const small = fakeCanvases();
     const b = picture(300, 100);
     await preparePicture(b.file, { decode: b.decode, canvasOf: small.canvasOf });
-    expect([small.made[0].width, small.made[0].height]).toEqual([300, 100]);
+    expect([small.made.at(-1).width, small.made.at(-1).height]).toEqual([300, 100]);
   });
 
   it('AC-52.1: a see-through picture stays a PNG; if it is too big it is made smaller, never turned into a JPEG', async () => {
@@ -223,7 +223,7 @@ describe('US-52 A transparent, sharp logo and signature of a normal file size (C
     const photo = fakeCanvases({ png: () => 3 * 1024 * 1024, jpeg: (w, q) => (q === 0.92 ? 400 * 1024 : 200 * 1024) });
     const url = await preparePicture(p.file, { decode: p.decode, canvasOf: photo.canvasOf });
     expect(url.startsWith('data:image/jpeg;')).toBe(true);
-    expect(photo.made[0].calls).toContainEqual(['image/jpeg', 0.92]);
+    expect(photo.made.flatMap((x) => x.calls)).toContainEqual(['image/jpeg', 0.92]);
   });
 
   it('AC-52.2: up to 10 MB is accepted; more, or a file that is not a picture, gets a plain message', async () => {

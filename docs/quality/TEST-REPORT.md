@@ -489,6 +489,11 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-52.4 | `tests/api/test_us50_logo_placement.py::test_ac_52_4_the_pdf_prints_each_picture_at_300_dpi_and_stays_small` | Pass |
 | AC-52.5 | `tests/api/test_us50_logo_placement.py::test_ac_52_5_a_webp_logo_and_signature_appear_in_the_pdf` | Pass |
 | AC-52.6 | `tests/api/test_us50_logo_placement.py::test_ac_52_6_a_wide_or_tall_signature_stays_inside_the_page_and_its_height` | Pass |
+| AC-53.1 | `tests/us53-clean-pictures.test.js` › AC-53.1 (checkerboard edge, soft joins, plain white box, enclosed checkerboard inside a ring, a plain white centre stays; `preparePicture` cleans and reports) | Pass |
+| AC-53.2 | `tests/us53-clean-pictures.test.js` › AC-53.2 (the logo is trimmed with a small border; an already transparent picture is only trimmed) | Pass |
+| AC-53.3 | `tests/us53-clean-pictures.test.js` › AC-53.3 (a coloured or dark background, a photo, an all-white picture and a light-grey detail are left alone) | Pass |
+| AC-53.4 | `tests/us53-clean-pictures.test.js` › AC-53.4 and AC-53.5: a cleaned logo says so, and "Keep my original" saves it without cleaning | Pass |
+| AC-53.5 | `tests/us53-clean-pictures.test.js` › AC-53.5: a cleaned signature says so too, and nothing is said when nothing was cleaned | Pass |
 
 ## Design checklist
 | Check | Result |

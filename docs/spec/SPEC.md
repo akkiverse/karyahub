@@ -447,6 +447,14 @@ As a business owner, I want to add my logo and my signature or stamp as transpar
 - **AC-52.5** Given a WebP logo or signature, then it appears in the PDF (it was silently left out before) and keeps its transparency. *(added CR-0019)*
 - **AC-52.6** Given a wide, tall or small signature, then on A4 it is at most 14 mm high and 40 mm wide, against the right margin, clear of the text under it; on the receipt it is at most 10 mm high and 30 mm wide, centred. *(added CR-0019)*
 
+### US-53: A fake-transparent logo or stamp is cleaned and fills its space
+As a business owner, I want a logo or stamp I saved from a website, with its grey-and-white "transparent" checkerboard, to come out really transparent and filling its space, so that my bills show only the logo, not a checkerboard box with a tiny logo inside.
+- **AC-53.1** Given a logo or signature whose edge is a checkerboard (two light greys or whites, with soft joins) or one plain light colour, when it is added, then the browser removes that background from the edges inwards, so the picture is transparent; checkerboard enclosed by the logo (inside a ring or a letter) goes too, while a plain white centre that does not touch the outside stays. *(added CR-0019)*
+- **AC-53.2** Given a picture with empty margins (transparent or removed), then the margins are trimmed, keeping a small border, so the logo or stamp fills its space instead of looking small. *(added CR-0019)*
+- **AC-53.3** Given a coloured or dark background, a photo, or an edge that is not made of light colourless shades, then the picture is not cleaned; a light-grey detail that differs from the background shades stays; if the clean-up would remove almost everything, nothing is removed. *(added CR-0019)*
+- **AC-53.4** Given a picture was cleaned, then the owner is told ("We removed the background ... and trimmed its empty edges") and a button "Keep my original" saves the picture as it was chosen, still scaled to a sharp size. *(added CR-0019)*
+- **AC-53.5** Given the logo and the signature or stamp, then both are cleaned in the same way. *(added CR-0019)*
+
 > **Planned, not built (CR-0018, Phase Alpha, v0.12.0).** US-44 to US-49 are approved. Their criteria become named tests when the build lands; until then no test exists for them. Background: [PHASE-ALPHA.md](../product/PHASE-ALPHA.md).
 
 ### US-44: See how KaryaHub is doing

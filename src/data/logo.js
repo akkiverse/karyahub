@@ -1,12 +1,16 @@
+import { cleanPicture } from './cleanup.js';
+
 // Turn a picture the owner chose into a sharp logo, signature or stamp (a data URL), in the browser (CR-0019, US-52).
 //
 // Any PNG, JPEG or WebP of up to 10 MB is accepted. It is scaled down (never up) to at most 800 px on its longest
 // side, with smoothing, so it stays sharp when printed. A picture with see-through parts stays a PNG, which keeps
 // them see-through: if that PNG is still too big it is made smaller, never turned into a JPEG (JPEG has no
-// transparency, so the background would turn into a solid box). A solid picture is a PNG when that is small enough
+// transparency, so the background would turn into a solid box). A fake checkerboard or plain background is
+// removed and empty edges are trimmed first (cleanup.js). A solid picture is a PNG when that is small enough
 // (crisp edges for a stamp or line art) and a high-quality JPEG when it is not.
 export const MAX_INPUT_BYTES = 10 * 1024 * 1024;
 export const MAX_SIDE = 800;
+export const WORK_SIDE = 1600; // the working size for finding the background; the result is scaled down from it
 export const MAX_BYTES = 900 * 1024; // what is sent; the server keeps up to 1 MB
 export const PNG_PREFERRED_BYTES = 350 * 1024;
 export const SMALLEST_SIDE = 160;
@@ -36,17 +40,35 @@ const makeCanvas = (width, height) => {
   return canvas;
 };
 
-export async function preparePicture(file, { decode = (f) => createImageBitmap(f), canvasOf = makeCanvas } = {}) {
+export async function preparePicture(file, { decode = (f) => createImageBitmap(f), canvasOf = makeCanvas, clean = true, onCleaned = () => {} } = {}) {
   if (file.size > MAX_INPUT_BYTES) throw new Error(TOO_BIG);
   let bitmap;
   try { bitmap = await decode(file); } catch { throw new Error(CANT_USE); }
+  // Draw it once on a working canvas, where a fake checkerboard or plain background is removed and the empty edges
+  // are trimmed (CR-0019, US-53); then scale what is left down to the final size.
+  const work = fitSize(bitmap.width, bitmap.height, WORK_SIDE);
+  const workCanvas = canvasOf(work.width, work.height);
+  const workCtx = workCanvas.getContext('2d');
+  workCtx.imageSmoothingEnabled = true;
+  workCtx.imageSmoothingQuality = 'high';
+  workCtx.drawImage(bitmap, 0, 0, work.width, work.height);
+  let box = { x: 0, y: 0, width: work.width, height: work.height };
+  if (clean) {
+    const image = workCtx.getImageData(0, 0, work.width, work.height);
+    const result = cleanPicture({ data: image.data, width: work.width, height: work.height });
+    if (result.removed || result.trimmed) {
+      if (result.removed) workCtx.putImageData(image, 0, 0);
+      box = result.box;
+      onCleaned({ removed: result.removed, trimmed: result.trimmed });
+    }
+  }
   for (let side = MAX_SIDE; side >= SMALLEST_SIDE; side = Math.floor(side * 0.75)) {
-    const { width, height } = fitSize(bitmap.width, bitmap.height, side);
+    const { width, height } = fitSize(box.width, box.height, side);
     const canvas = canvasOf(width, height);
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(bitmap, 0, 0, width, height);
+    ctx.drawImage(workCanvas, box.x, box.y, box.width, box.height, 0, 0, width, height);
     const png = canvas.toDataURL('image/png');
     if (hasTransparency(ctx, width, height)) {
       if (bytesOf(png) <= MAX_BYTES) return png;

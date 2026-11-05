@@ -373,6 +373,7 @@ export function lookPanel({ me, ui }) {
   return `<section class="panel" aria-labelledby="look-title" data-testid="look-panel">
     <div class="panel-head"><h2 class="panel-title" id="look-title">${W.lookTitle}</h2></div>
     ${f.notice ? `<p class="notice ${f.notice.error ? 'notice-error' : ''}" role="status" data-testid="look-notice">${e(f.notice.text)}</p>` : ''}
+    ${f.original ? `<p class="muted small" data-testid="keep-original"><button type="button" class="btn btn-ghost btn-small" data-action="bill-keep-original">${W.keepOriginal}</button></p>` : ''}
     <form data-form="bill-look" class="stack look-form" novalidate>
       <fieldset class="setting"><legend>${W.layout}</legend>${LAYOUTS.map(([v, label]) => `<label class="radio"><input type="radio" name="layout" value="${v}" data-look-live ${lk.layout === v ? 'checked' : ''} ${dis}> ${label}</label>`).join('')}</fieldset>
       <fieldset class="setting"><legend>${W.colour}</legend><div class="swatches">${COLOURS.map((c, i) => `<label class="swatch" style="--sw:${c}"><input type="radio" name="colour" value="${c}" data-look-live ${lk.colour === c ? 'checked' : ''} ${dis}><span class="sr-only">Colour ${i + 1}</span></label>`).join('')}</div></fieldset>

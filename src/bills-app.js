@@ -356,6 +356,12 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
         render();
         return true;
       }
+      case 'bill-keep-original': {
+        const o = ui.lookForm && ui.lookForm.original;
+        if (!o) return true;
+        await (o.what === 'logo' ? pickLogo : pickSignature)(o.file, o.toDataUrl, { clean: false });
+        return true;
+      }
       case 'bill-remove-logo': {
         const draft = lookDraft();
         try { session.set({ ...session.get(), business: await api.removeLogo() }); ui.lookForm = { draft, notice: { text: W.logoRemoved } }; } catch (err) { ui.lookForm = { draft, notice: { text: msg(err), error: true } }; }
@@ -518,23 +524,28 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     const form = root.querySelector('[data-form="bill-look"]');
     return form ? lookFields(form) : undefined;
   }
-  async function pickLogo(file, toDataUrl) {
+  /** `clean` is false when the owner chose "Keep my original": the picture is only scaled, not cleaned (US-53). */
+  async function pickLogo(file, toDataUrl, { clean = true } = {}) {
     if (!file) return;
     const draft = lookDraft();
+    let cleaned = false;
     try {
-      session.set({ ...session.get(), business: await api.saveLogo(await toDataUrl(file)) });
-      ui.lookForm = { draft, notice: { text: W.logoSaved } };
+      const url = await toDataUrl(file, { clean, onCleaned: () => { cleaned = true; } });
+      session.set({ ...session.get(), business: await api.saveLogo(url) });
+      ui.lookForm = { draft, notice: { text: cleaned ? W.logoCleaned : W.logoSaved }, ...(cleaned ? { original: { what: 'logo', file, toDataUrl } } : {}) };
     } catch (err) { ui.lookForm = { draft, notice: { text: err && err.message ? msg(err) : W.logoBad, error: true } }; }
     ui.focusNext = '[data-testid="look-notice"]';
     render();
   }
   /** The signature or stamp: any picture up to 10 MB, scaled sharp in the browser like the logo (CR-0019, US-52). */
-  async function pickSignature(file, toDataUrl) {
+  async function pickSignature(file, toDataUrl, { clean = true } = {}) {
     if (!file) return;
     const draft = lookDraft();
+    let cleaned = false;
     try {
-      session.set({ ...session.get(), business: await api.saveSignature(await toDataUrl(file)) });
-      ui.lookForm = { draft, notice: { text: W.signatureSaved } };
+      const url = await toDataUrl(file, { clean, onCleaned: () => { cleaned = true; } });
+      session.set({ ...session.get(), business: await api.saveSignature(url) });
+      ui.lookForm = { draft, notice: { text: cleaned ? W.signatureCleaned : W.signatureSaved }, ...(cleaned ? { original: { what: 'signature', file, toDataUrl } } : {}) };
     } catch (err) { ui.lookForm = { draft, notice: { text: err && err.message ? msg(err) : W.logoBad, error: true } }; }
     ui.focusNext = '[data-testid="look-notice"]';
     render();

@@ -171,3 +171,162 @@ export function cleanPicture(image) {
   const trimmed = Boolean(box) && (box.width < width * 0.95 || box.height < height * 0.95);
   return { removed: Boolean(mask), box: trimmed ? box : whole, trimmed };
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// A signature or stamp on paper (CR-0019, US-54).
+//
+// A photo or scan of a signature is not a flat white box: the paper is tinted, lit unevenly and a little noisy, so
+// the background rules above find no clean shade and remove nothing. Here the paper is measured locally instead:
+// the picture is cut into cells and the paper of a cell is its light end (ink is thin, paper is most of the cell),
+// then smoothed between cells. How much darker a pixel is than its own paper decides how much of it stays: the
+// paper goes fully see-through, solid ink stays solid, and soft pen edges stay soft (no hard edge, no halo). The
+// colour of the ink is worked out so that, laid back on that paper, it looks exactly as it did.
+// ---------------------------------------------------------------------------------------------------------------
+const PAPER_LIGHT = 140; // the paper is light: its average channel is at least this
+const PAPER_PERCENTILE = 0.9; // the paper of a cell is its 90th percentile (ink is the darker tenth or less)
+const INK_FLOOR = 0.14; // less darker than the paper than this is paper (camera noise, JPEG blotches, shading)
+const INK_FULL = 0.85; // this much darker than the paper is solid ink
+const MAX_INK = 0.6; // more of the picture than this is ink: it is a filled picture, not ink on paper
+const MIN_INK = 0.0005; // less than this: there is no ink to keep
+const SEE_THROUGH = 0.3; // this share already see-through: the picture needs no paper removed
+const SHADOW = 0.65; // the paper under a shadow is at least this much of the picture's usual paper
+const REACH = 2; // a cell takes the lightest paper within this many cells, so a big solid stamp is not mistaken for paper
+
+/** The paper colour of each cell of a grid laid over the picture: {cell, cols, rows, paper: Float32Array(cols*rows*3)}. */
+export function paperMap(data, width, height) {
+  const cell = Math.min(96, Math.max(16, Math.round(Math.max(width, height) / 20)));
+  const cols = Math.ceil(width / cell);
+  const rows = Math.ceil(height / cell);
+  const paper = new Float32Array(cols * rows * 3);
+  const hist = new Uint32Array(256 * 3);
+  for (let cy = 0; cy < rows; cy += 1) {
+    for (let cx = 0; cx < cols; cx += 1) {
+      hist.fill(0);
+      const x1 = Math.min(width, (cx + 1) * cell);
+      const y1 = Math.min(height, (cy + 1) * cell);
+      let count = 0;
+      for (let y = cy * cell; y < y1; y += 1) {
+        for (let x = cx * cell; x < x1; x += 1) {
+          const i = (y * width + x) * 4;
+          hist[data[i]] += 1;
+          hist[256 + data[i + 1]] += 1;
+          hist[512 + data[i + 2]] += 1;
+          count += 1;
+        }
+      }
+      const target = Math.max(1, Math.floor(count * PAPER_PERCENTILE));
+      for (let ch = 0; ch < 3; ch += 1) {
+        let seen = 0;
+        let v = 0;
+        for (; v < 255; v += 1) { seen += hist[ch * 256 + v]; if (seen >= target) break; }
+        paper[(cy * cols + cx) * 3 + ch] = Math.max(1, v);
+      }
+    }
+  }
+  // Under a big solid stamp a whole cell is ink: it takes the paper of the cells around it, and no cell is taken to
+  // be much darker than the picture's usual paper (a shadow, not ink).
+  const usual = [0, 1, 2].map((ch) => {
+    const values = [];
+    for (let k = ch; k < paper.length; k += 3) values.push(paper[k]);
+    values.sort((a, b) => a - b);
+    return values[Math.floor(values.length * 0.8)];
+  });
+  const reached = new Float32Array(paper.length);
+  for (let cy = 0; cy < rows; cy += 1) {
+    for (let cx = 0; cx < cols; cx += 1) {
+      for (let ch = 0; ch < 3; ch += 1) {
+        let best = 0;
+        for (let y = Math.max(0, cy - REACH); y <= Math.min(rows - 1, cy + REACH); y += 1) {
+          for (let x = Math.max(0, cx - REACH); x <= Math.min(cols - 1, cx + REACH); x += 1) best = Math.max(best, paper[(y * cols + x) * 3 + ch]);
+        }
+        reached[(cy * cols + cx) * 3 + ch] = Math.max(best, usual[ch] * SHADOW);
+      }
+    }
+  }
+  return { cell, cols, rows, paper: reached };
+}
+
+/** For each pixel column (or row), the two cells whose paper it blends and how far it is towards the second. */
+const blendAxis = (length, cell, count) => {
+  const first = new Int32Array(length);
+  const second = new Int32Array(length);
+  const toward = new Float32Array(length);
+  for (let p = 0; p < length; p += 1) {
+    const g = Math.min(count - 1, Math.max(0, (p + 0.5) / cell - 0.5));
+    const a = Math.floor(g);
+    first[p] = a;
+    second[p] = Math.min(count - 1, a + 1);
+    toward[p] = g - a;
+  }
+  return { first, second, toward };
+};
+
+/**
+ * Make the paper of `image` ({data, width, height}) see-through and keep the ink, in place. Returns
+ * {applied, reason}: `reason` says why nothing was changed ('small', 'see-through', 'dark', 'filled' or 'no-ink').
+ */
+export function inkToTransparent(image) {
+  const { data, width, height } = image;
+  if (!data || data.length !== width * height * 4 || width < 8 || height < 8) return { applied: false, reason: 'small' };
+  let clear = 0;
+  for (let i = 3; i < data.length; i += 4) if (data[i] < SOLID) clear += 1;
+  if (clear / (width * height) >= SEE_THROUGH) return { applied: false, reason: 'see-through' };
+  const { cell, cols, rows, paper } = paperMap(data, width, height);
+  let light = 0;
+  for (let k = 0; k < paper.length; k += 1) light += paper[k];
+  if (light / paper.length < PAPER_LIGHT) return { applied: false, reason: 'dark' };
+  const xs = blendAxis(width, cell, cols);
+  const ys = blendAxis(height, cell, rows);
+  const out = new Uint8ClampedArray(data.length);
+  let solid = 0;
+  const pr = [0, 0, 0];
+  for (let y = 0; y < height; y += 1) {
+    const ya = ys.first[y] * cols;
+    const yb = ys.second[y] * cols;
+    const fy = ys.toward[y];
+    for (let x = 0; x < width; x += 1) {
+      const fx = xs.toward[x];
+      const a0 = (ya + xs.first[x]) * 3;
+      const a1 = (ya + xs.second[x]) * 3;
+      const b0 = (yb + xs.first[x]) * 3;
+      const b1 = (yb + xs.second[x]) * 3;
+      const i = (y * width + x) * 4;
+      let darkest = 0;
+      for (let ch = 0; ch < 3; ch += 1) {
+        const top = paper[a0 + ch] + (paper[a1 + ch] - paper[a0 + ch]) * fx;
+        const bottom = paper[b0 + ch] + (paper[b1 + ch] - paper[b0 + ch]) * fx;
+        pr[ch] = Math.max(1, top + (bottom - top) * fy);
+        darkest = Math.max(darkest, 1 - data[i + ch] / pr[ch]);
+      }
+      const keep = Math.min(1, Math.max(0, (darkest - INK_FLOOR) / (INK_FULL - INK_FLOOR)));
+      if (keep <= 0) continue; // paper: stays see-through (the buffer starts at zero)
+      for (let ch = 0; ch < 3; ch += 1) out[i + ch] = (data[i + ch] - pr[ch] * (1 - keep)) / keep;
+      out[i + 3] = Math.round(keep * 255);
+      if (keep > 0.5) solid += 1;
+    }
+  }
+  const share = solid / (width * height);
+  if (share > MAX_INK) return { applied: false, reason: 'filled' };
+  if (share < MIN_INK) return { applied: false, reason: 'no-ink' };
+  data.set(out);
+  return { applied: true, reason: '' };
+}
+
+/**
+ * Clean a signature or stamp: ink on paper first (a photo or scan), and when that does not apply the flat
+ * background rules of `cleanPicture`. Returns {removed, box, trimmed, reason}; `reason` says why a picture that
+ * still has its background was left alone ('dark', 'filled', 'no-ink'), and is '' otherwise.
+ */
+export function cleanSignature(image) {
+  const { data, width, height } = image;
+  const ink = inkToTransparent(image);
+  if (ink.applied) {
+    const box = contentBox(data, width, height);
+    const whole = { x: 0, y: 0, width, height };
+    const trimmed = Boolean(box) && (box.width < width * 0.95 || box.height < height * 0.95);
+    return { removed: true, box: trimmed ? box : whole, trimmed, reason: '' };
+  }
+  const flat = cleanPicture(image);
+  const left = !flat.removed && ['dark', 'filled', 'no-ink'].includes(ink.reason) ? ink.reason : '';
+  return { ...flat, reason: left };
+}

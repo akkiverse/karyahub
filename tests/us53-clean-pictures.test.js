@@ -190,7 +190,7 @@ describe('US-53 the owner is told, and can keep the original (CR-0019)', () => {
     t = open(api, convert);
     choose(t, 'input[data-action="pick-signature"]', 'sign.png');
     await until(() => t.$('[data-testid="keep-original"]'));
-    expect(t.$('[data-testid="look-notice"]').textContent).toContain('removed the background around your signature');
+    expect(t.$('[data-testid="look-notice"]').textContent).toContain('made the paper see-through so only your ink shows');
     clean = false;
     choose(t, 'input[data-action="pick-signature"]', 'sign2.png');
     await until(() => !t.$('[data-testid="keep-original"]'));

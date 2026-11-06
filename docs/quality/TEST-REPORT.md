@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-04 · **Branch:** `main` at v0.11.0 (CR-0015, CR-0016) · **Result:** 594 of 594 tests passing (290 server + 1 Postgres-only test skipped without its database, 304 web), covering all 239 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-06 · **Branch:** `cr/0019-setup-logo-and-state` (CR-0019, v0.11.1 in review) · **Result:** 712 of 712 tests passing (335 server + 1 Postgres-only test skipped without its database, 377 web), covering all 239 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
@@ -12,6 +12,8 @@ Three suites:
 Some criteria have a test on each side (for example AC-7.2 and AC-23.1: the web app calls the API, and the server does the work). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
 Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see the spec); their old on-device tests were replaced by the tests for AC-18 to AC-22.
+
+**CR-0019 (6 Nov)** added 31 server tests (`test_us55_picture_size.py` 15, `test_us56_picture_logging.py` 16) and 42 web tests (`us54-signature-ink.test.js` 16, `us55-picture-size.test.js` 9, `us56-picture-warnings.test.js` 17), and changed one older test on purpose (`us53-clean-pictures.test.js`, AC-53.5: the signature's notice now reads "made the paper see-through"). The ink rule was run in real Chrome on a phone-like photo of a signature (warm paper, uneven light, noise, saved as a 60% JPEG): 94% of the picture came out see-through, 3.7% solid ink, the pen edge soft, on white, teal and dark; the Bill look screen (size bars, amber warning, the preview paper at 170% and 150%) was rendered with the app's own code and stylesheet. Not yet checked: a real signature photo taken on a phone, and the PDF of a business on the dev address.
 
 **CR-0016** added 7 server tests (`test_us43_history.py`) and 11 web tests (`us43-history.test.js`), and changed three older tests on purpose: one more row in the role table (`us15-admin.test.js`, AC-19.1) and History in the menu lists (`us26-bills.test.js`, AC-26.2, AC-26.3).
 
@@ -494,6 +496,24 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-53.3 | `tests/us53-clean-pictures.test.js` › AC-53.3 (a coloured or dark background, a photo, an all-white picture and a light-grey detail are left alone) | Pass |
 | AC-53.4 | `tests/us53-clean-pictures.test.js` › AC-53.4 and AC-53.5: a cleaned logo says so, and "Keep my original" saves it without cleaning | Pass |
 | AC-53.5 | `tests/us53-clean-pictures.test.js` › AC-53.5: a cleaned signature says so too, and nothing is said when nothing was cleaned | Pass |
+| AC-54.1 | `tests/us54-signature-ink.test.js` › AC-54.1 (clean scan, scan with JPEG noise, warm photo with shading, photo with shading and noise; the older rule fails on the photo) | Pass |
+| AC-54.2 | `tests/us54-signature-ink.test.js` › AC-54.2 (soft edges, no halo, ink colour kept and the pixel looks as it did on its paper, three inks; a big solid stamp stays solid) | Pass |
+| AC-54.3 | `tests/us54-signature-ink.test.js` › AC-54.3 (the empty margins are trimmed) | Pass |
+| AC-54.4 | `tests/us54-signature-ink.test.js` › AC-54.4 (dark, coloured, mostly ink, no ink, already see-through) | Pass |
+| AC-54.5 | `tests/us53-clean-pictures.test.js` › AC-53.5 (the notice and Keep my original); `tests/us54-signature-ink.test.js` › AC-54.5 (which cleaner runs) | Pass |
+| AC-54.6 | `tests/us54-signature-ink.test.js` › AC-54.6 and AC-54.5 (the logo gets no warning and the old rule) | Pass |
+| AC-55.1 | `tests/us55-picture-size.test.js` › AC-55.1 (a bar per existing picture; range 50 to 200, step 5, 100, value shown) | Pass |
+| AC-55.2 | `tests/us55-picture-size.test.js` › AC-55.2 (live preview, Save sends both, no size without a picture) | Pass |
+| AC-55.3 | `tests/api/test_us55_picture_size.py::test_ac_55_3_*` (page, A4 logo, A4 signature, receipt); `tests/us55-picture-size.test.js` › AC-55.3 and AC-55.4 | Pass |
+| AC-55.4 | `tests/api/test_us55_picture_size.py::test_ac_55_3_and_55_4_*`, `test_ac_55_4_*` (the 2 mm gap does not grow, margins, next page, receipt column) | Pass |
+| AC-55.5 | `tests/api/test_us55_picture_size.py::test_ac_55_3_and_55_4_the_a4_pdf_grows_the_logo_without_widening_the_gap` (under 300 KB at 200%) | Pass |
+| AC-55.6 | `tests/api/test_us55_picture_size.py::test_ac_55_6_*` (default 100, seven refused values, History); `tests/us55-picture-size.test.js` › AC-55.6 | Pass |
+| AC-56.1 | `tests/us56-picture-warnings.test.js` › AC-56.1 (too big, unreadable, too detailed, server refusal, offline); `tests/api/test_us56_picture_logging.py::test_ac_56_4_every_refused_picture_*` (422 each) | Pass |
+| AC-56.2 | `tests/us56-picture-warnings.test.js` › AC-56.2 (cleaning fails, background kept for three reasons, logo never warned, pixels unreadable stays PNG) | Pass |
+| AC-56.3 | `tests/us56-picture-warnings.test.js` › AC-56.3 (Bill look, bill paper, only once, nothing when fine) | Pass |
+| AC-56.4 | `tests/api/test_us56_picture_logging.py::test_ac_56_4_*` (12 refusals, dimensions, nothing logged when good, damaged stored picture, prepare failure) | Pass |
+| AC-56.5 | `tests/api/test_us56_picture_logging.py::test_ac_56_5_*` and `::test_ac_56_4_a_picture_the_pdf_cannot_print_*` (page and PDF still made) | Pass |
+| AC-56.6 | `tests/us56-picture-warnings.test.js` › AC-56.6 (no picture content or file name in the console) | Pass |
 
 ## Design checklist
 | Check | Result |

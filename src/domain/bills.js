@@ -10,8 +10,16 @@ import { unitsOf } from './inventory.js';
 export const DOC_VERSION = 2;
 export const BIG_BILL = 5_000_000; // ₹50,000 in paise (AC-27.8)
 export const DEFAULT_LOOK = {
-  layout: 'a4_classic', logo_position: 'left', colour: '#0F766E', phone: '', bank: { account_name: '', account_number: '', ifsc: '' },
+  layout: 'a4_classic', logo_position: 'left', logo_size: 100, signature_size: 100, colour: '#0F766E', phone: '', bank: { account_name: '', account_number: '', ifsc: '' },
   upi_id: '', terms: '', prefix: '', due_days: 0, estimate_valid_days: 15,
+};
+export const SIZE_MIN = 50; // the logo and the signature can be 50% to 200% of their usual size (CR-0019, US-55)
+export const SIZE_MAX = 200;
+export const SIZE_STEP = 5;
+/** A picture's size in percent from a look (100 when it was never chosen or is not a sensible number). */
+export const pictureSize = (look, key) => {
+  const n = Number(look && look[key]);
+  return Number.isFinite(n) && n >= SIZE_MIN && n <= SIZE_MAX ? Math.round(n) : 100;
 };
 export const LOGO_POSITIONS = [['left', W.logoLeft], ['center', W.logoCentre], ['right', W.logoRight]];
 export const COLOURS = ['#0F766E', '#1D4ED8', '#4338CA', '#9F1239', '#15803D', '#334155'];

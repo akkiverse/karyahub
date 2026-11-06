@@ -31,14 +31,15 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def _log_ai_calls() -> None:
-    """Send the AI kit's line per call (model, server, outcome, seconds) to the runtime logs (CR-0010)."""
-    kit_log = logging.getLogger("studio_ai")
-    kit_log.setLevel(logging.INFO)
-    if not any(getattr(h, "_karyahub", False) for h in kit_log.handlers):
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
-        handler._karyahub = True  # type: ignore[attr-defined]
-        kit_log.addHandler(handler)
+    """Send the AI kit's line per call (CR-0010) and the picture warnings (US-56) to the runtime logs."""
+    for name in ("studio_ai", "karyahub.pictures"):
+        picked = logging.getLogger(name)
+        picked.setLevel(logging.INFO)
+        if not any(getattr(h, "_karyahub", False) for h in picked.handlers):
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+            handler._karyahub = True  # type: ignore[attr-defined]
+            picked.addHandler(handler)
 
 
 async def _one_line(result: dict[str, Any]):

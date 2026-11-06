@@ -1189,6 +1189,17 @@ export function mountApp(root, options = {}) {
   root.addEventListener('change', onChange);
   root.addEventListener('input', onInput);
   // More options stays open across redraws while a bill is being made.
+  // A saved logo or signature that the browser cannot show: say so beside it, and in the console (CR-0019, US-56).
+  // (An image's error event does not bubble, so this listens while it travels down.)
+  root.addEventListener('error', (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== 'IMG' || !img.dataset || !img.dataset.picture || img.dataset.warned) return;
+    img.dataset.warned = '1';
+    const what = img.dataset.picture === 'logo' ? 'logo' : 'signature';
+    try { console.warn('[karyahub] picture: not-shown', { kind: what }); } catch { /* no console */ }
+    img.hidden = true;
+    img.insertAdjacentHTML('afterend', `<span class="notice notice-error" role="alert" data-testid="picture-missing">${W.pictureMissing.replace('{what}', what === 'logo' ? W.logo.toLowerCase() : W.signature.toLowerCase())}</span>`);
+  }, true);
   root.addEventListener('toggle', (e) => { if (e.target.matches?.('.more-options') && ui.billEd) ui.billEd.more = e.target.open; }, true);
   root.ownerDocument.addEventListener('keydown', onKey);
   applyTheme(win);

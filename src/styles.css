@@ -1039,6 +1039,7 @@ a.kpi-sub { color: var(--kh-link); font-weight: 600; }
 .qty.is-out, .qty.is-short { color: var(--kh-bad); }
 .notice { background: var(--kh-primary-soft); border: 1px solid var(--kh-border-hover); border-radius: 12px; color: var(--kh-text); }
 .notice-error { background: var(--kh-bad-bg); border-color: var(--kh-bad-line); color: var(--kh-bad); }
+.notice-warn { background: var(--kh-warn-bg, #FEF3C7); border-color: var(--kh-warn-line, #F59E0B); color: var(--kh-warn, #92400E); }
 
 /* Boxes */
 .field { color: var(--kh-text); font-weight: 500; }
@@ -1539,3 +1540,10 @@ button.seg { border: 0; background: transparent; font: inherit; font-size: 0.875
 .bill-history summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; min-height: 32px; }
 .bill-history .history li { padding: 8px 0; border-top: 1px solid var(--kh-border); }
 
+/* The size bar of a logo or signature (CR-0019, US-55): a plain horizontal slider with its value beside the name. */
+.size-bar { margin-top: 4px; }
+.size-bar > span { display: flex; justify-content: space-between; gap: 8px; }
+.size-bar output { font-variant-numeric: tabular-nums; color: var(--kh-primary-accent, var(--c-brand)); font-weight: 700; }
+.field.size-bar input[type="range"] { min-height: 44px; padding: 0; border: 0; background: transparent; width: 100%; accent-color: var(--kh-primary-accent, var(--c-brand)); cursor: pointer; }
+.field.size-bar input[type="range"]:focus-visible { outline: 3px solid var(--c-focus, var(--kh-primary-accent)); outline-offset: 2px; border-radius: 8px; }
+.notice-warn { margin-top: 0; }

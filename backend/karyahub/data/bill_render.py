@@ -7,6 +7,7 @@ PDFs use the bundled Noto Sans (SIL Open Font License, ``fonts/OFL.txt``) so ₹
 
 import base64
 import io
+import logging
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,9 @@ from karyahub.data import bills
 from karyahub.domain import tax
 
 FONTS = Path(__file__).resolve().parent.parent / "fonts"
+log = logging.getLogger(
+    "karyahub.pictures"
+)  # a picture that could not be used is logged, the bill is still made
 COMPOSITION_LINE = "Composition taxable person, not eligible to collect tax on supplies"
 
 
@@ -31,6 +35,14 @@ def _logo_position(look: dict[str, Any]) -> str:
         return "center"
     position = look.get("logo_position", "left")
     return position if position in ("left", "center", "right") else "left"
+
+
+def _size(look: dict[str, Any], key: str) -> int:
+    """A picture's size in percent of its usual size (CR-0019, US-55); 100 when never chosen or not sensible."""
+    value = look.get(key, 100)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return 100
+    return round(value) if 50 <= value <= 200 else 100
 
 
 def model(body: dict[str, Any], business_name: str, look: dict[str, Any]) -> dict[str, Any]:
@@ -129,6 +141,8 @@ def model(body: dict[str, Any], business_name: str, look: dict[str, Any]) -> dic
         "paid": body.get("status") == "paid",
         "layout": look.get("layout", "a4_classic"),
         "logo_position": _logo_position(look),
+        "logo_size": _size(look, "logo_size"),
+        "signature_size": _size(look, "signature_size"),
         "colour": look.get("colour", "#0F766E"),
     }
 
@@ -192,9 +206,16 @@ def page_html(
         return escape(text, quote=False).replace('"', "&quot;")
 
     s, c = m["seller"], m["customer"]
-    logo = prepare_image(logo, 480, 168)  # drawn at most 160 by 56 px, so three times that is plenty
-    signature = prepare_image(signature, 480, 180)
-    logo_img = f'<img class="logo" alt="" src="{_data_url(logo)}">' if logo else ""
+    ls, ss = (
+        m["logo_size"] / 100,
+        m["signature_size"] / 100,
+    )  # the picture grows; the space around it does not
+    logo = prepare_image(
+        logo, round(480 * ls), round(168 * ls), what="logo"
+    )  # drawn at most 160 by 56 px, x3
+    signature = prepare_image(signature, round(480 * ss), round(180 * ss), what="signature")
+    logo_style = f"max-width:{round(160 * ls)}px;max-height:{round(56 * ls)}px"
+    logo_img = f'<img class="logo" alt="" style="{logo_style}" src="{_data_url(logo)}">' if logo else ""
     logo_at = m["logo_position"]
     logo_html = logo_img if logo_at == "left" else ""  # left: above the name, as it always was
     logo_row = f'<div class="logo-row">{logo_img}</div>' if logo and logo_at == "center" else ""
@@ -256,7 +277,8 @@ def page_html(
             pay += f"<p>UPI {e(m['upi_id'])}</p>"
         pay += "</div>"
     terms = f"<div><p><strong>Terms</strong></p><p>{e(m['terms'])}</p></div>" if m["terms"] else ""
-    sign = f'<img alt="Signature" src="{_data_url(signature)}">' if signature else ""
+    sign_style = f"max-height:{round(60 * ss)}px;max-width:100%"
+    sign = f'<img alt="Signature" style="{sign_style}" src="{_data_url(signature)}">' if signature else ""
     dates = "".join(f'<p><span class="muted">{e(k)}</span> {e(v)}</p>' for k, v in m["dates"])
     stamp = '<div class="stamp" aria-hidden="true"><span>CANCELLED</span></div>' if m["cancelled"] else ""
     paper = f"""
@@ -302,7 +324,9 @@ PRINT_DPI = (
 PDF_PICTURE_BYTES = 150 * 1024  # above this a picture is simplified, so the whole PDF stays small
 
 
-def prepare_image(image: tuple[str, bytes] | None, max_w_px: int, max_h_px: int) -> tuple[str, bytes] | None:
+def prepare_image(
+    image: tuple[str, bytes] | None, max_w_px: int, max_h_px: int, *, what: str = "picture"
+) -> tuple[str, bytes] | None:
     """The picture ready to print or show: PNG or JPEG, at most ``max_w_px`` by ``max_h_px`` (never scaled up).
 
     A transparent picture stays transparent (PNG); WebP and anything else Pillow reads becomes PNG or JPEG, which
@@ -330,7 +354,14 @@ def prepare_image(image: tuple[str, bytes] | None, max_w_px: int, max_h_px: int)
                 picture.save(out, "JPEG", quality=90, optimize=True)
                 return "image/jpeg", out.getvalue()
         return "image/png", out.getvalue()
-    except Exception:
+    except Exception as exc:  # the bill is made without it, and the reason is in the logs (US-56)
+        log.warning(
+            "picture left out of the bill: kind=%s reason=prepare-failed error=%s mime=%s bytes=%s",
+            what,
+            type(exc).__name__,
+            image[0],
+            len(image[1]),
+        )
         return None
 
 
@@ -338,15 +369,32 @@ def _mm_px(mm: float) -> int:
     return round(mm / 25.4 * PRINT_DPI)
 
 
-def _image(pdf: FPDF, image: tuple[str, bytes] | None, x: float, y: float, h: float, w: float = 0) -> None:
+def _image(
+    pdf: FPDF,
+    image: tuple[str, bytes] | None,
+    x: float,
+    y: float,
+    h: float,
+    w: float = 0,
+    *,
+    what: str = "picture",
+) -> None:
     if image:
         try:
             pdf.image(io.BytesIO(image[1]), x=x, y=y, h=h, **({"w": w} if w else {}))
-        except Exception:  # a picture fpdf2 can't read is left out rather than losing the bill
-            return
+        except Exception as exc:  # a picture fpdf2 can't read is left out rather than losing the bill
+            log.warning(
+                "picture left out of the PDF: kind=%s reason=draw-failed error=%s mime=%s bytes=%s",
+                what,
+                type(exc).__name__,
+                image[0],
+                len(image[1]),
+            )
 
 
-def logo_size(image: tuple[str, bytes] | None, max_h: float, max_w: float) -> tuple[float, float] | None:
+def logo_size(
+    image: tuple[str, bytes] | None, max_h: float, max_w: float, *, what: str = "picture"
+) -> tuple[float, float] | None:
     """The logo's width and height in mm: its own proportions, at most ``max_h`` high and ``max_w`` wide (CR-0019).
 
     None when there is no logo or the picture can't be read, so the bill is made without it.
@@ -356,9 +404,13 @@ def logo_size(image: tuple[str, bytes] | None, max_h: float, max_w: float) -> tu
     try:
         with Image.open(io.BytesIO(image[1])) as picture:
             px_w, px_h = picture.size
-    except Exception:
+    except Exception as exc:
+        log.warning(
+            "picture left out of the PDF: kind=%s reason=unreadable error=%s", what, type(exc).__name__
+        )
         return None
     if px_w <= 0 or px_h <= 0:
+        log.warning("picture left out of the PDF: kind=%s reason=no-size", what)
         return None
     scale = min(max_h / px_h, max_w / px_w)
     return round(px_w * scale, 2), round(px_h * scale, 2)
@@ -388,8 +440,9 @@ def _cancelled_stamp(pdf: FPDF, w: float, h: float) -> None:
 def pdf_bytes(
     m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple[str, bytes] | None
 ) -> bytes:
-    logo = prepare_image(logo, _mm_px(45), _mm_px(14))
-    signature = prepare_image(signature, _mm_px(40), _mm_px(14))
+    ls, ss = m["logo_size"] / 100, m["signature_size"] / 100
+    logo = prepare_image(logo, _mm_px(45 * ls), _mm_px(14 * ls), what="logo")
+    signature = prepare_image(signature, _mm_px(40 * ss), _mm_px(14 * ss), what="signature")
     if m["layout"] == "receipt_80":
         return _receipt(m, logo, signature)
     pdf = _Pdf(format="A4")
@@ -406,11 +459,11 @@ def pdf_bytes(
     s, c = m["seller"], m["customer"]
     top = pdf.get_y()
     left_top = right_top = top  # where the name block and the heading block start
-    box = logo_size(logo, 14, 45)
+    box = logo_size(logo, 14 * ls, 45 * ls, what="logo")
     if box:
         w, h = box
         x, y = logo_place(m["logo_position"], w, h, left=12, right=198, top=top, page_w=210)
-        _image(pdf, logo, x, y, h, w)
+        _image(pdf, logo, x, y, h, w, what="logo")
         below = top + h + 2
         if m["logo_position"] == "left":  # above the name, as it always was
             left_top = below
@@ -534,9 +587,13 @@ def pdf_bytes(
         pdf.cell(90, 5, "Terms", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Noto", size=9)
         pdf.multi_cell(100, 4.5, m["terms"], new_x="LMARGIN", new_y="NEXT")
-    sign_box = logo_size(signature, 14, 40)
+    sign_box = logo_size(signature, 14 * ss, 40 * ss, what="signature")
+    need = (sign_box[1] + 2 if sign_box else 16) + 10  # the picture, then the two lines under it
+    if y + need > 297 - 15:  # a bigger signature must not run off the page: it starts the next one
+        pdf.add_page()
+        y = pdf.get_y()
     if sign_box:
-        _image(pdf, signature, 198 - sign_box[0], y, sign_box[1], sign_box[0])
+        _image(pdf, signature, 198 - sign_box[0], y, sign_box[1], sign_box[0], what="signature")
     pdf.set_xy(120, y + (sign_box[1] + 2 if sign_box else 16))
     pdf.cell(78, 5, f"For {s['name']}", align="R", new_x="LEFT", new_y="NEXT")
     pdf.set_x(120)
@@ -553,13 +610,18 @@ def _headings(accent: tuple[int, int, int]) -> Any:
 
 
 def _receipt(m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple[str, bytes] | None) -> bytes:
-    box = logo_size(logo, 12, 40)
+    ls, ss = m["logo_size"] / 100, m["signature_size"] / 100
+    box = logo_size(logo, 12 * ls, min(40 * ls, 72), what="logo")  # 72 mm is the receipt's whole column
+    sign_box = logo_size(signature, 10 * ss, min(30 * ss, 72), what="signature")
     height = (
         120
         + 9 * len(m["rows"])
         + 5 * len(m["total_rows"])
         + 5 * len(m["summary"])
         + (box[1] + 3 if box else 0)
+        + (
+            max(0.0, sign_box[1] - 10) if sign_box else 0
+        )  # the 120 above already makes room for a usual signature
     )
     pdf = _Pdf(format=(80, height))
     pdf.set_auto_page_break(False)
@@ -575,7 +637,7 @@ def _receipt(m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple
 
     if box:  # the receipt's column is centred, so is the logo (CR-0019: it was left out of this PDF before)
         x, y = logo_place("center", box[0], box[1], left=4, right=76, top=pdf.get_y(), page_w=80)
-        _image(pdf, logo, x, y, box[1], box[0])
+        _image(pdf, logo, x, y, box[1], box[0], what="logo")
         pdf.set_y(y + box[1] + 2)
     line(s["name"], bold=True, size=10)
     line(s["address"])
@@ -614,9 +676,16 @@ def _receipt(m: dict[str, Any], logo: tuple[str, bytes] | None, signature: tuple
     line(m["in_words"], size=7)
     line(f"UPI {m['upi_id']}" if m["upi_id"] else "")
     line(m["terms"], size=7)
-    sign_box = logo_size(signature, 10, 30)
     if sign_box:
-        _image(pdf, signature, (80 - sign_box[0]) / 2, pdf.get_y() + 1, sign_box[1], sign_box[0])
+        _image(
+            pdf,
+            signature,
+            (80 - sign_box[0]) / 2,
+            pdf.get_y() + 1,
+            sign_box[1],
+            sign_box[0],
+            what="signature",
+        )
         pdf.ln(sign_box[1] + 2)
     line("Authorised signatory", size=7)
     if m["cancelled"]:

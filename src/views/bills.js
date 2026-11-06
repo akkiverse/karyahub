@@ -4,7 +4,7 @@ import { icon } from '../ui/icons.js';
 import { escapeHtml as e, rupees, rupeesExact, localStamp } from '../format.js';
 import { W } from '../words.js';
 import { STATES, stateLabel, GST_RATES } from '../domain/tax.js';
-import {
+import { pictureSize, SIZE_MIN, SIZE_MAX, SIZE_STEP,
   billList, CHIPS, docWord, figuresOf, isBill, isV2, lookOf, numberText, saveProblem, sellerOf, statusOf, STATUS_WORDS, totalOf, LAYOUTS, LOGO_POSITIONS, COLOURS, unitText,
 } from '../domain/bills.js';
 import { unitsOf } from '../domain/inventory.js';
@@ -222,7 +222,10 @@ export function billPaper(doc, { business, settings = {}, sample = false, look =
   const bank = lk.bank || {};
   const cancelled = doc.status === 'cancelled';
   const place = doc.place_of_supply || c.state_code || seller.state_code;
-  const logoImg = business && business.logo_version ? `<img class="doc-logo" data-testid="doc-logo-img" alt="" src="/api/v1/business/logo?v=${e(business.logo_version)}">` : '';
+  const logoPct = pictureSize(lk, 'logo_size');
+  const signPct = pictureSize(lk, 'signature_size');
+  // the picture grows inside its own box; the margins around it do not change (US-55)
+  const logoImg = business && business.logo_version ? `<img class="doc-logo" data-testid="doc-logo-img" data-picture="logo" alt="" style="max-width:${Math.round(120 * logoPct / 100)}px;max-height:${Math.round(64 * logoPct / 100)}px" src="/api/v1/business/logo?v=${e(business.logo_version)}">` : '';
   const logoAt = lk.layout === 'receipt_80' ? 'center' : (LOGO_POSITIONS.some(([v]) => v === lk.logo_position) ? lk.logo_position : 'left'); // the receipt always centres it (CR-0019)
   const ocean = String(lk.colour).toUpperCase() === COLOURS[0]; // the default colour prints as the brand gradient (CR-0015)
   return `<article class="doc bill-paper layout-${e(lk.layout)} ${ocean ? 'is-ocean' : ''}" style="--bill-accent:${e(lk.colour)}" data-testid="bill-paper" aria-label="${e(heading)} ${e(doc.number || '')}">
@@ -252,7 +255,7 @@ export function billPaper(doc, { business, settings = {}, sample = false, look =
     <footer class="doc-foot bill-foot">
       ${bank.account_number || (isBill(doc) && lk.upi_id) ? `<div><p class="label">Pay to</p>${bank.account_number ? `<p>${e(bank.account_name)}</p><p>A/c ${e(bank.account_number)} · IFSC ${e(bank.ifsc)}</p>` : ''}${isBill(doc) && lk.upi_id ? `<p>UPI ${e(lk.upi_id)}</p>` : ''}</div>` : ''}
       ${doc.terms || lk.terms ? `<div><p class="label">${W.terms}</p><p>${e(doc.terms || lk.terms)}</p></div>` : ''}
-      <div class="sign">${business && business.signature_version ? `<img alt="Signature" src="/api/v1/business/signature?v=${e(business.signature_version)}">` : ''}<p>For ${e(seller.name)}</p><p class="muted">${W.authorised}</p></div>
+      <div class="sign">${business && business.signature_version ? `<img alt="Signature" data-testid="doc-signature-img" data-picture="signature" style="max-height:${Math.round(56 * signPct / 100)}px" src="/api/v1/business/signature?v=${e(business.signature_version)}">` : ''}<p>For ${e(seller.name)}</p><p class="muted">${W.authorised}</p></div>
     </footer>
   </article>`;
 }
@@ -353,13 +356,19 @@ export function setupScreen({ me, ui }) {
   </section>`;
 }
 
+/** A size bar for a picture (US-55): 50% to 200%, steps of 5, with its value beside it. */
+function sizeBar(name, label, value, testid) {
+  return `<label class="field size-bar" data-testid="${testid}"><span>${label} <output data-size-for="${name}">${value}%</output></span><input type="range" name="${name}" min="${SIZE_MIN}" max="${SIZE_MAX}" step="${SIZE_STEP}" value="${value}" data-look-live aria-label="${label}"><small class="muted">${W.sizeHint}</small></label>`;
+}
+
 /** The logo, beside the signature in Bill look (CR-0019): add, replace, remove, and where it goes. */
 function logoBlock(b, lk) {
   const has = Boolean(b.logo_version);
   const at = LOGO_POSITIONS.some(([v]) => v === lk.logo_position) ? lk.logo_position : 'left';
-  return `<div class="logo-field" data-testid="logo-field"><span class="logo-label">${W.logo}</span>${has ? `<img class="logo-preview" data-testid="logo-preview" alt="${W.logo}" src="/api/v1/business/logo?v=${e(b.logo_version)}">` : `<span class="muted small" data-testid="logo-hint">${W.noLogo}</span>`}
+  return `<div class="logo-field" data-testid="logo-field"><span class="logo-label">${W.logo}</span>${has ? `<img class="logo-preview" data-testid="logo-preview" data-picture="logo" alt="${W.logo}" src="/api/v1/business/logo?v=${e(b.logo_version)}">` : `<span class="muted small" data-testid="logo-hint">${W.noLogo}</span>`}
     <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${has ? W.replaceLogo : W.addLogo}<input class="sr-only" type="file" name="logo" accept="image/png,image/jpeg,image/webp" data-action="pick-logo"></label>${has ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-logo">${W.removeLogo}</button>` : ''}</div>
     <small class="muted" data-testid="logo-picture-hint">${W.pictureHint}</small>
+    ${has ? sizeBar('logo_size', W.logoSize, pictureSize(lk, 'logo_size'), 'logo-size') : ''}
   </div>
   ${has ? `<fieldset class="setting" data-testid="logo-position"><legend>${W.logoWhere}</legend>${LOGO_POSITIONS.map(([v, label]) => `<label class="radio"><input type="radio" name="logo_position" value="${v}" data-look-live ${at === v ? 'checked' : ''}> ${label}</label>`).join('')}<small class="muted">${W.logoReceiptNote}</small></fieldset>` : ''}`;
 }
@@ -372,7 +381,7 @@ export function lookPanel({ me, ui }) {
   const dis = locked ? 'disabled' : '';
   return `<section class="panel" aria-labelledby="look-title" data-testid="look-panel">
     <div class="panel-head"><h2 class="panel-title" id="look-title">${W.lookTitle}</h2></div>
-    ${f.notice ? `<p class="notice ${f.notice.error ? 'notice-error' : ''}" role="status" data-testid="look-notice">${e(f.notice.text)}</p>` : ''}
+    ${f.notice ? `<p class="notice ${f.notice.error ? 'notice-error' : f.notice.warn ? 'notice-warn' : ''}" role="${f.notice.error ? 'alert' : 'status'}" data-testid="look-notice">${e(f.notice.text)}</p>` : ''}
     ${f.original ? `<p class="muted small" data-testid="keep-original"><button type="button" class="btn btn-ghost btn-small" data-action="bill-keep-original">${W.keepOriginal}</button></p>` : ''}
     <form data-form="bill-look" class="stack look-form" novalidate>
       <fieldset class="setting"><legend>${W.layout}</legend>${LAYOUTS.map(([v, label]) => `<label class="radio"><input type="radio" name="layout" value="${v}" data-look-live ${lk.layout === v ? 'checked' : ''} ${dis}> ${label}</label>`).join('')}</fieldset>
@@ -387,8 +396,8 @@ export function lookPanel({ me, ui }) {
       <label class="field"><span>${W.dueDays}</span><input name="due_days" type="number" min="0" max="365" value="${e(lk.due_days)}" ${dis}><small class="muted">${W.dueDaysHint}</small></label>
       <label class="field"><span>${W.validDays}</span><input name="estimate_valid_days" type="number" min="1" max="365" value="${e(lk.estimate_valid_days)}" ${dis}></label>
       ${locked ? '' : logoBlock(b, lk)}
-      ${locked ? '' : `<div class="logo-field"><span class="logo-label">${W.signature}</span>${b.signature_version ? `<img class="logo-preview" alt="${W.signature}" src="/api/v1/business/signature?v=${e(b.signature_version)}">` : ''}
-        <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${b.signature_version ? W.replaceSignature : W.addSignature}<input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp" data-action="pick-signature"></label>${b.signature_version ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-signature">${W.removeSignature}</button>` : ''}</div><small class="muted" data-testid="signature-picture-hint">${W.pictureHint}</small></div>
+      ${locked ? '' : `<div class="logo-field"><span class="logo-label">${W.signature}</span>${b.signature_version ? `<img class="logo-preview" data-testid="signature-preview" data-picture="signature" alt="${W.signature}" src="/api/v1/business/signature?v=${e(b.signature_version)}">` : ''}
+        <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${b.signature_version ? W.replaceSignature : W.addSignature}<input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp" data-action="pick-signature"></label>${b.signature_version ? `<button type="button" class="btn btn-ghost btn-small" data-action="bill-remove-signature">${W.removeSignature}</button>` : ''}</div><small class="muted" data-testid="signature-picture-hint">${W.pictureHint}</small>${b.signature_version ? sizeBar('signature_size', W.signatureSize, pictureSize(lk, 'signature_size'), 'signature-size') : ''}</div>
         <button type="submit" class="btn btn-primary">${icon('check', { size: 18 })} ${W.saveLook}</button>`}
     </form>
   </section>`;

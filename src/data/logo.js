@@ -1,4 +1,4 @@
-import { cleanPicture } from './cleanup.js';
+import { cleanPicture, cleanSignature } from './cleanup.js';
 
 // Turn a picture the owner chose into a sharp logo, signature or stamp (a data URL), in the browser (CR-0019, US-52).
 //
@@ -6,7 +6,8 @@ import { cleanPicture } from './cleanup.js';
 // side, with smoothing, so it stays sharp when printed. A picture with see-through parts stays a PNG, which keeps
 // them see-through: if that PNG is still too big it is made smaller, never turned into a JPEG (JPEG has no
 // transparency, so the background would turn into a solid box). A fake checkerboard or plain background is
-// removed and empty edges are trimmed first (cleanup.js). A solid picture is a PNG when that is small enough
+// removed and empty edges are trimmed first (cleanup.js); for a signature or stamp (`kind: 'signature'`) the paper of
+// a photo or scan is made see-through and only the ink stays (US-54). A solid picture is a PNG when that is small enough
 // (crisp edges for a stamp or line art) and a high-quality JPEG when it is not.
 export const MAX_INPUT_BYTES = 10 * 1024 * 1024;
 export const MAX_SIDE = 800;
@@ -18,6 +19,14 @@ export const TOO_BIG = 'That picture is bigger than 10 MB. Choose a smaller one.
 export const CANT_USE = "That picture couldn't be used. Choose a PNG, JPEG or WebP.";
 export const TOO_DETAILED = 'That picture is too detailed to keep sharp. Choose a simpler one.';
 
+/**
+ * A failure or a surprise, said once in the browser console with its reason, for support (US-56). Never the picture
+ * itself and never anything personal: its kind, its size and what happened.
+ */
+export function report(code, detail = {}) {
+  try { console.warn(`[karyahub] picture: ${code}`, detail); } catch { /* no console */ }
+}
+
 /** The picture's size when its longest side is at most `max`; a smaller picture is left as it is. */
 export function fitSize(width, height, max = MAX_SIDE) {
   const scale = Math.min(1, max / Math.max(width, height));
@@ -26,9 +35,17 @@ export function fitSize(width, height, max = MAX_SIDE) {
 
 const bytesOf = (url) => Math.floor((url.length - url.indexOf(',') - 1) * 0.75);
 
-/** True when any pixel is not fully solid, so the picture must stay a PNG. */
+/**
+ * True when any pixel is not fully solid, so the picture must stay a PNG. When the browser will not let the pixels
+ * be read (a canvas memory limit, a privacy setting) it answers true: a PNG is always safe, a JPEG could turn a
+ * see-through picture into a solid box.
+ */
 export function hasTransparency(ctx, width, height) {
-  const { data } = ctx.getImageData(0, 0, width, height);
+  let data;
+  try { ({ data } = ctx.getImageData(0, 0, width, height)); } catch (err) {
+    report('pixels-unreadable', { why: err && err.message });
+    return true;
+  }
   for (let i = 3; i < data.length; i += 4) if (data[i] < 255) return true;
   return false;
 }
@@ -40,10 +57,11 @@ const makeCanvas = (width, height) => {
   return canvas;
 };
 
-export async function preparePicture(file, { decode = (f) => createImageBitmap(f), canvasOf = makeCanvas, clean = true, onCleaned = () => {} } = {}) {
-  if (file.size > MAX_INPUT_BYTES) throw new Error(TOO_BIG);
+export async function preparePicture(file, { decode = (f) => createImageBitmap(f), canvasOf = makeCanvas, clean = true, kind = 'logo', onCleaned = () => {}, onWarn = () => {} } = {}) {
+  const about = { kind, type: file.type || '', bytes: file.size };
+  if (file.size > MAX_INPUT_BYTES) { report('too-big', about); throw new Error(TOO_BIG); }
   let bitmap;
-  try { bitmap = await decode(file); } catch { throw new Error(CANT_USE); }
+  try { bitmap = await decode(file); } catch (err) { report('unreadable', { ...about, why: err && err.name }); throw new Error(CANT_USE); }
   // Draw it once on a working canvas, where a fake checkerboard or plain background is removed and the empty edges
   // are trimmed (CR-0019, US-53); then scale what is left down to the final size.
   const work = fitSize(bitmap.width, bitmap.height, WORK_SIDE);
@@ -54,12 +72,25 @@ export async function preparePicture(file, { decode = (f) => createImageBitmap(f
   workCtx.drawImage(bitmap, 0, 0, work.width, work.height);
   let box = { x: 0, y: 0, width: work.width, height: work.height };
   if (clean) {
-    const image = workCtx.getImageData(0, 0, work.width, work.height);
-    const result = cleanPicture({ data: image.data, width: work.width, height: work.height });
-    if (result.removed || result.trimmed) {
-      if (result.removed) workCtx.putImageData(image, 0, 0);
-      box = result.box;
-      onCleaned({ removed: result.removed, trimmed: result.trimmed });
+    try {
+      const image = workCtx.getImageData(0, 0, work.width, work.height);
+      const result = kind === 'signature'
+        ? cleanSignature({ data: image.data, width: work.width, height: work.height })
+        : cleanPicture({ data: image.data, width: work.width, height: work.height });
+      if (result.removed || result.trimmed) {
+        if (result.removed) workCtx.putImageData(image, 0, 0);
+        box = result.box;
+        onCleaned({ removed: result.removed, trimmed: result.trimmed });
+      } else if (result.reason) {
+        report('background-kept', { ...about, why: result.reason }); // a dark or filled picture, or one with no ink
+        onWarn({ code: 'background-kept', reason: result.reason });
+      }
+    } catch (err) {
+      // Cleaning is a help, never a reason to lose the picture: it is saved as chosen and the owner is told.
+      report('clean-failed', { ...about, why: err && err.message });
+      onWarn({ code: 'clean-failed' });
+      box = { x: 0, y: 0, width: work.width, height: work.height };
+      workCtx.drawImage(bitmap, 0, 0, work.width, work.height);
     }
   }
   for (let side = MAX_SIDE; side >= SMALLEST_SIDE; side = Math.floor(side * 0.75)) {
@@ -81,6 +112,7 @@ export async function preparePicture(file, { decode = (f) => createImageBitmap(f
     }
     if (bytesOf(png) <= MAX_BYTES) return png;
   }
+  report('too-detailed', about);
   throw new Error(TOO_DETAILED);
 }
 

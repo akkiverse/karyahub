@@ -13,11 +13,11 @@ Changes can be made two ways. Both follow the same spec-driven rules, so the doc
 
 ## Making a change by hand
 
-1. Make sure the change has an issue (a story or a bug), then create a branch: `git checkout -b cr/NNNN-<short-name>`.
+1. Make sure the change has an issue (a story or a bug), then create a branch **from `dev`**: `git checkout dev && git pull --ff-only && git checkout -b cr/NNNN-<short-name>`. Changes reach production only through `dev` ([docs/process/ENVIRONMENTS.md](docs/process/ENVIRONMENTS.md)).
 2. Copy `docs/changes/CR-template.md` to `docs/changes/CR-<next number>-<short-name>.md` and fill in *Why* and *What*.
 3. Update the spec and tests, then the code.
-4. Open a pull request that names its issues. The template lists what to check. Vercel posts a preview link.
-5. Merge when CI is green and the preview looks right.
+4. Open a pull request **into `dev`** that names its issues. The template lists what to check. Vercel posts a preview link.
+5. Merge into `dev` when CI is green and the preview looks right. Testers check the dev address; when a set of changes is ready, one release pull request `dev` → `main` ships it.
 
 **Short on time?** You can also just commit code. Before the Idea Studio Engineer does any new work here, it reconciles: it reads every commit made without it since its last change and writes the missing change request, changelog entry and spec updates for you. Clear commit messages make that record better.
 

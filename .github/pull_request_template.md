@@ -1,3 +1,4 @@
+<!-- Base branch: `dev` for every change. Only the release pull request (dev -> main) and a hotfix go to `main`. -->
 ## Change request
 <!-- Link the CR in docs/changes/ and say in one line what changes for the user. -->
 

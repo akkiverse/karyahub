@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The logo moved from Business details to Bill look. `POST /api/v1/platform/businesses` accepts `state` (a name); a bare `state_code` still works when it is on the list.
 
 ### Fixed
+- **A logo or signature with a drawn-in checkerboard is cleaned fully, and its size bar grows only the picture.** A picture from an image generator kept faint specks (the darker blotches of its checkerboard), so the logo's empty margin was never trimmed and seemed to widen with the size bar, and a signature kept a faint checkerboard over its whole area. A drawn-in checkerboard is now removed with all its blotches (for the logo and the signature alike), and stray specks far from the picture no longer keep its empty margin, while fine details near it (a tagline, small dots, thin letters) stay. Pictures added before this need choosing again. See [CR-0020](docs/changes/CR-0020-picture-cleanup-fixes.md), US-57.
 - **A4 modern PDFs** no longer paint the item table and tax summary solid in the brand colour (it made the table hard to read).
 - **Add a business** on Businesses no longer opens "You don't have access to Home" for the platform admin; it takes you to the form. Links to a place on the same page, like Skip to content, also stay on the page. See [CR-0017](docs/changes/CR-0017-add-business-link.md).
 

@@ -12,6 +12,7 @@ const SPREAD = 16; // and colourless: its channels differ by at most this
 const DOMINANT = 0.12; // a shade must make up this much of the edge to count as the background
 const COVERED = 0.85; // and the background shades together this much of it
 const TOLERANCE = 12; // how far from the background shades a pixel may be and still count as background
+const CHECKER_TOLERANCE = 32; // a drawn-in checkerboard is blotchy: its darker squares dip further below its grey (US-57)
 const SOLID = 16; // a pixel with at least this much opacity is part of the picture
 const MIN_REMOVED = 0.02; // less than this is not a background worth removing
 const CHECKER_GAP = 20; // two edge shades this far apart are a checkerboard
@@ -52,7 +53,8 @@ export function borderShades(data, width, height) {
   const lightest = Math.max(...shades);
   const darkest = Math.min(...shades);
   // two clearly different shades on the edge (a white and a grey) mean a checkerboard, not a plain box
-  return { low: Math.max(0, darkest - TOLERANCE), high: Math.min(255, lightest + TOLERANCE), checker: lightest - darkest >= CHECKER_GAP };
+  const checker = lightest - darkest >= CHECKER_GAP;
+  return { low: Math.max(0, darkest - (checker ? CHECKER_TOLERANCE : TOLERANCE)), high: Math.min(255, lightest + TOLERANCE), checker };
 }
 
 /** A test for "this pixel is one of the background shades" (or already see-through). */
@@ -125,20 +127,75 @@ export function enclosedCheckerboard(data, width, height, mask, { low, high }) {
   }
 }
 
-/** The smallest box holding every solid pixel, with a small border; null when nothing is solid. */
+const MAIN_BLOB = 0.00005; // a shape this much of the picture (at least 24 px) is part of the picture itself, not a speck
+const NEAR = 0.04; // a small shape within this much of the picture's size from the main shapes is a detail (a dot, a thin letter)
+
+/**
+ * The smallest box holding the picture, with a small border; null when nothing is solid. Specks (a few stray pixels
+ * far from the picture, left by a blotchy background or JPEG noise) do not count, so they cannot keep the empty
+ * margin: small shapes count only when they are close to the main shapes, so dots, thin letters and a tagline stay (US-57).
+ */
 export function contentBox(data, width, height, mask = null) {
-  let x0 = width; let y0 = height; let x1 = -1; let y1 = -1;
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const p = y * width + x;
-      if ((mask && mask[p]) || data[p * 4 + 3] < SOLID) continue;
-      if (x < x0) x0 = x;
-      if (x > x1) x1 = x;
-      if (y < y0) y0 = y;
-      if (y > y1) y1 = y;
+  const size = width * height;
+  const label = new Int32Array(size); // 0 = not solid or not visited, else the shape's number
+  const stack = new Int32Array(size);
+  const shapes = [null]; // per shape: [area, x0, y0, x1, y1]
+  for (let start = 0; start < size; start += 1) {
+    if (label[start] || (mask && mask[start]) || data[start * 4 + 3] < SOLID) continue;
+    const id = shapes.length;
+    const shape = [0, width, height, -1, -1];
+    shapes.push(shape);
+    label[start] = id;
+    let top = 0;
+    stack[top] = start;
+    top += 1;
+    while (top > 0) {
+      top -= 1;
+      const p = stack[top];
+      const x = p % width;
+      const y = (p - x) / width;
+      shape[0] += 1;
+      if (x < shape[1]) shape[1] = x;
+      if (y < shape[2]) shape[2] = y;
+      if (x > shape[3]) shape[3] = x;
+      if (y > shape[4]) shape[4] = y;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= height) continue;
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const nx = x + dx;
+          if (nx < 0 || nx >= width) continue;
+          const q = ny * width + nx;
+          if (label[q] || (mask && mask[q]) || data[q * 4 + 3] < SOLID) continue;
+          label[q] = id;
+          stack[top] = q;
+          top += 1;
+        }
+      }
     }
   }
-  if (x1 < 0) return null;
+  if (shapes.length === 1) return null;
+  const mainArea = Math.max(24, MAIN_BLOB * size);
+  let [x0, y0, x1, y1] = [width, height, -1, -1];
+  for (let k = 1; k < shapes.length; k += 1) {
+    const [area, a, b, c, d] = shapes[k];
+    if (area < mainArea) continue;
+    x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, c); y1 = Math.max(y1, d);
+  }
+  if (x1 < 0) { // nothing big: a tiny picture, or all fine detail; keep every solid pixel
+    for (let k = 1; k < shapes.length; k += 1) {
+      const [, a, b, c, d] = shapes[k];
+      x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, c); y1 = Math.max(y1, d);
+    }
+  } else {
+    const near = Math.max(8, Math.round(NEAR * Math.max(x1 - x0 + 1, y1 - y0 + 1)));
+    const [m0, n0, m1, n1] = [x0 - near, y0 - near, x1 + near, y1 + near];
+    for (let k = 1; k < shapes.length; k += 1) {
+      const [area, a, b, c, d] = shapes[k];
+      if (area >= mainArea || a < m0 || b < n0 || c > m1 || d > n1) continue; // a speck outside the reach is left out
+      x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, c); y1 = Math.max(y1, d);
+    }
+  }
   const pad = Math.max(2, Math.round(0.03 * Math.max(x1 - x0 + 1, y1 - y0 + 1)));
   const left = Math.max(0, x0 - pad);
   const top = Math.max(0, y0 - pad);
@@ -313,12 +370,18 @@ export function inkToTransparent(image) {
 }
 
 /**
- * Clean a signature or stamp: ink on paper first (a photo or scan), and when that does not apply the flat
- * background rules of `cleanPicture`. Returns {removed, box, trimmed, reason}; `reason` says why a picture that
+ * Clean a signature or stamp: a drawn-in checkerboard by the flat rules of `cleanPicture`; otherwise ink on paper first
+ * (a photo or scan), and when that does not apply the flat background rules. Returns {removed, box, trimmed, reason}; `reason` says why a picture that
  * still has its background was left alone ('dark', 'filled', 'no-ink'), and is '' otherwise.
  */
 export function cleanSignature(image) {
   const { data, width, height } = image;
+  // A drawn-in checkerboard is not paper: its two greys would read as faint ink, so the flat rule takes it first (US-57).
+  const edge = borderShades(data, width, height);
+  if (edge && edge.checker) {
+    const flat = cleanPicture(image);
+    if (flat.removed) return { ...flat, reason: '' };
+  }
   const ink = inkToTransparent(image);
   if (ink.applied) {
     const box = contentBox(data, width, height);

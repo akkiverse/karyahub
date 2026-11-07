@@ -30,10 +30,15 @@ PACKS = {"field_service": "Field service", "trading": "Trading", "shop_counter":
 READY_PACKS = ("field_service",)  # the others say "Coming soon" (AC-26.1)
 REGISTRATION_WORDS = {"regular": "Regular", "composition": "Composition", "unregistered": "Not registered"}
 LAYOUTS = ("a4_classic", "a4_modern", "receipt_80")
+PICTURE_SIZES = (50, 200)  # the smallest and largest percent of the usual size (US-55)
+LOGO_POSITIONS = ("left", "center", "right")  # CR-0019: where the logo goes; the receipt always centres it
 # Six brand colours that keep white text and thin accents readable (WCAG AA against white).
 COLOURS = ("#0F766E", "#1D4ED8", "#4338CA", "#9F1239", "#15803D", "#334155")
 DEFAULT_LOOK: dict[str, Any] = {
     "layout": "a4_classic",
+    "logo_position": "left",  # before CR-0019 the logo was always top left
+    "logo_size": 100,  # CR-0019, US-55: the logo and the signature as a percent of their usual size
+    "signature_size": 100,
     "colour": "#0F766E",
     "phone": "",
     "bank": {"account_name": "", "account_number": "", "ifsc": ""},
@@ -49,8 +54,8 @@ IFSC_RE = re.compile(r"^[A-Z]{4}0[A-Z0-9]{6}$")
 ACCOUNT_RE = re.compile(r"^\d{9,18}$")
 UPI_RE = re.compile(r"^[A-Za-z0-9._-]{2,64}@[A-Za-z]{2,64}$")
 PHONE_RE = re.compile(r"^[0-9 +()-]{0,20}$")
-MAX_SIGNATURE = 300 * 1024
-BAD_SIGNATURE = "Use a PNG or JPEG picture of up to 300 KB for the signature."
+MAX_SIGNATURE = 1024 * 1024  # as stored (CR-0019, US-52); the browser scales a bigger picture down first
+BAD_SIGNATURE = "Use a PNG, JPEG or WebP picture of up to 1 MB for the signature."
 
 
 def look_of(b: Business) -> dict[str, Any]:
@@ -126,6 +131,22 @@ def _clean_look(raw: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
     look = {**current, **{k: v for k, v in raw.items() if k in DEFAULT_LOOK and v is not None}}
     if look["layout"] not in LAYOUTS:
         raise AppError("validation_error", "Pick a layout: A4 classic, A4 modern or small receipt.", 422)
+    if look["logo_position"] not in LOGO_POSITIONS:
+        raise AppError(
+            "validation_error", "Pick where the logo goes: top left, top centre or top right.", 422
+        )
+    for key, name in (("logo_size", "logo"), ("signature_size", "signature")):
+        size = look[key]
+        if (
+            isinstance(size, bool)
+            or not isinstance(size, int)
+            or not PICTURE_SIZES[0] <= size <= PICTURE_SIZES[1]
+        ):
+            raise AppError(
+                "validation_error",
+                f"Pick a size for the {name} from {PICTURE_SIZES[0]}% to {PICTURE_SIZES[1]}%.",
+                422,
+            )
     look["colour"] = str(look["colour"]).upper()
     if look["colour"] not in COLOURS:
         raise AppError("validation_error", "Pick one of the six colours.", 422)
@@ -178,6 +199,11 @@ async def put_look(db: AsyncSession, p: accounts.Principal, raw: dict[str, Any])
     changed = [k for k in DEFAULT_LOOK if before.get(k) != look.get(k)]
     if changed:
         detail = "Changed the bill look"
+        if "logo_position" in changed:
+            detail += f"; the logo now goes at the top {look['logo_position']}".replace("center", "centre")
+        for key, name in (("logo_size", "logo"), ("signature_size", "signature")):
+            if key in changed:
+                detail += f"; the {name} size is now {look[key]}%"
         if "prefix" in changed:
             detail += f"; numbers from the next bill look like {sample_number(look['prefix'])}"
         await accounts.audit(db, business.id, p.user.name, "bill_look", detail)
@@ -189,7 +215,7 @@ async def set_signature(db: AsyncSession, p: accounts.Principal, data_url: str) 
     business = accounts._require_business(p)
     accounts.assert_editable(business)
     logo.decode_image(
-        data_url, max_bytes=MAX_SIGNATURE, mimes=("image/png", "image/jpeg"), message=BAD_SIGNATURE
+        data_url, max_bytes=MAX_SIGNATURE, message=BAD_SIGNATURE, what="signature", business_id=business.id
     )
     business.signature_data = data_url.strip()
     business.signature_version = hashlib.sha256(data_url.encode()).hexdigest()[:12]
@@ -212,9 +238,23 @@ async def signature_bytes(db: AsyncSession, business_id: str) -> tuple[str, byte
     data_url = (await db.execute(select(Business.signature_data).where(Business.id == business_id))).scalar()
     if not data_url:
         return None
-    return logo.decode_image(data_url, max_bytes=MAX_SIGNATURE, mimes=("image/png", "image/jpeg"))
+    try:
+        return logo.decode_image(
+            data_url,
+            max_bytes=MAX_SIGNATURE,
+            message=BAD_SIGNATURE,
+            what="signature",
+            business_id=business_id,
+        )
+    except AppError:  # a damaged picture is left out (and logged by decode_image); it must never stop a bill
+        return None
 
 
 async def logo_bytes(db: AsyncSession, business_id: str) -> tuple[str, bytes] | None:
     data_url = (await db.execute(select(Business.logo_data).where(Business.id == business_id))).scalar()
-    return logo.decode_image(data_url) if data_url else None
+    if not data_url:
+        return None
+    try:
+        return logo.decode_image(data_url, what="logo", business_id=business_id)
+    except AppError:  # as above
+        return None

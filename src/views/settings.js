@@ -26,15 +26,6 @@ function serviceRows(mode, meta) {
   }).join('');
 }
 
-function logoBlock(me) {
-  const version = me && me.business && me.business.logo_version;
-  return `<div class="logo-field" data-testid="logo-field">
-    <span class="logo-label">Logo</span>
-    ${version ? `<img class="logo-preview" data-testid="logo-preview" alt="Your logo" src="/api/v1/business/logo?v=${escapeHtml(version)}">` : '<span class="muted small">No logo yet. It shows on your estimates and bills.</span>'}
-    <div class="logo-actions"><label class="btn btn-secondary btn-small">${icon('file', { size: 16 })} ${version ? 'Replace logo' : 'Add a logo'}<input class="sr-only" type="file" name="logo" accept="image/png,image/jpeg,image/webp" data-action="pick-logo"></label>${version ? `<button type="button" class="btn btn-ghost btn-small" data-action="remove-logo">Remove logo</button>` : ''}</div>
-  </div>`;
-}
-
 function profileForm(s, ui, locked, me) {
   const f = ui.profile || {};
   return `<section class="panel" aria-labelledby="profile-title">
@@ -47,7 +38,6 @@ function profileForm(s, ui, locked, me) {
       <label class="field"><span>GSTIN</span><input name="gstin" maxlength="15" value="${escapeHtml(f.gstin ?? s.gstin)}" ${locked ? 'disabled' : ''}></label>
       ${locked ? '<p class="muted small">The demo business\'s details can\'t be changed.</p>' : `<button type="submit" class="btn btn-primary">${icon('check', { size: 18 })} Save details</button>`}
     </form>
-    ${locked ? '' : logoBlock(me)}
   </section>`;
 }
 

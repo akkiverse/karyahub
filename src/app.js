@@ -567,18 +567,6 @@ export function mountApp(root, options = {}) {
       root.querySelector('#admin-add input[name="name"]')?.focus({ preventScroll: true });
       return;
     }
-    if (a === 'remove-logo') {
-      if (el.disabled) return;
-      el.disabled = true;
-      try {
-        const saved = await api.removeLogo();
-        session.set({ ...session.get(), business: saved });
-        ui.profile = { notice: { text: 'The logo is removed.' } };
-      } catch (err) { ui.profile = { notice: { text: msg(err), error: true } }; }
-      ui.focusNext = '[data-testid="profile-notice"]';
-      render();
-      return;
-    }
     if (a === 'sign-out') {
       try { await api.signOut(); } catch { /* the cookie ends on its own after 12 hours */ }
       await endSession('You have signed out.');
@@ -1036,7 +1024,7 @@ export function mountApp(root, options = {}) {
         render();
       }
     } else if (kind === 'add-business') {
-      const data = { name: v('name'), address: v('address'), gstin: v('gstin').toUpperCase(), state_code: v('state_code') || '27', owner_name: v('owner_name'), owner_phone: v('owner_phone'), ...(v('owner_pin') ? { owner_pin: v('owner_pin') } : {}) };
+      const data = { name: v('name'), address: v('address'), gstin: v('gstin').toUpperCase(), state: v('state') || 'Maharashtra', owner_name: v('owner_name'), owner_phone: v('owner_phone'), ...(v('owner_pin') ? { owner_pin: v('owner_pin') } : {}) };
       try {
         const res = await api.createBusiness(data);
         await loadBusinesses({ form: {}, formError: '', issued: { name: res.owner.name, phone: res.owner.phone, pin: res.pin }, notice: { text: `${res.business.name} was created.` } });
@@ -1108,7 +1096,8 @@ export function mountApp(root, options = {}) {
     const el = e.target;
     rememberItemForm(el);
     const a = el.dataset.action;
-    if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0]); return; }
+    if (a === 'pick-signature') { await bills.pickSignature(el.files && el.files[0], logoImage); return; }
+    if (a === 'pick-logo') { await bills.pickLogo(el.files && el.files[0], logoImage); return; }
     if (bills.onChange(e)) return;
     if (el.matches('[data-hist-who]')) { ui.history = { ...ui.history, who: el.value }; loadHistory({ full: false }); return; }
     if (el.matches('[data-inv-filter]')) { ui.inv.f = { ...(ui.inv.f || {}), [el.dataset.invFilter]: el.value }; paintInv(); return; }
@@ -1127,17 +1116,7 @@ export function mountApp(root, options = {}) {
     else if (a === 'set-mode') { actions.setSetting('mode', el.value); loadForRoute(); }
     else if (a === 'set-theme') { setThemePref(el.value, win); paintTheme(); }
     else if (a === 'toggle-failure') actions.setSetting('simulate_failure', el.checked);
-    else if (a === 'pick-logo') {
-      const file = el.files && el.files[0];
-      if (!file) return;
-      try {
-        const saved = await api.saveLogo(await logoImage(file));
-        session.set({ ...session.get(), business: saved });
-        ui.profile = { notice: { text: 'Saved. The logo now shows on your quotes and invoices.' } };
-      } catch (err) { ui.profile = { notice: { text: err && err.message ? msg(err) : "That picture couldn't be used. Choose a PNG, JPEG or WebP.", error: true } }; }
-      ui.focusNext = '[data-testid="profile-notice"]';
-      render();
-    } else if (a === 'pick-csv') {
+    else if (a === 'pick-csv') {
       const file = el.files && el.files[0];
       if (!file) return;
       const text = await file.text();
@@ -1210,6 +1189,17 @@ export function mountApp(root, options = {}) {
   root.addEventListener('change', onChange);
   root.addEventListener('input', onInput);
   // More options stays open across redraws while a bill is being made.
+  // A saved logo or signature that the browser cannot show: say so beside it, and in the console (CR-0019, US-56).
+  // (An image's error event does not bubble, so this listens while it travels down.)
+  root.addEventListener('error', (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== 'IMG' || !img.dataset || !img.dataset.picture || img.dataset.warned) return;
+    img.dataset.warned = '1';
+    const what = img.dataset.picture === 'logo' ? 'logo' : 'signature';
+    try { console.warn('[karyahub] picture: not-shown', { kind: what }); } catch { /* no console */ }
+    img.hidden = true;
+    img.insertAdjacentHTML('afterend', `<span class="notice notice-error" role="alert" data-testid="picture-missing">${W.pictureMissing.replace('{what}', what === 'logo' ? W.logo.toLowerCase() : W.signature.toLowerCase())}</span>`);
+  }, true);
   root.addEventListener('toggle', (e) => { if (e.target.matches?.('.more-options') && ui.billEd) ui.billEd.more = e.target.open; }, true);
   root.ownerDocument.addEventListener('keydown', onKey);
   applyTheme(win);

@@ -71,7 +71,7 @@ def test_ac_29_3_an_estimate_is_billed_only_once(biller):
 
 # ---------- US-30 ----------
 def test_ac_30_1_bill_look_is_checked_and_needs_manage_settings(biller):
-    """AC-30.1: layout, one of 6 colours, bank, UPI ID, terms and a signature of up to 300 KB."""
+    """AC-30.1: layout, one of 6 colours, bank, UPI ID, terms and a signature of up to 1 MB (CR-0019, US-52)."""
     owner = biller()["owner"]
     good = {
         "layout": "a4_modern",
@@ -93,9 +93,9 @@ def test_ac_30_1_bill_look_is_checked_and_needs_manage_settings(biller):
         assert owner.put("/api/v1/business/bill-look", json=bad).status_code == 422, bad
     png = "data:image/png;base64," + base64.b64encode(PNG).decode()
     assert owner.put("/api/v1/business/signature", json={"data_url": png}).status_code == 200
-    big = "data:image/png;base64," + base64.b64encode(PNG + b"0" * 310_000).decode()
+    big = "data:image/png;base64," + base64.b64encode(PNG + b"0" * 1_100_000).decode()
     r = owner.put("/api/v1/business/signature", json={"data_url": big})
-    assert r.status_code == 422 and "300 KB" in r.json()["error"]["message"]
+    assert r.status_code == 422 and "1 MB" in r.json()["error"]["message"]  # was 300 KB before CR-0019
     assert owner.get("/api/v1/auth/me").json()["business"]["signature_version"]
 
 

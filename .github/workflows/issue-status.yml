@@ -1,14 +1,14 @@
 name: Issue status
 
 # Keeps issue labels and milestones in step with pull requests and releases (docs/process/TRACKING.md).
-#   pull request opened or ready  -> issues it names get "status: in review"
+#   pull request opened, edited or ready -> issues it names get "status: in review"
 #   pull request back to draft    -> "status: in progress"
 #   pull request merged           -> "status: merged" for issues it closes, "status: in progress" for issues it only refs
 #   release published            -> the milestone named like the tag is closed
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+    types: [opened, reopened, edited, ready_for_review, converted_to_draft, closed]  # edited: an issue added to the description later
   release:
     types: [published]
 

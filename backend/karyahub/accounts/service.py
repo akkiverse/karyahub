@@ -32,6 +32,7 @@ from karyahub.db.models import (
     User,
     UserPermission,
 )
+from karyahub.domain.tax import STATES
 from karyahub.errors import AppError
 from karyahub.settings import Settings
 
@@ -830,6 +831,27 @@ def business_dict(b: Business) -> dict:
         "active": b.active,
         "logo_version": b.logo_version or "",
     }
+
+
+STATE_BY_NAME = {name.lower(): code for code, name in STATES.items()}
+PICK_A_STATE = "Pick a state from the list."
+
+
+def resolve_state(name: str | None, code: str | None) -> str:
+    """The GST state code for a state the admin picked by name (preferred) or sent as a code.
+
+    Neither given means Maharashtra, as before. A name or code that is not on the list is refused.
+    """
+    if name and name.strip():
+        found = STATE_BY_NAME.get(" ".join(name.split()).lower())
+        if found is None:
+            raise AppError("validation_error", PICK_A_STATE, 422)
+        return found
+    if code and code.strip():
+        if code.strip() not in STATES:
+            raise AppError("validation_error", PICK_A_STATE, 422)
+        return code.strip()
+    return "27"
 
 
 def _check_profile(name: str, address: str, gstin: str, state_code: str) -> None:

@@ -356,6 +356,19 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
         render();
         return true;
       }
+      case 'bill-keep-original': {
+        const o = ui.lookForm && ui.lookForm.original;
+        if (!o) return true;
+        await (o.what === 'logo' ? pickLogo : pickSignature)(o.file, o.toDataUrl, { clean: false });
+        return true;
+      }
+      case 'bill-remove-logo': {
+        const draft = lookDraft();
+        try { session.set({ ...session.get(), business: await api.removeLogo() }); ui.lookForm = { draft, notice: { text: W.logoRemoved } }; } catch (err) { ui.lookForm = { draft, notice: { text: msg(err), error: true } }; }
+        ui.focusNext = '[data-testid="look-notice"]';
+        render();
+        return true;
+      }
       case 'bill-remove-signature':
         try { session.set({ ...session.get(), business: await api.removeSignature() }); ui.lookForm = { notice: { text: W.lookSaved } }; } catch (err) { ui.lookForm = { notice: { text: msg(err), error: true } }; }
         render();
@@ -488,7 +501,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     const f = new FormData(form);
     const n = (k) => (f.get(k) === '' || f.get(k) === null ? undefined : Number(f.get(k)));
     return {
-      layout: f.get('layout'), colour: f.get('colour'), phone: f.get('phone') || '', upi_id: f.get('upi_id') || '', terms: f.get('terms') || '',
+      layout: f.get('layout'), ...(f.get('logo_position') ? { logo_position: f.get('logo_position') } : {}), ...(f.get('logo_size') ? { logo_size: Number(f.get('logo_size')) } : {}), ...(f.get('signature_size') ? { signature_size: Number(f.get('signature_size')) } : {}), colour: f.get('colour'), phone: f.get('phone') || '', upi_id: f.get('upi_id') || '', terms: f.get('terms') || '',
       prefix: f.get('prefix') || '', due_days: n('due_days'), estimate_valid_days: n('estimate_valid_days'),
       bank: { account_name: f.get('account_name') || '', account_number: f.get('account_number') || '', ifsc: f.get('ifsc') || '' },
     };
@@ -499,6 +512,7 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     if (!form || !slot) return;
     const lk = { ...lookOf(business()), ...lookFields(form) };
     lk.prefix = String(lk.prefix || '').toUpperCase();
+    form.querySelectorAll('[data-size-for]').forEach((out) => { out.textContent = `${lk[out.dataset.sizeFor]}%`; });
     const sample = {
       id: 'sample', doc_version: 2, type: 'invoice', status: 'saved', number: `${lk.prefix}${lk.prefix && !'/-'.includes(lk.prefix.at(-1)) ? '/' : ''}26-27/0001`, date: '2026-11-02', due_date: '2026-11-02',
       customer: { name: 'Mehta Clinic', address: 'Kothrud, Pune', state_code: (business() && business().state_code) || '27' },
@@ -506,12 +520,44 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     };
     slot.innerHTML = billPaper(sample, { business: business(), settings: store.get().settings, sample: true, look: lk });
   }
-  async function pickSignature(file) {
+  /** What is typed in the Bill look form but not saved yet, so adding a logo doesn't wipe it. */
+  function lookDraft() {
+    const form = root.querySelector('[data-form="bill-look"]');
+    return form ? lookFields(form) : undefined;
+  }
+  /**
+   * Add a logo or a signature (US-52, US-53, US-54, US-56). `clean` is false when the owner chose "Keep my original":
+   * the picture is only scaled, not cleaned. Every way it can go wrong ends in a plain notice, and in the console.
+   */
+  async function pickPicture(what, file, toDataUrl, { clean = true } = {}) {
     if (!file) return;
-    if (file.size > 300 * 1024 || !/^image\/(png|jpeg)$/.test(file.type)) { ui.lookForm = { notice: { text: 'Use a PNG or JPEG picture of up to 300 KB for the signature.', error: true } }; render(); return; }
-    const dataUrl = await new Promise((resolve, reject) => { const r = new win.FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); });
-    try { session.set({ ...session.get(), business: await api.saveSignature(dataUrl) }); ui.lookForm = { notice: { text: W.lookSaved } }; } catch (err) { ui.lookForm = { notice: { text: msg(err), error: true } }; }
+    const draft = lookDraft();
+    const words = what === 'logo'
+      ? { saved: W.logoSaved, cleaned: W.logoCleaned, save: (url) => api.saveLogo(url) }
+      : { saved: W.signatureSaved, cleaned: W.signatureInk, save: (url) => api.saveSignature(url) };
+    let cleaned = false;
+    let warning = '';
+    try {
+      const url = await toDataUrl(file, {
+        clean,
+        kind: what === 'logo' ? 'logo' : 'signature',
+        onCleaned: () => { cleaned = true; },
+        onWarn: ({ code, reason }) => { warning = code === 'clean-failed' ? W.cleanFailed : (W.backgroundKept[reason] || ''); },
+      });
+      let business;
+      try { business = await words.save(url); } catch (err) { reportPicture('save-failed', what, err); throw err; }
+      session.set({ ...session.get(), business });
+      const text = cleaned ? words.cleaned : words.saved;
+      ui.lookForm = { draft, notice: { text: warning ? `${text} ${warning}` : text, ...(warning && !cleaned ? { warn: true } : {}) }, ...(cleaned ? { original: { what, file, toDataUrl } } : {}) };
+    } catch (err) { ui.lookForm = { draft, notice: { text: err && err.message ? msg(err) : W.logoBad, error: true } }; }
+    ui.focusNext = '[data-testid="look-notice"]';
     render();
+  }
+  const pickLogo = (file, toDataUrl, options) => pickPicture('logo', file, toDataUrl, options);
+  /** The signature or stamp: any picture up to 10 MB, scaled sharp in the browser like the logo (CR-0019, US-52). */
+  const pickSignature = (file, toDataUrl, options) => pickPicture('signature', file, toDataUrl, options);
+  function reportPicture(code, what, err) {
+    try { console.warn(`[karyahub] picture: ${code}`, { kind: what, why: err && (err.code || err.status || err.name), message: err && err.message }); } catch { /* no console */ }
   }
 
   // ---------- routes ----------
@@ -531,5 +577,5 @@ export function createBills({ store, api, session, sync, ui, render, navigate, r
     return null;
   }
 
-  return { onClick, onInput, onChange, onSubmit, load, fromJob, pickSignature, stop: () => timers.forEach(clearTimeout) };
+  return { onClick, onInput, onChange, onSubmit, load, fromJob, pickSignature, pickLogo, stop: () => timers.forEach(clearTimeout) };
 }

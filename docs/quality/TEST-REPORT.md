@@ -1,6 +1,6 @@
 # KaryaHub: Test report
 
-**Run:** 2026-11-06 · **Branch:** `cr/0019-setup-logo-and-state` (CR-0019, v0.11.1 in review) · **Result:** 712 of 712 tests passing (335 server + 1 Postgres-only test skipped without its database, 377 web), covering all 239 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
+**Run:** 2026-11-06 · **Branch:** `cr/0020-picture-cleanup-fixes` (CR-0020 on top of CR-0019, v0.11.1 in review) · **Result:** 719 of 719 tests passing (335 server + 1 Postgres-only test skipped without its database, 384 web), covering all 239 current acceptance criteria (13 retired by CR-0005, AC-4.4 retired by CR-0012) · **Lint:** Ruff check and format clean · **Build:** `npm run build` passed (Vite 8)
 
 Every web test starts signed in as the demo owner (`tests/helpers.js`) unless it tests sign-in, another role or a real business (`tests/us23-business-data.test.js` opens the app as a real business's owner against `tests/fake-sync.js`). Since CR-0005 each server test gets its own throwaway in-memory database and no test can reach a real one (an autouse fixture clears `DATABASE_URL`, `KARYAHUB_DATABASE_URL`, `POSTGRES_URL`, the PIN secret and the setup token). No test calls a real AI server: pytest sets `studio_ai.TRANSPORT` to an `httpx.MockTransport`, and Vitest uses fakes.
 
@@ -12,6 +12,8 @@ Three suites:
 Some criteria have a test on each side (for example AC-7.2 and AC-23.1: the web app calls the API, and the server does the work). The screen criteria AC-22.3 to AC-22.7 are tested through the screens that show AC-19, AC-20 and AC-21.
 
 Criteria AC-13.1 to AC-13.6 and AC-15.1 to AC-15.7 were retired in CR-0005 (see the spec); their old on-device tests were replaced by the tests for AC-18 to AC-22.
+
+**CR-0020 (7 Nov)** added 7 web tests (`us57-checkerboard.test.js`); web total 384 of 384, server unchanged. Four of the seven fail on the CR-0019 code (the other three guard what must not change). The fix was also run on the real picture that was reported (a 1024 x 1024 logo with a drawn-in checkerboard and washed-out blotches) with the app's own cleaning code: before, the crop stayed the whole picture and the signature kept a faint checkerboard over all of it (6.3% half-see-through pixels); after, both are cropped to 834 x 278 px with 93.5% of the picture clear and no partial pixels left from the background, and the tagline and small dots kept. Not yet checked: the picture on the dev address after this is merged.
 
 **CR-0019 (6 Nov)** added 31 server tests (`test_us55_picture_size.py` 15, `test_us56_picture_logging.py` 16) and 42 web tests (`us54-signature-ink.test.js` 16, `us55-picture-size.test.js` 9, `us56-picture-warnings.test.js` 17), and changed one older test on purpose (`us53-clean-pictures.test.js`, AC-53.5: the signature's notice now reads "made the paper see-through"). The ink rule was run in real Chrome on a phone-like photo of a signature (warm paper, uneven light, noise, saved as a 60% JPEG): 94% of the picture came out see-through, 3.7% solid ink, the pen edge soft, on white, teal and dark; the Bill look screen (size bars, amber warning, the preview paper at 170% and 150%) was rendered with the app's own code and stylesheet. Not yet checked: a real signature photo taken on a phone, and the PDF of a business on the dev address.
 
@@ -514,6 +516,11 @@ CR-0009 also changed one older test: `test_ac_19_4_owner_switches_permissions_fo
 | AC-56.4 | `tests/api/test_us56_picture_logging.py::test_ac_56_4_*` (12 refusals, dimensions, nothing logged when good, damaged stored picture, prepare failure) | Pass |
 | AC-56.5 | `tests/api/test_us56_picture_logging.py::test_ac_56_5_*` and `::test_ac_56_4_a_picture_the_pdf_cannot_print_*` (page and PDF still made) | Pass |
 | AC-56.6 | `tests/us56-picture-warnings.test.js` › AC-56.6 (no picture content or file name in the console) | Pass |
+| AC-57.1 | `tests/us57-checkerboard.test.js` › AC-57.1 (a made-up generator picture: no checkerboard or speck left) | Pass |
+| AC-57.2 | `tests/us57-checkerboard.test.js` › AC-57.2 (a signature on a drawn-in checkerboard, colours kept) | Pass |
+| AC-57.3 | `tests/us57-checkerboard.test.js` › AC-57.3 (two tests: cropped to the logo; specks alone cannot keep the margin) | Pass |
+| AC-57.4 | `tests/us57-checkerboard.test.js` › AC-57.4 (two tests: dots and a thin letter near the logo, and the tagline, stay) | Pass |
+| AC-57.5 | `tests/us57-checkerboard.test.js` › AC-57.5 (only the picture's own style changes between 50% and 200%, for both pictures) | Pass |
 
 ## Design checklist
 | Check | Result |

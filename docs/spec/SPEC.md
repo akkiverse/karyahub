@@ -482,6 +482,14 @@ As a business owner, I want a clear message when a logo or signature cannot be u
 - **AC-56.5** Given a picture that failed, then the bill page and the PDF are still made without it (no error page). *(added CR-0019)*
 - **AC-56.6** Given a failure in the browser, then one console line (`[karyahub] picture: <reason>`) carries its kind, type, size and reason, and never the picture or the file name. *(added CR-0019)*
 
+### US-57: A logo or signature with a drawn-in checkerboard is cleaned fully, and its size grows without extra space
+As a business owner, I want the grey-and-white checkerboard that an image generator draws into a "transparent" picture, and every stray speck, gone from my logo and signature, and the size bar to make only the picture bigger, so that my bill looks clean at any size.
+- **AC-57.1** Given a logo with a drawn-in checkerboard (two greys, soft joins, darker and lighter blotches), when I add it, then no checkerboard and no speck is left. *(added CR-0020)*
+- **AC-57.2** Given a signature or stamp with a drawn-in checkerboard, when I add it, then it is cleaned the same way (the checkerboard is removed by the flat-background rule, not read as faint ink) and keeps its own colours. *(added CR-0020)*
+- **AC-57.3** Given specks left far from the picture, then they do not keep its empty margin: the saved picture is cropped to the logo or ink. *(added CR-0020)*
+- **AC-57.4** Given fine details near the picture (a tagline, small dots, thin letters), then they stay inside the crop. *(added CR-0020)*
+- **AC-57.5** Given the size bar moved between 50% and 200%, then only the picture's own box changes: nothing else on the preview, the page or the PDFs gets more space. *(added CR-0020)*
+
 > **Planned, not built (CR-0018, Phase Alpha, v0.12.0).** US-44 to US-49 are approved. Their criteria become named tests when the build lands; until then no test exists for them. Background: [PHASE-ALPHA.md](../product/PHASE-ALPHA.md).
 
 ### US-44: See how KaryaHub is doing
